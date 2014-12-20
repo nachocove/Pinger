@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"os"
-	"runtime/pprof"
 	"time"
+	"log"
+	"flag"
 )
 
 var rng *rand.Rand
@@ -23,36 +23,42 @@ const (
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	fmt.Printf("Got connection from %s\n", conn.RemoteAddr().String())
+	if debug {
+		log.Printf("Got connection from %s\n", conn.RemoteAddr().String())
+	}
 	sleep_time := time.Duration(rand.Intn(maxWaitTime-minWaitTime) + minWaitTime)
 
-	fmt.Printf("Sleeping %d seconds\n", sleep_time)
+	if debug {
+		fmt.Printf("Sleeping %d seconds\n", sleep_time)
+	}
 	time.Sleep(sleep_time * time.Second)
-	fmt.Println("Exiting")
+	if debug {
+		fmt.Println("Exiting")
+	}
 }
 
+var debug bool
+
 func main() {
+	flag.BoolVar(&debug, "d", false, "Debugging")
+	
+	flag.Parse()
+	
 	port := 8082
 	bindAddress := ""
 	dialString := fmt.Sprintf("%s:%d", bindAddress, port)
-	fmt.Printf("Listening on %s\n", dialString)
+	log.Printf("Listening on %s\n", dialString)
 	ln, err := net.Listen("tcp", dialString)
 	if err != nil {
-		fmt.Println("Could not open connection", err.Error())
+		log.Println("Could not open connection", err.Error())
 		os.Exit(1)
 	}
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			fmt.Println("Could not accept connection", err.Error())
+			log.Println("Could not accept connection", err.Error())
 			continue
 		}
 		go handleConnection(conn)
 	}
-	f, err := os.Create("memprofile.pprof")
-	if err != nil {
-		log.Fatal(err)
-	}
-	pprof.WriteHeapProfile(f)
-	f.Close()
 }
