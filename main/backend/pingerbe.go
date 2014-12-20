@@ -1,13 +1,13 @@
 package main
 
 import (
+	"flag"
 	"io"
+	"log"
 	"net"
 	"os"
-	"flag"
-	"log"
-	"runtime/pprof"
 	"runtime"
+	"runtime/pprof"
 	"time"
 )
 
@@ -47,6 +47,7 @@ func makeConnection(mychan chan int) {
 var debug bool
 
 var memstats = runtime.MemStats{}
+
 func printMemStats() {
 	runtime.ReadMemStats(&memstats)
 	log.Printf("Total: %dM InUse: %dM", memstats.TotalAlloc/1024, memstats.Alloc/1024)
@@ -57,12 +58,12 @@ var printMemStatsTimer *time.Timer
 
 func main() {
 	var maxConnection int
-	
+
 	flag.IntVar(&maxConnection, "n", 1000, "Number of connections to make")
-	flag.BoolVar(&debug, "d", false, "debug mode")	
+	flag.BoolVar(&debug, "d", false, "debug mode")
 
 	flag.Parse()
-	
+
 	log.Printf("Running with %d connections.", maxConnection)
 	printMemStats()
 	mychan := make(chan int, maxConnection)

@@ -1,13 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"os"
 	"time"
-	"log"
-	"flag"
 )
 
 var rng *rand.Rand
@@ -41,9 +41,9 @@ var debug bool
 
 func main() {
 	flag.BoolVar(&debug, "d", false, "Debugging")
-	
+
 	flag.Parse()
-	
+
 	port := 8082
 	bindAddress := ""
 	dialString := fmt.Sprintf("%s:%d", bindAddress, port)
