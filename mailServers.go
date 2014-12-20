@@ -1,22 +1,21 @@
 package Pinger
 
-import (
-
-)
+import ()
 
 type MailServerType int
+
 const (
-	MAILSERVER_UNKNOWN MailServerType = iota
- 	MAILSERVER_EXCHANGE MailServerType = iota
- 	MAILSERVER_HOTMAIL MailServerType = iota 
+	MAILSERVER_UNKNOWN  MailServerType = iota
+	MAILSERVER_EXCHANGE MailServerType = iota
+	MAILSERVER_HOTMAIL  MailServerType = iota
 )
 
-var mailServers = [...]string {
- "UNKNOWN",
- "EXCHANGE",
- "HOTMAIL",
+var mailServers = [...]string{
+	"UNKNOWN",
+	"EXCHANGE",
+	"HOTMAIL",
 }
 
 func (mailServer MailServerType) String() string {
- return mailServers[mailServer]
+	return mailServers[mailServer]
 }

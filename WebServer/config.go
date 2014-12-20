@@ -1,24 +1,26 @@
 package WebServer
 
 import (
-	"os"
-	"fmt"
 	"encoding/json"
 	"flag"
+	"fmt"
+	"os"
 )
 
 const (
-	defaultPort = 8080
-	defaultHost = "0.0.0.0"
+	defaultPort        = 8080
+	defaultHost        = "0.0.0.0"
 	defaultTemplateDir = "templates"
 )
+
 // ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
 type ServerConfiguration struct {
-	port int
+	port        int
 	bindAddress string
 	templateDir string
-	debug bool
+	debug       bool
 }
+
 var configFile string
 
 var Server ServerConfiguration
@@ -34,15 +36,14 @@ func init() {
 	flag.BoolVar(&Server.debug, "d", false, "Debug")
 }
 
-
 // Configuration - The top level configuration structure.
 type Configuration struct {
-    Server    ServerConfiguration
+	Server ServerConfiguration
 }
 
 func GetConfigAndRun() {
 	flag.Parse()
-	configuration := Configuration{ Server }
+	configuration := Configuration{Server}
 	if configuration.Server.templateDir == "" {
 		fmt.Println("No template directory specified!")
 		os.Exit(1)
@@ -56,7 +57,7 @@ func GetConfigAndRun() {
 		decoder := json.NewDecoder(file)
 		err = decoder.Decode(&configuration)
 		if err != nil {
-		  fmt.Println("error:", err)
+			fmt.Println("error:", err)
 			os.Exit(1)
 		}
 	}

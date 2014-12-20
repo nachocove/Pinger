@@ -2,10 +2,10 @@ package WebServer
 
 import (
 	"fmt"
-	"net/http"
-	"github.com/gorilla/mux"
-	"github.com/gorilla/context"
 	"github.com/codegangsta/negroni"
+	"github.com/gorilla/context"
+	"github.com/gorilla/mux"
+	"net/http"
 )
 
 type contextKey int
@@ -15,23 +15,23 @@ const (
 	serverConfigkey contextKey = iota
 )
 
-func GetServerConfig(r *http.Request) (*ServerConfiguration) {
-    val, ok := context.GetOk(r, serverConfigkey)
-    if !ok {
-        panic("No template in context")
-    }
+func GetServerConfig(r *http.Request) *ServerConfiguration {
+	val, ok := context.GetOk(r, serverConfigkey)
+	if !ok {
+		panic("No template in context")
+	}
 
-    serverConfig, ok := val.(*ServerConfiguration)
-    if !ok {
-        panic("No string template in context")
-    }
+	serverConfig, ok := val.(*ServerConfiguration)
+	if !ok {
+		panic("No string template in context")
+	}
 
-    return serverConfig
+	return serverConfig
 }
 
 type ContextMiddleWare struct {
-	
 }
+
 func (c *ContextMiddleWare) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	if Server.templateDir == "" {
 		panic("No templateDir defined!")
@@ -55,6 +55,6 @@ var router = mux.NewRouter()
 
 func run(configuration Configuration) {
 	middlewares := negroni.New(negroni.NewRecovery(), negroni.NewLogger(), NewStatic("/public", "/static", ""), NewContextMiddleWare())
-  	middlewares.UseHandler(router)
-	middlewares.Run(fmt.Sprintf("%s:%d", configuration.Server.bindAddress, configuration.Server.port))	
+	middlewares.UseHandler(router)
+	middlewares.Run(fmt.Sprintf("%s:%d", configuration.Server.bindAddress, configuration.Server.port))
 }
