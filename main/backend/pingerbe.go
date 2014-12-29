@@ -2,47 +2,14 @@ package main
 
 import (
 	"flag"
-	"io"
+	"github.com/nachocove/Pinger/Pinger"
 	"log"
-	"net"
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"sync"
 	"time"
 )
-
-var connections []net.Conn
-
-func makeConnection(mychan chan int) {
-	dialString := "localhost:8082"
-	if debug {
-		log.Println("Opening connection to", dialString)
-	}
-	conn, err := net.Dial("tcp", dialString)
-	defer func(conn net.Conn) {
-		if debug {
-			log.Println("Cleaning up connection")
-		}
-		if conn != nil {
-			conn.Close()
-		}
-		mychan <- 1
-	}(conn)
-	if err != nil {
-		log.Println("Could not open connection", err.Error())
-		return
-	}
-
-	data := make([]byte, 512)
-	if debug {
-		log.Println("Reading 1 bytes")
-	}
-	_, err = conn.Read(data[0:1])
-	if err != nil && err != io.EOF {
-		log.Println("Error on connection read", err.Error())
-		return
-	}
-}
 
 var debug bool
 
@@ -64,21 +31,25 @@ func main() {
 
 	flag.Parse()
 
-	log.Printf("Running with %d connections.", maxConnection)
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	log.Printf("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
 	printMemStats()
-	mychan := make(chan int, maxConnection)
-	for i := 0; i < maxConnection; i++ {
-		go makeConnection(mychan)
-	}
+
+	dialString := "localhost:8082"
+	var wg sync.WaitGroup
+
 	for i := 0; i < maxConnection; i++ {
 		if debug {
-			log.Println("Reaping connection goroutine")
+			log.Println("Opening connection to", dialString)
 		}
-		<-mychan
+		_ = Pinger.NewExchangeClient(dialString, &wg, debug)
 	}
+	wg.Wait()
 	defer func() {
-		log.Printf("Writing memory profile")
-		f, err := os.Create("/tmp/memprofile.pprof")
+		profileFile := "/tmp/memprofile.pprof"
+		log.Printf("Writing memory profile: %s\n", profileFile)
+		f, err := os.Create(profileFile)
 		if err != nil {
 			log.Fatal(err)
 		}

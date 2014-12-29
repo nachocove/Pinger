@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/nachocove/Pinger/Pinger"
+	"io"
 	"log"
 	"math/rand"
 	"net"
@@ -17,23 +19,57 @@ func init() {
 }
 
 const (
-	minWaitTime = 5
+	minWaitTime = 10
 	maxWaitTime = 30
 )
 
+func randomInt(x, y int) int {
+	return rand.Intn(y-x) + x
+}
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
+	connections := Pinger.MakeChan(conn)
+	remote := conn.RemoteAddr().String()
 	if debug {
-		log.Printf("Got connection from %s\n", conn.RemoteAddr().String())
+		fmt.Printf("%s: Got connection\n", remote)
 	}
-	sleep_time := time.Duration(rand.Intn(maxWaitTime-minWaitTime) + minWaitTime)
 
-	if debug {
-		fmt.Printf("Sleeping %d seconds\n", sleep_time)
+	sleepTime := randomInt(minWaitTime, maxWaitTime)
+	timer := time.NewTimer(time.Duration(sleepTime) * time.Second)
+	defer timer.Stop()
+
+	// continuously read from the connection
+	for {
+		var exit_loop = false
+		fmt.Printf("%s: Waiting %d seconds for something to happen\n", remote, sleepTime)
+		select {
+		// This case means we recieved data on the connection
+		case data := <-connections.Ch:
+			// just write the data back. We are the ultimate echo.
+			conn.Write(data)
+
+		// This case means we got an error and the goroutine has finished
+		case err := <-connections.ECh:
+			// handle our error then exit for loop
+			if err == io.EOF {
+				fmt.Printf("%s: Connection closed\n", remote)
+			} else {
+				fmt.Printf("%s: Error %s\n", remote, err.Error())
+			}
+			exit_loop = true
+
+		case <-timer.C:
+			if debug {
+				fmt.Printf("%s: Timer expired.\n", remote)
+			}
+			exit_loop = true
+		}
+		if exit_loop {
+			break
+		}
 	}
-	time.Sleep(sleep_time * time.Second)
 	if debug {
-		fmt.Println("Exiting")
+		fmt.Printf("%s: Exiting\n", remote)
 	}
 }
 

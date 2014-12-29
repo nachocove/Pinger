@@ -19,6 +19,12 @@ cd $GOPATH/src/github.com/nachocove/
 git clone git@github.com:nachocove/Pinger.git
 ```
 
+Links about performance and scaling:
+
+"Alternative to a go routine per connection?" https://groups.google.com/forum/#!topic/golang-nuts/TSf14CJyA2s
+
+Recommends just sticking with one goroutine per connection. Seems it can handle 100K (but didn't say how much memory that uses).
+
 Dependencies:
 
 ```
