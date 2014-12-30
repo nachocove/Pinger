@@ -88,10 +88,14 @@ func main() {
 	var help bool
 	var minWaitTime int
 	var maxWaitTime int
+	var logFileName string
+	var bindAddress string
 	
 	flag.IntVar(&port, "p", 8082, "Listen port")
 	flag.IntVar(&minWaitTime, "min", 30, "min wait time")
 	flag.IntVar(&maxWaitTime, "max", 600, "max wait time")
+	flag.StringVar(&logFileName, "l", "/srv/nachocove/testServer/testServer.log", "log file")
+	flag.StringVar(&bindAddress, "b", "", "bind address")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
 	flag.BoolVar(&help, "h", false, "Verbose")
@@ -101,11 +105,21 @@ func main() {
 		usage()
 		os.Exit(0)
 	}
-	bindAddress := ""
+	
+	logFile, err := os.OpenFile(logFileName, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if err != nil {
+	    log.Fatalf("error opening file %s: %v", logFileName, err)
+	}
+	defer logFile.Close()
+	if verbose || debug {
+		log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+	} else {
+		log.SetOutput(logFile)
+	}
+	
 	dialString := fmt.Sprintf("%s:%d", bindAddress, port)
 	if verbose {
 		log.Printf("Listening on %s\n", dialString)
-		log.Printf("Max/Min: %d %d\n", minWaitTime, maxWaitTime) 
 	}
 	ln, err := net.Listen("tcp", dialString)
 	if err != nil {
