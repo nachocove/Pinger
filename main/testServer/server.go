@@ -28,7 +28,7 @@ func randomInt(x, y int) int {
 }
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	connections := Pinger.MakeChan(conn)
+	ch, eCh := Pinger.MakeChan(conn)
 	remote := conn.RemoteAddr().String()
 	if debug {
 		fmt.Printf("%s: Got connection\n", remote)
@@ -44,12 +44,13 @@ func handleConnection(conn net.Conn) {
 		fmt.Printf("%s: Waiting %d seconds for something to happen\n", remote, sleepTime)
 		select {
 		// This case means we recieved data on the connection
-		case data := <-connections.Ch:
+		case data := <-ch:
 			// just write the data back. We are the ultimate echo.
+			fmt.Printf("Received data and sending it back: %s\n", string(data))
 			conn.Write(data)
 
 		// This case means we got an error and the goroutine has finished
-		case err := <-connections.ECh:
+		case err := <-eCh:
 			// handle our error then exit for loop
 			if err == io.EOF {
 				fmt.Printf("%s: Connection closed\n", remote)
