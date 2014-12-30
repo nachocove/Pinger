@@ -5,10 +5,12 @@ A place where devices register their email credentials, which
 then pings the mail server at various intervals, and sends devices
 push notifications.
 
-Download:
+Download/install:
 
 ```
-go get github.com/nachocove/Pinger
+go get github.com/nachocove/Pinger/main/backend
+go get github.com/nachocove/Pinger/main/webserver
+go get github.com/nachocove/Pinger/main/testServer
 ```
 
 or to get the git repo:
@@ -25,7 +27,7 @@ Links about performance and scaling:
 
 Recommends just sticking with one goroutine per connection. Seems it can handle 100K (but didn't say how much memory that uses).
 
-Dependencies:
+Web server Dependencies:
 
 ```
 go get github.com/codegangsta/negroni

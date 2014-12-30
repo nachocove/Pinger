@@ -8,6 +8,7 @@ import (
 	"sync"
 )
 
+// MakeChan given a net.Conn connection, create a goroutine to listen on the connection, and create read and error channels for select.
 func MakeChan(conn net.Conn) (chan []byte, chan error) {
 	ch := make(chan []byte)
 	eCh := make(chan error)
@@ -31,12 +32,15 @@ func MakeChan(conn net.Conn) (chan []byte, chan error) {
 	return ch, eCh
 }
 
+// HandlerFunc Function used to handle incoming data on a channel.
 type HandlerFunc func([]byte)
 
+// HandleIncoming set the incoming data handler
 func (client *Client) HandleIncoming(handler HandlerFunc) {
 	client.incomingHandler = handler
 }
 
+// Client The client structure for tracking a particular endpoint
 type Client struct {
 	connection      net.Conn
 	incoming        chan []byte
@@ -47,10 +51,12 @@ type Client struct {
 	incomingHandler HandlerFunc
 }
 
+// String Convert the client structure into a printable string
 func (client *Client) String() string {
 	return fmt.Sprintf("Client %s (debug %t)", client.connection.RemoteAddr().String(), client.debug)
 }
 
+// Done The client is exiting. Cleanup and alert anyone waiting.
 func (client *Client) Done() {
 	if client.debug {
 		log.Println("Finished with Client")
@@ -60,6 +66,7 @@ func (client *Client) Done() {
 	}
 }
 
+// Wait The wait loop. Send outgoing data down the connection, and gets incoming data off the connection and puts it on the channel.
 func (client *Client) Wait() {
 	if client.waitGroup != nil {
 		defer client.waitGroup.Done()
@@ -67,7 +74,7 @@ func (client *Client) Wait() {
 	defer client.connection.Close()
 
 	for {
-		var exit_loop = false
+		var exitLoop = false
 		select {
 		case data := <-client.incoming:
 			// just write the data back. We are the ultimate echo.
@@ -80,7 +87,7 @@ func (client *Client) Wait() {
 			_, err := client.connection.Write(data)
 			if err != nil {
 				fmt.Println("ERROR", err.Error())
-				exit_loop = true
+				exitLoop = true
 			}
 
 		case err := <-client.err:
@@ -92,9 +99,9 @@ func (client *Client) Wait() {
 			} else {
 				fmt.Printf("Error %s\n", err.Error())
 			}
-			exit_loop = true
+			exitLoop = true
 		}
-		if exit_loop {
+		if exitLoop {
 			break
 		}
 	}
@@ -104,6 +111,7 @@ func printIncoming(data []byte) {
 	fmt.Println(data)
 }
 
+// Listen Set up the go routine for monitoring the connection. Also mark the client as running in case anyone is waiting.
 func (client *Client) Listen(wait *sync.WaitGroup) {
 	if client.debug {
 		log.Println("Starting client")
@@ -117,6 +125,7 @@ func (client *Client) Listen(wait *sync.WaitGroup) {
 	}
 }
 
+// NewClient Set up a new client
 func NewClient(dialString string, debug bool) *Client {
 	connection, err := net.Dial("tcp", dialString)
 	if err != nil {
