@@ -11,7 +11,7 @@ Download/install:
 go get github.com/nachocove/Pinger/...
 ```
 
-.. note: Yes, that's 3 dots. 3 dots ('...') is idiomatic go for 'everything under here'.
+.. note:: Yes, that's 3 dots. 3 dots ('...') is idiomatic go for 'everything under here'.
 
 or to get the git repo:
 
