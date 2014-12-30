@@ -6,5 +6,5 @@ RUN mkdir -p /srv/nachocove/testServer
 RUN useradd nachocove
 RUN chown -R nachocove /srv/nachocove
 USER nachocove
-ENTRYPOINT ["/go/bin/testServer -v"]
+ENTRYPOINT /go/bin/testServer -v
 EXPOSE 8082
