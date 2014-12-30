@@ -8,10 +8,10 @@ push notifications.
 Download/install:
 
 ```
-go get github.com/nachocove/Pinger/main/backend
-go get github.com/nachocove/Pinger/main/webserver
-go get github.com/nachocove/Pinger/main/testServer
+go get github.com/nachocove/Pinger/...
 ```
+
+.. note: Yes, that's 3 dots. 3 dots ('...') is idiomatic go for 'everything under here'.
 
 or to get the git repo:
 
