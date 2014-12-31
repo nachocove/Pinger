@@ -180,7 +180,9 @@ func main() {
 	if debug {
 		log.Printf("Min %d, Max %d\n", minWaitTime, maxWaitTime)
 	}
-	memstats.SetBaseMemStats()
+	if memstats != nil {
+		memstats.SetBaseMemStats()
+	}
 	for {
 		conn, err := ln.Accept()
 		if err != nil {

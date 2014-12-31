@@ -60,12 +60,12 @@ func main() {
 	var memstats *Pinger.MemStats
 	if printMemPeriodic > 0 || printMem {
 		memstats = Pinger.NewMemStats(memStatsExtraInfo, debug, false)
-	}
-	if printMemPeriodic > 0 {
-		memstats.PrintMemStatsPeriodic(printMemPeriodic)
-	}
-	if printMem && printMemPeriodic <= 0 {
-		memstats.PrintMemStats()
+		if printMemPeriodic > 0 {
+			memstats.PrintMemStatsPeriodic(printMemPeriodic)
+		}
+		if printMem && printMemPeriodic <= 0 {
+			memstats.PrintMemStats()
+		}
 	}
 
 	connectionString = flag.Arg(0)
@@ -87,7 +87,9 @@ func main() {
 	wg.Wait()
 	defer func() {
 		log.Printf("All Connections closed: ")
-		memstats.PrintMemStats()
+		if memstats != nil {
+			memstats.PrintMemStats()
+		}
 		profileFile := "/tmp/memprofile.pprof"
 		log.Printf("Writing memory profile: %s\n", profileFile)
 		f, err := os.Create(profileFile)
