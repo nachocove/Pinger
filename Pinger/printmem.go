@@ -37,28 +37,28 @@ func (stats *MemStats) SetBaseMemStats() {
 	runtime.ReadMemStats(&stats.Basememstats)
 }
 
+var meg = float64(1024.0 * 1024.0)
+
 // PrintIncrementalMemStats print memory statistics once.
 func (stats *MemStats) PrintIncrementalMemStats() {
 	runtime.ReadMemStats(&stats.Memstats)
 	extra := stats.extraInfo(stats)
-	incrTotalAlloc := stats.Memstats.TotalAlloc - stats.Basememstats.TotalAlloc
-	incrAlloc := int(stats.Memstats.Alloc) - int(stats.Basememstats.Alloc)
-	if stats.debug {
-		log.Printf("incrTotalAlloc %d, incrAlloc %d (%d-%d)\n", incrTotalAlloc, incrAlloc, stats.Memstats.Alloc, stats.Basememstats.Alloc)
-	}
-	log.Printf("Memory: %dM InUse: %dM IncrMemory: %dM IncrInUse: %dM %s\n",
-		stats.Memstats.TotalAlloc/1024,
-		stats.Memstats.Alloc/1024,
-		incrTotalAlloc/1024,
-		incrAlloc/1024,
+	incrTotalAlloc := int64(stats.Memstats.TotalAlloc) - int64(stats.Basememstats.TotalAlloc)
+	incrAlloc := int64(stats.Memstats.Alloc) - int64(stats.Basememstats.Alloc)
+	log.Printf("Memory: %.2fM InUse: %.2fM IncrMemory: %.2fM IncrInUse: %.2fM %s\n",
+		float64(stats.Memstats.TotalAlloc)/meg,
+		float64(stats.Memstats.Alloc)/meg,
+		float64(incrTotalAlloc)/meg,
+		float64(incrAlloc)/meg,
 		extra)
 }
+
 
 // PrintMemStats print memory statistics once.
 func (stats *MemStats) PrintMemStats() {
 	runtime.ReadMemStats(&stats.Memstats)
 	extra := stats.extraInfo(stats)
-	log.Printf("Memory: %dM InUse: %dM %s\n", stats.Memstats.TotalAlloc/1024, stats.Memstats.Alloc/1024, extra)
+	log.Printf("Memory: %.2fM InUse: %.2fM %s\n", float64(stats.Memstats.TotalAlloc)/meg, float64(stats.Memstats.Alloc)/meg, extra)
 }
 
 // PrintMemStatsPeriodic print memory statistics periodically, starting now.

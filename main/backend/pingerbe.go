@@ -20,9 +20,10 @@ var usage = func() {
 }
 
 func memStatsExtraInfo(stats *Pinger.MemStats) string {
+	k := float64(1024.0)
 	if Pinger.ActiveClientCount > 0 {
-		var allocM = int((stats.Memstats.Alloc - stats.Basememstats.Alloc) / 1024)
-		return fmt.Sprintf("number of connections: %d (mem/conn %dM)", Pinger.ActiveClientCount, allocM/Pinger.ActiveClientCount)
+		allocM := (float64(stats.Memstats.Alloc) - float64(stats.Basememstats.Alloc)) / k
+		return fmt.Sprintf("number of connections: %d (est. mem/conn %fk)", Pinger.ActiveClientCount, allocM/float64(Pinger.ActiveClientCount))
 	} else {
 		return fmt.Sprintf("number of connections: %d", Pinger.ActiveClientCount)
 	}
