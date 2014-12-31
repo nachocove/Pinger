@@ -17,8 +17,8 @@ type MemStats struct {
 // NewMemStats create a new MemStats structure
 func NewMemStats(extraInfo func() string) *MemStats {
 	stats := MemStats{
-		sleepTime: 0,
-		extraInfo: extraInfo,
+		sleepTime:          0,
+		extraInfo:          extraInfo,
 		printMemStatsTimer: nil,
 	}
 	return &stats
