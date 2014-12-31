@@ -68,7 +68,6 @@ func (stats *MemStats) PrintMemStatsPeriodic(sleepTime int) {
 }
 
 func (stats *MemStats) printMemStatsAndRestartTimer() {
-	runtime.GC()
 	if stats.printIncremental {
 		stats.PrintIncrementalMemStats()
 	} else {
