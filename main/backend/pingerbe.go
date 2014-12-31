@@ -27,7 +27,7 @@ func printMemStatsPeriodic(n int) {
 
 var printMemStatsTimer *time.Timer
 var usage = func() {
-	fmt.Fprintf(os.Stderr, "USAGE: %s ....\n", path.Base(os.Args[0]))
+	fmt.Fprintf(os.Stderr, "USAGE: %s <flags> <connection string>\n", path.Base(os.Args[0]))
 	flag.PrintDefaults()
 }
 
@@ -35,16 +35,17 @@ func main() {
 	var printMemPeriodic int
 	var maxConnection int
 	var printMem bool
-	var helpB bool
-
+	var help bool
+	var connectionString string
+	
 	flag.IntVar(&maxConnection, "n", 1000, "Number of connections to make")
-	flag.BoolVar(&debug, "d", false, "debug mode")
-	flag.BoolVar(&helpB, "h", false, "help")
+	flag.BoolVar(&debug, "d", false, "Debugging")
+	flag.BoolVar(&help, "h", false, "Verbose")
 	flag.BoolVar(&printMem, "m", false, "print memory mode")
 	flag.IntVar(&printMemPeriodic, "p", 0, "print memory periodically mode in seconds")
 
 	flag.Parse()
-	if helpB {
+	if help {
 		usage()
 		os.Exit(0)
 	}
@@ -60,14 +61,19 @@ func main() {
 		printMemStats()
 	}
 
-	dialString := "localhost:8082"
+	fmt.Println(flag.Arg(0))
+	if len(flag.Args()) != 1 {
+		usage()
+		os.Exit(1)
+	}
+	connectionString = flag.Arg(0)
 	var wg sync.WaitGroup
 
 	for i := 0; i < maxConnection; i++ {
 		if debug {
-			log.Println("Opening connection to", dialString)
+			log.Println("Opening connection to", connectionString)
 		}
-		client := Pinger.NewExchangeClient(dialString, debug)
+		client := Pinger.NewExchangeClient(connectionString, debug)
 		fmt.Println(client)
 		client.Listen(&wg)
 	}
