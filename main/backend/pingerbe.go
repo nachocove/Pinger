@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
 	"log"
 	"os"
@@ -9,7 +10,6 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sync"
-	"fmt"
 )
 
 var debug bool
@@ -29,7 +29,7 @@ func main() {
 	var printMem bool
 	var help bool
 	var connectionString string
-	
+
 	flag.IntVar(&maxConnection, "n", 1000, "Number of connections to make")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&help, "h", false, "Verbose")
@@ -58,7 +58,7 @@ func main() {
 	if printMemPeriodic > 0 {
 		memstats.PrintMemStatsPeriodic()
 	}
-	if printMem && printMemPeriodic <= 0{
+	if printMem && printMemPeriodic <= 0 {
 		memstats.PrintMemStats()
 	}
 
