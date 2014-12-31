@@ -81,7 +81,7 @@ func main() {
 		if client != nil {
 			err := client.Listen(&wg)
 			if err != nil {
-				log.Println("Could not open connection", i)
+				log.Println("Could not open connection", i, err.Error())
 			}
 		}
 	}
