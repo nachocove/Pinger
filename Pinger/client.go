@@ -25,7 +25,7 @@ type Client struct {
 	waitGroup       *sync.WaitGroup
 	debug           bool
 	incomingHandler HandlerFunc
-	dialString		string
+	dialString      string
 }
 
 var ActiveClientCount int
@@ -115,7 +115,7 @@ func printIncoming(data []byte) {
 
 // Listen Set up the go routine for monitoring the connection. Also mark the client as running in case anyone is waiting.
 // This function creates a go routine (Wait()), which itself adds 1 goroutines for listening.
-func (client *Client) Listen(wait *sync.WaitGroup) (error) {
+func (client *Client) Listen(wait *sync.WaitGroup) error {
 	if client.debug {
 		log.Println("Starting client")
 	}
@@ -124,7 +124,7 @@ func (client *Client) Listen(wait *sync.WaitGroup) (error) {
 	if err != nil {
 		return err
 	}
-	client.connection = connection	
+	client.connection = connection
 	go client.Wait()
 	if client.waitGroup != nil {
 		client.waitGroup.Add(1)

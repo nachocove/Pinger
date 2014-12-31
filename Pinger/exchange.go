@@ -1,18 +1,18 @@
 package Pinger
 
 import (
+	"fmt"
+	"log"
+	"math/rand"
 	"sync"
 	"time"
-	"math/rand"
-	"log"
-	"fmt"
 )
 
 // ExchangeClient A client with type exchange.
 type ExchangeClient struct {
-	client *Client
+	client          *Client
 	pingPeriodicity int
-	debug bool
+	debug           bool
 }
 
 // String convert the ExchangeClient structure to something printable
@@ -39,20 +39,21 @@ func (ex *ExchangeClient) periodicCheck() {
 	data := fmt.Sprintf("Greetings from %s", ex.client.connection.LocalAddr().String())
 
 	for {
-		sleepTime := randomInt(10,30)
+		sleepTime := randomInt(10, 30)
 		if ex.debug {
 			log.Printf("Sleeping %d\n", sleepTime)
 		}
-		time.Sleep(time.Duration(sleepTime)*time.Second)
+		time.Sleep(time.Duration(sleepTime) * time.Second)
 		if ex.debug {
 			log.Println("ExchangeClient sending", data)
 		}
 		ex.client.outgoing <- []byte(data)
 	}
 }
+
 // Listen sets up the exchange client to listen. Most of the hard work is done via the Client.Listen()
 // launches 1 goroutine for periodic checking, if confgured.
-func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) (error) {
+func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) error {
 	// Listen launches 2 goroutines
 	err := ex.client.Listen(wait)
 	if ex.pingPeriodicity > 0 {

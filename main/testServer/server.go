@@ -2,15 +2,15 @@ package main
 
 import (
 	"flag"
-	"fmt"	
+	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
 	"io"
 	"log"
 	"math/rand"
 	"net"
 	"os"
-	"time"
 	"path"
+	"time"
 )
 
 var rng *rand.Rand
@@ -28,8 +28,8 @@ var ActiveConnections int = 0
 // handleConnection Creates channels for incoming data and error, starts a single goroutine, and echoes all data received back.
 func handleConnection(conn net.Conn, disconnectTime int) {
 	defer conn.Close()
- 	inCh := make(chan []byte)
-	eCh  := make(chan error)
+	inCh := make(chan []byte)
+	eCh := make(chan error)
 	// Start a goroutine to read from our net connection
 	go func(conn net.Conn, ch chan []byte, eCh chan error) {
 		data := make([]byte, 512)
@@ -51,7 +51,7 @@ func handleConnection(conn net.Conn, disconnectTime int) {
 		log.Printf("%s: Got connection\n", remote)
 	}
 	ActiveConnections++
-	
+
 	timer := time.NewTimer(time.Duration(disconnectTime) * time.Second)
 	defer timer.Stop()
 
@@ -95,7 +95,7 @@ func handleConnection(conn net.Conn, disconnectTime int) {
 	if debug || verbose {
 		log.Printf("%s: Closing connection\n", remote)
 	}
-	ActiveConnections--	
+	ActiveConnections--
 }
 
 var debug bool
@@ -133,30 +133,30 @@ func main() {
 		usage()
 		os.Exit(0)
 	}
-	
+
 	var logOutput io.Writer = nil
 
-//	if logFileName != "" {
-//		var logFile *os.File
-//		logFile, err := os.OpenFile(logFileName, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
-//		if err != nil {
-//	    	log.Fatalf("error opening file %s: %v", logFileName, err)
-//		}
-//		defer logFile.Close()
-//		logOutput = io.Writer(logFile)
-//	} else {
-//		logFile, err := os.OpenFile("/dev/null", os.O_RDWR, 0666)
-//		if err != nil {
-//	    	log.Fatalf("error opening /dev/null %s: %v", logFileName, err)
-//		}
-//		logOutput = io.Writer(logFile)
-//	}
-//	if verbose || debug {
-//		logOutput = io.MultiWriter(os.Stdout, logOutput)
-//	}
+	//	if logFileName != "" {
+	//		var logFile *os.File
+	//		logFile, err := os.OpenFile(logFileName, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	//		if err != nil {
+	//	    	log.Fatalf("error opening file %s: %v", logFileName, err)
+	//		}
+	//		defer logFile.Close()
+	//		logOutput = io.Writer(logFile)
+	//	} else {
+	//		logFile, err := os.OpenFile("/dev/null", os.O_RDWR, 0666)
+	//		if err != nil {
+	//	    	log.Fatalf("error opening /dev/null %s: %v", logFileName, err)
+	//		}
+	//		logOutput = io.Writer(logFile)
+	//	}
+	//	if verbose || debug {
+	//		logOutput = io.MultiWriter(os.Stdout, logOutput)
+	//	}
 	logOutput = io.Writer(os.Stdout)
 	log.SetOutput(logOutput)
-	
+
 	dialString := fmt.Sprintf("%s:%d", bindAddress, port)
 	if verbose {
 		log.Printf("Listening on %s\n", dialString)
@@ -173,7 +173,7 @@ func main() {
 	}
 
 	if debug {
-		log.Printf("Min %d, Max %d\n", minWaitTime, maxWaitTime)		
+		log.Printf("Min %d, Max %d\n", minWaitTime, maxWaitTime)
 	}
 	for {
 		conn, err := ln.Accept()
@@ -182,7 +182,7 @@ func main() {
 			continue
 		}
 		disconnectTime := randomInt(minWaitTime, maxWaitTime)
-		
+
 		// this adds 2 goroutines per connection. One the handleConnection itself, which then launches a read-goroutine
 		go handleConnection(conn, disconnectTime)
 	}

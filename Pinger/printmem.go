@@ -1,19 +1,19 @@
 package Pinger
 
 import (
-	"time"
-	"runtime"
 	"log"
+	"runtime"
+	"time"
 )
 
 type MemStats struct {
-	memstats runtime.MemStats
-	sleepTime int
-	extraInfo func() (string)
-	printMemStatsTimer *time.Timer	
+	memstats           runtime.MemStats
+	sleepTime          int
+	extraInfo          func() string
+	printMemStatsTimer *time.Timer
 }
 
-func NewMemStats(sleepTime int, extraInfo func() string) (*MemStats) {
+func NewMemStats(sleepTime int, extraInfo func() string) *MemStats {
 	stats := MemStats{sleepTime: sleepTime, extraInfo: extraInfo}
 	return &stats
 }
@@ -28,5 +28,5 @@ func (stats *MemStats) PrintMemStatsPeriodic() {
 
 func (stats *MemStats) printMemStatsAndRestartTimer() {
 	stats.PrintMemStats()
-	stats.printMemStatsTimer = time.AfterFunc(time.Duration(stats.sleepTime)*time.Second, stats.printMemStatsAndRestartTimer)	
+	stats.printMemStatsTimer = time.AfterFunc(time.Duration(stats.sleepTime)*time.Second, stats.printMemStatsAndRestartTimer)
 }
