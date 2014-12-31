@@ -3,7 +3,7 @@ package Pinger
 import (
 	"time"
 	"runtime"
-	"fmt"
+	"log"
 )
 
 type MemStats struct {
@@ -20,7 +20,7 @@ func NewMemStats(sleepTime int, extraInfo func() string) (*MemStats) {
 func (stats *MemStats) PrintMemStats() {
 	runtime.ReadMemStats(&stats.memstats)
 	extra := stats.extraInfo()
-	fmt.Printf("%s Memory: %dM InUse: %dM\n", extra, stats.memstats.TotalAlloc/1024, stats.memstats.Alloc/1024)
+	log.Printf("%s Memory: %dM InUse: %dM\n", extra, stats.memstats.TotalAlloc/1024, stats.memstats.Alloc/1024)
 }
 func (stats *MemStats) PrintMemStatsPeriodic() {
 	stats.printMemStatsAndRestartTimer()

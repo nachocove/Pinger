@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"fmt"	
 	"github.com/nachocove/Pinger/Pinger"
 	"io"
 	"log"
@@ -48,7 +48,7 @@ func handleConnection(conn net.Conn, disconnectTime int) {
 
 	remote := conn.RemoteAddr().String()
 	if debug || verbose {
-		fmt.Printf("%s: Got connection\n", remote)
+		log.Printf("%s: Got connection\n", remote)
 	}
 	ActiveConnections++
 	
@@ -59,14 +59,14 @@ func handleConnection(conn net.Conn, disconnectTime int) {
 	for {
 		var exit_loop = false
 		if debug {
-			fmt.Printf("%s: Waiting %d seconds for something to happen\n", remote, disconnectTime)
+			log.Printf("%s: Waiting %d seconds for something to happen\n", remote, disconnectTime)
 		}
 		select {
 		// This case means we recieved data on the connection
 		case data := <-inCh:
 			// just write the data back. We are the ultimate echo.
 			if debug {
-				fmt.Printf("Received data and sending it back: %s\n", string(data))
+				log.Printf("Received data and sending it back: %s\n", string(data))
 			}
 			conn.Write(data)
 
@@ -75,16 +75,16 @@ func handleConnection(conn net.Conn, disconnectTime int) {
 			// handle our error then exit for loop
 			if err == io.EOF {
 				if debug || verbose {
-					fmt.Printf("%s: Connection closed\n", remote)
+					log.Printf("%s: Connection closed\n", remote)
 				}
 			} else {
-				fmt.Printf("%s: Error %s\n", remote, err.Error())
+				log.Printf("%s: Error %s\n", remote, err.Error())
 			}
 			exit_loop = true
 
 		case <-timer.C:
 			if debug {
-				fmt.Printf("%s: Timer expired.\n", remote)
+				log.Printf("%s: Timer expired.\n", remote)
 			}
 			exit_loop = true
 		}
@@ -93,7 +93,7 @@ func handleConnection(conn net.Conn, disconnectTime int) {
 		}
 	}
 	if debug || verbose {
-		fmt.Printf("%s: Closing connection\n", remote)
+		log.Printf("%s: Closing connection\n", remote)
 	}
 	ActiveConnections--	
 }

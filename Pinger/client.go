@@ -88,7 +88,7 @@ func (client *Client) Wait() {
 			// write data to the connection
 			_, err := client.connection.Write(data)
 			if err != nil {
-				fmt.Printf("ERROR on write: %s\n", err.Error())
+				log.Printf("ERROR on write: %s\n", err.Error())
 				exitLoop = true
 			}
 
@@ -96,10 +96,10 @@ func (client *Client) Wait() {
 			// handle our error then exit for loop
 			if err == io.EOF {
 				if client.debug {
-					fmt.Printf("Connection closed\n")
+					log.Printf("Connection closed\n")
 				}
 			} else {
-				fmt.Printf("Error from channel: %s\n", err.Error())
+				log.Printf("Error from channel: %s\n", err.Error())
 			}
 			exitLoop = true
 		}
@@ -110,7 +110,7 @@ func (client *Client) Wait() {
 }
 
 func printIncoming(data []byte) {
-	fmt.Println(data)
+	log.Println(data)
 }
 
 // Listen Set up the go routine for monitoring the connection. Also mark the client as running in case anyone is waiting.

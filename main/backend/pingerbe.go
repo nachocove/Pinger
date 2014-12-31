@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
 	"log"
 	"os"
@@ -10,12 +9,13 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sync"
+	"fmt"
 )
 
 var debug bool
 
 var usage = func() {
-	fmt.Fprintf(os.Stderr, "USAGE: %s <flags> <connection string>\n", path.Base(os.Args[0]))
+	fmt.Printf("USAGE: %s <flags> <connection string>\n", path.Base(os.Args[0]))
 	flag.PrintDefaults()
 }
 
@@ -42,7 +42,7 @@ func main() {
 		usage()
 		os.Exit(0)
 	}
-	fmt.Println(flag.Arg(0))
+
 	if len(flag.Args()) != 1 {
 		usage()
 		os.Exit(1)
@@ -58,8 +58,7 @@ func main() {
 	if printMemPeriodic > 0 {
 		memstats.PrintMemStatsPeriodic()
 	}
-	if printMem {
-		fmt.Printf("With 0 connections: ")
+	if printMem && printMemPeriodic <= 0{
 		memstats.PrintMemStats()
 	}
 
@@ -81,7 +80,7 @@ func main() {
 	}
 	wg.Wait()
 	defer func() {
-		fmt.Printf("All Connections closed: ")
+		log.Printf("All Connections closed: ")
 		memstats.PrintMemStats()
 		profileFile := "/tmp/memprofile.pprof"
 		log.Printf("Writing memory profile: %s\n", profileFile)

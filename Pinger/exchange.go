@@ -1,11 +1,11 @@
 package Pinger
 
 import (
-	"fmt"
 	"sync"
 	"time"
 	"math/rand"
 	"log"
+	"fmt"
 )
 
 // ExchangeClient A client with type exchange.
@@ -41,11 +41,11 @@ func (ex *ExchangeClient) periodicCheck() {
 	for {
 		sleepTime := randomInt(10,30)
 		if ex.debug {
-			fmt.Printf("Sleeping %d\n", sleepTime)
+			log.Printf("Sleeping %d\n", sleepTime)
 		}
 		time.Sleep(time.Duration(sleepTime)*time.Second)
 		if ex.debug {
-			fmt.Println("ExchangeClient sending", data)
+			log.Println("ExchangeClient sending", data)
 		}
 		ex.client.outgoing <- []byte(data)
 	}
