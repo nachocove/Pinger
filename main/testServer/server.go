@@ -105,8 +105,13 @@ var usage = func() {
 	flag.PrintDefaults()
 }
 
-func memStatsExtraInfo() string {
-	return fmt.Sprintf("number of connections: %d", activeConnections)
+func memStatsExtraInfo(stats *Pinger.MemStats) string {
+	if activeConnections > 0 {
+		var allocM = int((int(stats.Memstats.Alloc) - int(stats.Basememstats.Alloc)) / 1024)
+		return fmt.Sprintf("number of connections: %d (est. mem/conn %dM)", activeConnections, allocM/activeConnections)
+	} else {
+		return fmt.Sprintf("number of connections: %d", activeConnections)
+	}
 }
 
 func main() {
@@ -168,13 +173,14 @@ func main() {
 	}
 	var memstats *Pinger.MemStats
 	if printMemPeriodic > 0 {
-		memstats = Pinger.NewMemStats(memStatsExtraInfo)
+		memstats = Pinger.NewMemStats(memStatsExtraInfo, debug, false)
 		memstats.PrintMemStatsPeriodic(printMemPeriodic)
 	}
 
 	if debug {
 		log.Printf("Min %d, Max %d\n", minWaitTime, maxWaitTime)
 	}
+	memstats.SetBaseMemStats()
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
