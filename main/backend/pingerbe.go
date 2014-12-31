@@ -10,29 +10,21 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sync"
-	"time"
 )
 
 var debug bool
 
-var memstats = runtime.MemStats{}
-
-func printMemStats() {
-	runtime.ReadMemStats(&memstats)
-	fmt.Printf("Memory: %dM InUse: %dM\n", memstats.TotalAlloc/1024, memstats.Alloc/1024)
-}
-func printMemStatsPeriodic(n int) {
-	printMemStatsTimer = time.AfterFunc(time.Duration(n)*time.Second, printMemStats)
-}
-
-var printMemStatsTimer *time.Timer
 var usage = func() {
 	fmt.Fprintf(os.Stderr, "USAGE: %s <flags> <connection string>\n", path.Base(os.Args[0]))
 	flag.PrintDefaults()
 }
 
+func memStatsExtraInfo() string {
+	return fmt.Sprintf("number of connections: %d", Pinger.ActiveClientCount)
+}
 func main() {
 	var printMemPeriodic int
+	var pingPeriodic int
 	var maxConnection int
 	var printMem bool
 	var help bool
@@ -42,30 +34,35 @@ func main() {
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&help, "h", false, "Verbose")
 	flag.BoolVar(&printMem, "m", false, "print memory mode")
-	flag.IntVar(&printMemPeriodic, "p", 0, "print memory periodically mode in seconds")
+	flag.IntVar(&printMemPeriodic, "mem", 0, "print memory periodically mode in seconds")
+	flag.IntVar(&pingPeriodic, "ping", 0, "ping server")
 
 	flag.Parse()
 	if help {
 		usage()
 		os.Exit(0)
 	}
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	log.Printf("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
-	if printMemPeriodic > 0 {
-		printMemStatsPeriodic(printMemPeriodic)
-	}
-	if printMem {
-		fmt.Printf("With 0 connections: ")
-		printMemStats()
-	}
-
 	fmt.Println(flag.Arg(0))
 	if len(flag.Args()) != 1 {
 		usage()
 		os.Exit(1)
 	}
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	log.Printf("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
+
+	var memstats *Pinger.MemStats
+	if printMemPeriodic > 0 || printMem {
+		memstats = Pinger.NewMemStats(printMemPeriodic, memStatsExtraInfo)
+	}
+	if printMemPeriodic > 0 {
+		memstats.PrintMemStatsPeriodic()
+	}
+	if printMem {
+		fmt.Printf("With 0 connections: ")
+		memstats.PrintMemStats()
+	}
+
 	connectionString = flag.Arg(0)
 	var wg sync.WaitGroup
 
@@ -73,14 +70,19 @@ func main() {
 		if debug {
 			log.Println("Opening connection to", connectionString)
 		}
-		client := Pinger.NewExchangeClient(connectionString, debug)
-		fmt.Println(client)
-		client.Listen(&wg)
+		client := Pinger.NewExchangeClient(connectionString, pingPeriodic, debug)
+		// this launches either 2 or 3 goroutines per connection. 3 if pingPeriodic > 0, 2 otherwise.
+		if client != nil {
+			err := client.Listen(&wg)
+			if err != nil {
+				log.Println("Could not open connection", i)
+			}
+		}
 	}
 	wg.Wait()
 	defer func() {
 		fmt.Printf("All Connections closed: ")
-		printMemStats()
+		memstats.PrintMemStats()
 		profileFile := "/tmp/memprofile.pprof"
 		log.Printf("Writing memory profile: %s\n", profileFile)
 		f, err := os.Create(profileFile)

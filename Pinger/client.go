@@ -8,30 +8,6 @@ import (
 	"sync"
 )
 
-// MakeChan given a net.Conn connection, create a goroutine to listen on the connection, and create read and error channels for select.
-func MakeChan(conn net.Conn) (chan []byte, chan error) {
-	ch := make(chan []byte)
-	eCh := make(chan error)
-
-	// Start a goroutine to read from our net connection
-	go func(ch chan []byte, eCh chan error) {
-		data := make([]byte, 512)
-		for {
-			// try to read the data
-			_, err := conn.Read(data)
-			if err != nil {
-				// send an error if it's encountered
-				eCh <- err
-				return
-			}
-			// send data if we read some.
-			ch <- data
-		}
-	}(ch, eCh)
-
-	return ch, eCh
-}
-
 // HandlerFunc Function used to handle incoming data on a channel.
 type HandlerFunc func([]byte)
 
@@ -49,6 +25,13 @@ type Client struct {
 	waitGroup       *sync.WaitGroup
 	debug           bool
 	incomingHandler HandlerFunc
+	dialString		string
+}
+
+var ActiveClientCount int
+
+func init() {
+	ActiveClientCount = 0
 }
 
 // String Convert the client structure into a printable string
@@ -64,14 +47,33 @@ func (client *Client) Done() {
 	if client.waitGroup != nil {
 		client.waitGroup.Done()
 	}
+	ActiveClientCount--
 }
 
 // Wait The wait loop. Send outgoing data down the connection, and gets incoming data off the connection and puts it on the channel.
+// Is itself launched as a goroutine, and adds a single goroutine for listening on the connection
 func (client *Client) Wait() {
-	if client.waitGroup != nil {
-		defer client.waitGroup.Done()
+	defer client.Done()
+	if client.connection == nil {
+		log.Fatalln("Wait called without an open connection")
 	}
 	defer client.connection.Close()
+
+	// Start a goroutine to read from our net connection
+	go func(conn net.Conn, ch chan []byte, eCh chan error) {
+		data := make([]byte, 512)
+		for {
+			// try to read the data
+			_, err := conn.Read(data)
+			if err != nil {
+				// send an error if it's encountered
+				eCh <- err
+				return
+			}
+			// send data if we read some.
+			ch <- data
+		}
+	}(client.connection, client.incoming, client.err)
 
 	for {
 		var exitLoop = false
@@ -86,7 +88,7 @@ func (client *Client) Wait() {
 			// write data to the connection
 			_, err := client.connection.Write(data)
 			if err != nil {
-				fmt.Println("ERROR", err.Error())
+				fmt.Printf("ERROR on write: %s\n", err.Error())
 				exitLoop = true
 			}
 
@@ -97,7 +99,7 @@ func (client *Client) Wait() {
 					fmt.Printf("Connection closed\n")
 				}
 			} else {
-				fmt.Printf("Error %s\n", err.Error())
+				fmt.Printf("Error from channel: %s\n", err.Error())
 			}
 			exitLoop = true
 		}
@@ -112,34 +114,33 @@ func printIncoming(data []byte) {
 }
 
 // Listen Set up the go routine for monitoring the connection. Also mark the client as running in case anyone is waiting.
-func (client *Client) Listen(wait *sync.WaitGroup) {
+// This function creates a go routine (Wait()), which itself adds 1 goroutines for listening.
+func (client *Client) Listen(wait *sync.WaitGroup) (error) {
 	if client.debug {
 		log.Println("Starting client")
 	}
-
 	client.waitGroup = wait
-
+	connection, err := net.Dial("tcp", client.dialString)
+	if err != nil {
+		return err
+	}
+	client.connection = connection	
 	go client.Wait()
 	if client.waitGroup != nil {
 		client.waitGroup.Add(1)
 	}
+	ActiveClientCount++
+	return nil
 }
 
 // NewClient Set up a new client
 func NewClient(dialString string, debug bool) *Client {
-	connection, err := net.Dial("tcp", dialString)
-	if err != nil {
-		log.Println("Could not open connection", err.Error())
-		return nil
-	}
-
-	ch, eCh := MakeChan(connection)
-
 	client := &Client{
-		connection:      connection,
-		incoming:        ch,
+		dialString:      dialString,
+		connection:      nil,
+		incoming:        make(chan []byte),
 		outgoing:        make(chan []byte),
-		err:             eCh,
+		err:             make(chan error),
 		waitGroup:       nil,
 		debug:           debug,
 		incomingHandler: printIncoming,

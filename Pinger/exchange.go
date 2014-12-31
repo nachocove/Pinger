@@ -5,11 +5,13 @@ import (
 	"sync"
 	"time"
 	"math/rand"
+	"log"
 )
 
 // ExchangeClient A client with type exchange.
 type ExchangeClient struct {
 	client *Client
+	pingPeriodicity int
 	debug bool
 }
 
@@ -19,7 +21,7 @@ func (ex *ExchangeClient) String() string {
 }
 
 // Exchangehandler the incoming data handler
-func Exchangehandler(data []byte) {
+func exchangehandler(data []byte) {
 	//fmt.Println("ExchangeClient received", string(data))
 }
 
@@ -49,16 +51,25 @@ func (ex *ExchangeClient) periodicCheck() {
 	}
 }
 // Listen sets up the exchange client to listen. Most of the hard work is done via the Client.Listen()
-func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) {
-	ex.client.Listen(wait)
-	go ex.periodicCheck()
+// launches 1 goroutine for periodic checking, if confgured.
+func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) (error) {
+	// Listen launches 2 goroutines
+	err := ex.client.Listen(wait)
+	if ex.pingPeriodicity > 0 {
+		go ex.periodicCheck()
+	}
+	return err // no error
 }
 
 // TODO This really ought to just be a method/interface thing
 
 // NewExchangeClient set up a new exchange client
-func NewExchangeClient(dialString string, debug bool) *ExchangeClient {
+func NewExchangeClient(dialString string, pingPeriodicity int, debug bool) *ExchangeClient {
 	client := NewClient(dialString, debug)
-	client.incomingHandler = Exchangehandler
-	return &ExchangeClient{client, debug}
+	if client == nil {
+		log.Println("Could not get Client")
+		return nil
+	}
+	client.incomingHandler = exchangehandler
+	return &ExchangeClient{client, pingPeriodicity, debug}
 }
