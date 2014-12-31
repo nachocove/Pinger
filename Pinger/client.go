@@ -28,6 +28,7 @@ type Client struct {
 	dialString      string
 }
 
+// ActiveClientCount count of actively open connections
 var ActiveClientCount int
 
 func init() {

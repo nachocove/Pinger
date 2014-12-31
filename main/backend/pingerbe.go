@@ -53,10 +53,10 @@ func main() {
 
 	var memstats *Pinger.MemStats
 	if printMemPeriodic > 0 || printMem {
-		memstats = Pinger.NewMemStats(printMemPeriodic, memStatsExtraInfo)
+		memstats = Pinger.NewMemStats(memStatsExtraInfo)
 	}
 	if printMemPeriodic > 0 {
-		memstats.PrintMemStatsPeriodic()
+		memstats.PrintMemStatsPeriodic(printMemPeriodic)
 	}
 	if printMem && printMemPeriodic <= 0 {
 		memstats.PrintMemStats()

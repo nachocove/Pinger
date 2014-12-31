@@ -23,7 +23,7 @@ func randomInt(x, y int) int {
 	return rand.Intn(y-x) + x
 }
 
-var ActiveConnections int = 0
+var activeConnections int
 
 // handleConnection Creates channels for incoming data and error, starts a single goroutine, and echoes all data received back.
 func handleConnection(conn net.Conn, disconnectTime int) {
@@ -50,14 +50,14 @@ func handleConnection(conn net.Conn, disconnectTime int) {
 	if debug || verbose {
 		log.Printf("%s: Got connection\n", remote)
 	}
-	ActiveConnections++
+	activeConnections++
 
 	timer := time.NewTimer(time.Duration(disconnectTime) * time.Second)
 	defer timer.Stop()
 
 	// continuously read from the connection
 	for {
-		var exit_loop = false
+		var exitLoop = false
 		if debug {
 			log.Printf("%s: Waiting %d seconds for something to happen\n", remote, disconnectTime)
 		}
@@ -80,22 +80,22 @@ func handleConnection(conn net.Conn, disconnectTime int) {
 			} else {
 				log.Printf("%s: Error %s\n", remote, err.Error())
 			}
-			exit_loop = true
+			exitLoop = true
 
 		case <-timer.C:
 			if debug {
 				log.Printf("%s: Timer expired.\n", remote)
 			}
-			exit_loop = true
+			exitLoop = true
 		}
-		if exit_loop {
+		if exitLoop {
 			break
 		}
 	}
 	if debug || verbose {
 		log.Printf("%s: Closing connection\n", remote)
 	}
-	ActiveConnections--
+	activeConnections--
 }
 
 var debug bool
@@ -106,7 +106,7 @@ var usage = func() {
 }
 
 func memStatsExtraInfo() string {
-	return fmt.Sprintf("number of connections: %d", ActiveConnections)
+	return fmt.Sprintf("number of connections: %d", activeConnections)
 }
 
 func main() {
@@ -134,7 +134,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	var logOutput io.Writer = nil
+	var logOutput io.Writer
 
 	//	if logFileName != "" {
 	//		var logFile *os.File
@@ -168,8 +168,8 @@ func main() {
 	}
 	var memstats *Pinger.MemStats
 	if printMemPeriodic > 0 {
-		memstats = Pinger.NewMemStats(printMemPeriodic, memStatsExtraInfo)
-		memstats.PrintMemStatsPeriodic()
+		memstats = Pinger.NewMemStats(memStatsExtraInfo)
+		memstats.PrintMemStatsPeriodic(printMemPeriodic)
 	}
 
 	if debug {

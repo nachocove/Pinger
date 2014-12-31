@@ -23,17 +23,17 @@ type ServerConfiguration struct {
 
 var configFile string
 
-var Server ServerConfiguration
+var server ServerConfiguration
 
 func init() {
-	Server.templateDir = defaultTemplateDir
-	flag.IntVar(&Server.port, "port", defaultPort, "The post to bind to")
-	flag.IntVar(&Server.port, "p", defaultPort, "The post to bind to")
-	flag.StringVar(&Server.bindAddress, "host", defaultHost, "The IP address to bind to")
+	server.templateDir = defaultTemplateDir
+	flag.IntVar(&server.port, "port", defaultPort, "The post to bind to")
+	flag.IntVar(&server.port, "p", defaultPort, "The post to bind to")
+	flag.StringVar(&server.bindAddress, "host", defaultHost, "The IP address to bind to")
 	flag.StringVar(&configFile, "config", "", "A config file to read.")
 	flag.StringVar(&configFile, "c", "", "A config file to read.")
-	flag.BoolVar(&Server.debug, "debug", false, "Debug")
-	flag.BoolVar(&Server.debug, "d", false, "Debug")
+	flag.BoolVar(&server.debug, "debug", false, "Debug")
+	flag.BoolVar(&server.debug, "d", false, "Debug")
 }
 
 // Configuration - The top level configuration structure.
@@ -41,9 +41,10 @@ type Configuration struct {
 	Server ServerConfiguration
 }
 
+// GetConfigAndRun process command line arguments and run the server
 func GetConfigAndRun() {
 	flag.Parse()
-	configuration := Configuration{Server}
+	configuration := Configuration{server}
 	if configuration.Server.templateDir == "" {
 		fmt.Println("No template directory specified!")
 		os.Exit(1)

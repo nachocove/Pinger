@@ -15,6 +15,7 @@ const (
 	serverConfigkey contextKey = iota
 )
 
+// GetServerConfig get the server config from the context
 func GetServerConfig(r *http.Request) *ServerConfiguration {
 	val, ok := context.GetOk(r, serverConfigkey)
 	if !ok {
@@ -29,20 +30,24 @@ func GetServerConfig(r *http.Request) *ServerConfiguration {
 	return serverConfig
 }
 
+// ContextMiddleWare placeholder to attach methods to
 type ContextMiddleWare struct {
 }
 
 func (c *ContextMiddleWare) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	if Server.templateDir == "" {
+	if server.templateDir == "" {
 		panic("No templateDir defined!")
 	}
-	context.Set(r, serverConfigkey, &Server)
+	context.Set(r, serverConfigkey, &server)
 	next(rw, r)
 }
+
+// NewContextMiddleWare create new ContextMiddleWare
 func NewContextMiddleWare() *ContextMiddleWare {
 	return &ContextMiddleWare{}
 }
 
+// NewStatic create a new negroni.Static router.
 func NewStatic(directory, prefix, index string) *negroni.Static {
 	return &negroni.Static{
 		Dir:       http.Dir(directory),
