@@ -26,7 +26,7 @@ func randomInt(x, y int) int {
 var activeConnections int
 
 // handleConnection Creates channels for incoming data and error, starts a single goroutine, and echoes all data received back.
-func handleConnection(conn net.Conn, disconnectTime int) {
+func handleConnection(conn net.Conn, disconnectTime time.Duration) {
 	defer conn.Close()
 	inCh := make(chan []byte)
 	eCh := make(chan error)
@@ -52,7 +52,11 @@ func handleConnection(conn net.Conn, disconnectTime int) {
 	}
 	activeConnections++
 
-	timer := time.NewTimer(time.Duration(disconnectTime) * time.Second)
+	var timer *time.Timer
+	if disconnectTime <= 0 {
+		log.Fatalln("disconnectTime must be > 0")
+	}
+	timer = time.NewTimer(disconnectTime)
 	defer timer.Stop()
 
 	// continuously read from the connection
@@ -124,8 +128,8 @@ func main() {
 	var printMemPeriodic int
 
 	flag.IntVar(&port, "p", 8082, "Listen port")
-	flag.IntVar(&minWaitTime, "min", 30, "min wait time")
-	flag.IntVar(&maxWaitTime, "max", 600, "max wait time")
+	flag.IntVar(&minWaitTime, "min", 0, "min wait time")
+	flag.IntVar(&maxWaitTime, "max", 0, "max wait time")
 	flag.StringVar(&logFileName, "l", "", "log file")
 	flag.StringVar(&bindAddress, "b", "", "bind address")
 	flag.BoolVar(&debug, "d", false, "Debugging")
@@ -138,7 +142,11 @@ func main() {
 		usage()
 		os.Exit(0)
 	}
-
+	if minWaitTime > maxWaitTime {
+		fmt.Printf("min must be less than max\n")
+		usage()
+		os.Exit(1)
+	}
 	var logOutput io.Writer
 
 	//	if logFileName != "" {
@@ -189,8 +197,10 @@ func main() {
 			log.Println("Could not accept connection", err.Error())
 			continue
 		}
-		disconnectTime := randomInt(minWaitTime, maxWaitTime)
-
+		disconnectTime := time.Duration(24)*time.Hour
+		if minWaitTime > 0 || maxWaitTime > 0 {
+			disconnectTime = time.Duration(randomInt(minWaitTime, maxWaitTime)) *time.Second
+		}
 		// this adds 2 goroutines per connection. One the handleConnection itself, which then launches a read-goroutine
 		go handleConnection(conn, disconnectTime)
 	}
