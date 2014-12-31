@@ -96,9 +96,7 @@ func (client *Client) Wait() {
 		case err := <-client.err:
 			// handle our error then exit for loop
 			if err == io.EOF {
-				if client.debug {
-					log.Printf("Connection closed\n")
-				}
+				log.Printf("Connection closed\n")
 			} else {
 				log.Printf("Error from channel: %s\n", err.Error())
 			}
