@@ -53,7 +53,6 @@ func (stats *MemStats) PrintIncrementalMemStats() {
 		extra)
 }
 
-
 // PrintMemStats print memory statistics once.
 func (stats *MemStats) PrintMemStats() {
 	runtime.ReadMemStats(&stats.Memstats)

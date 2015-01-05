@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
@@ -11,8 +13,6 @@ import (
 	"os"
 	"path"
 	"time"
-	"crypto/tls"
-	"errors"
 )
 
 var rng *rand.Rand
@@ -28,14 +28,18 @@ func randomInt(x, y int) int {
 var activeConnections int
 
 // handleConnection Creates channels for incoming data and error, starts a single goroutine, and echoes all data received back.
-func handleConnection(conn interface{net.Conn}, disconnectTime time.Duration, doTls bool) {
+func handleConnection(conn interface {
+	net.Conn
+}, disconnectTime time.Duration, doTls bool) {
 	defer conn.Close()
 	inCh := make(chan []byte)
 	eCh := make(chan error)
 	// Start a goroutine to read from our net connection
-	go func(conn interface{net.Conn}, doTls bool, ch chan []byte, eCh chan error) {
+	go func(conn interface {
+		net.Conn
+	}, doTls bool, ch chan []byte, eCh chan error) {
 		data := make([]byte, 512)
-		firstTime := true 
+		firstTime := true
 		for {
 			// try to read the data
 			_, err := conn.Read(data)
@@ -142,7 +146,7 @@ func main() {
 	var maxWaitTime int
 	var logFileName string
 	var certFile string
-	var keyFile string	
+	var keyFile string
 	var certChainFile string
 	var bindAddress string
 	var printMemPeriodic int
@@ -207,9 +211,9 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Could not read cert and key files")
 			os.Exit(1)
 		}
-		
+
 		config := tls.Config{Certificates: []tls.Certificate{cert}}
-		if certChainFile != ""{
+		if certChainFile != "" {
 			log.Println("-chan not yet implemented")
 		}
 		if debug {
@@ -224,7 +228,7 @@ func main() {
 	if verbose {
 		log.Printf("Listening on %s\n", dialString)
 	}
-	
+
 	if err != nil {
 		log.Println("Could not open connection", err.Error())
 		os.Exit(1)
@@ -247,9 +251,9 @@ func main() {
 			log.Println("Could not accept connection", err.Error())
 			continue
 		}
-		disconnectTime := time.Duration(24)*time.Hour
+		disconnectTime := time.Duration(24) * time.Hour
 		if minWaitTime > 0 || maxWaitTime > 0 {
-			disconnectTime = time.Duration(randomInt(minWaitTime, maxWaitTime)) *time.Second
+			disconnectTime = time.Duration(randomInt(minWaitTime, maxWaitTime)) * time.Second
 		}
 		// this adds 2 goroutines per connection. One the handleConnection itself, which then launches a read-goroutine
 		go handleConnection(conn, disconnectTime, doTls)

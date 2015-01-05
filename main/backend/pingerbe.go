@@ -1,18 +1,18 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"runtime"
 	"runtime/pprof"
 	"sync"
-	"io/ioutil"
-	"crypto/x509"
-	"crypto/tls"
 )
 
 var debug bool
@@ -79,7 +79,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Could not parse certfile %s\n", caCertChainFile)
 		os.Exit(1)
 	}
-	
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	log.Printf("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
 
@@ -107,7 +107,7 @@ func main() {
 		} else {
 			reopen = true
 		}
-		config := &tls.Config{RootCAs: pool,}
+		config := &tls.Config{RootCAs: pool}
 		if tlsCheckHostname {
 			config.InsecureSkipVerify = false
 		} else {

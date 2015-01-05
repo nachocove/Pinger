@@ -1,14 +1,14 @@
 package Pinger
 
 import (
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"sync"
 	"time"
-	"crypto/tls"
-	"errors"
 )
 
 // HandlerFunc Function used to handle incoming data on a channel.
@@ -26,7 +26,9 @@ const (
 
 // Client The client structure for tracking a particular endpoint
 type Client struct {
-	connection      interface{net.Conn}
+	connection interface {
+		net.Conn
+	}
 	incoming        chan []byte
 	outgoing        chan []byte
 	command         chan int
@@ -167,7 +169,7 @@ func (client *Client) wait() {
 					log.Println("Stopping")
 				}
 				exitLoop = true
-				// don't try to reopen anything. We're outta here. 
+				// don't try to reopen anything. We're outta here.
 				client.reopenOnClose = false
 			}
 		}

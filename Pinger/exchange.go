@@ -1,12 +1,12 @@
 package Pinger
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"math/rand"
 	"sync"
 	"time"
-	"crypto/tls"
 )
 
 // ExchangeClient A client with type exchange.
@@ -29,7 +29,7 @@ func exchangehandler(data []byte) {
 var rng *rand.Rand
 
 func init() {
-	rand.Seed( time.Now().UTC().UnixNano())	
+	rand.Seed(time.Now().UTC().UnixNano())
 	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 }
 
@@ -61,7 +61,7 @@ func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) error {
 	if err == nil && ex.pingPeriodicity > 0 {
 		go ex.periodicCheck()
 	}
-	return err  // could be nil
+	return err // could be nil
 }
 
 // TODO This really ought to just be a method/interface thing
