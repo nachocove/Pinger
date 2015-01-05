@@ -33,6 +33,7 @@ func NewMemStats(extraInfo func(*MemStats) string, debug, printIncremental bool)
 	return &stats
 }
 
+// SetBaseMemStats set the base state for memory calculations to the current state of things
 func (stats *MemStats) SetBaseMemStats() {
 	runtime.ReadMemStats(&stats.Basememstats)
 }

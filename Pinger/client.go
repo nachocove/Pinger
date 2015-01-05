@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"sync"
 	"time"
 )
@@ -20,15 +19,14 @@ func (client *Client) HandleIncoming(handler HandlerFunc) {
 }
 
 const (
-	NoCommand = iota
-	Stop      = iota
+	noCommand = iota
+	// Stop stop the client
+	Stop = iota
 )
 
 // Client The client structure for tracking a particular endpoint
 type Client struct {
-	connection interface {
-		net.Conn
-	}
+	connection      *tls.Conn
 	incoming        chan []byte
 	outgoing        chan []byte
 	command         chan int
