@@ -10,6 +10,9 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sync"
+	"io/ioutil"
+	"crypto/x509"
+	"crypto/tls"
 )
 
 var debug bool
@@ -34,15 +37,21 @@ func main() {
 	var pingPeriodic int
 	var maxConnection int
 	var printMem bool
+	var tlsCheckHostname bool
 	var help bool
 	var connectionString string
+	var noReopenConnections bool
+	var caCertChainFile string
 
 	flag.IntVar(&maxConnection, "n", 1000, "Number of connections to make")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&help, "h", false, "Verbose")
+	flag.BoolVar(&tlsCheckHostname, "tlscheckhost", false, "Verify the hostname to the certificate")
+	flag.BoolVar(&noReopenConnections, "no-reopen", false, "Verbose")
 	flag.BoolVar(&printMem, "m", false, "print memory mode")
 	flag.IntVar(&printMemPeriodic, "mem", 0, "print memory periodically mode in seconds")
 	flag.IntVar(&pingPeriodic, "ping", 0, "ping server")
+	flag.StringVar(&caCertChainFile, "cachain", "", "File containing one or more ca certs")
 
 	flag.Parse()
 	if help {
@@ -55,6 +64,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	if caCertChainFile == "" {
+		fmt.Fprintln(os.Stderr, "Need a ca cert chain file")
+		os.Exit(1)
+	}
+	caCertChain, err := ioutil.ReadFile(caCertChainFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Open %s: %v\n", caCertChainFile, err)
+		os.Exit(1)
+	}
+	pool := x509.NewCertPool()
+	ok := pool.AppendCertsFromPEM(caCertChain)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "Could not parse certfile %s\n", caCertChainFile)
+		os.Exit(1)
+	}
+	
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	log.Printf("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
 
@@ -76,7 +101,19 @@ func main() {
 		if debug {
 			log.Println("Opening connection to", connectionString)
 		}
-		client := Pinger.NewExchangeClient(connectionString, pingPeriodic, debug)
+		var reopen bool
+		if noReopenConnections {
+			reopen = false
+		} else {
+			reopen = true
+		}
+		config := &tls.Config{RootCAs: pool,}
+		if tlsCheckHostname {
+			config.InsecureSkipVerify = false
+		} else {
+			config.InsecureSkipVerify = true
+		}
+		client := Pinger.NewExchangeClient(connectionString, pingPeriodic, reopen, config, debug)
 		// this launches either 2 or 3 goroutines per connection. 3 if pingPeriodic > 0, 2 otherwise.
 		if client != nil {
 			err := client.Listen(&wg)

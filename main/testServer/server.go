@@ -11,6 +11,8 @@ import (
 	"os"
 	"path"
 	"time"
+	"crypto/tls"
+	"errors"
 )
 
 var rng *rand.Rand
@@ -26,13 +28,14 @@ func randomInt(x, y int) int {
 var activeConnections int
 
 // handleConnection Creates channels for incoming data and error, starts a single goroutine, and echoes all data received back.
-func handleConnection(conn net.Conn, disconnectTime time.Duration) {
+func handleConnection(conn interface{net.Conn}, disconnectTime time.Duration, doTls bool) {
 	defer conn.Close()
 	inCh := make(chan []byte)
 	eCh := make(chan error)
 	// Start a goroutine to read from our net connection
-	go func(conn net.Conn, ch chan []byte, eCh chan error) {
+	go func(conn interface{net.Conn}, doTls bool, ch chan []byte, eCh chan error) {
 		data := make([]byte, 512)
+		firstTime := true 
 		for {
 			// try to read the data
 			_, err := conn.Read(data)
@@ -41,10 +44,23 @@ func handleConnection(conn net.Conn, disconnectTime time.Duration) {
 				eCh <- err
 				return
 			}
+			if doTls && firstTime {
+				tlsconn, ok := conn.(*tls.Conn)
+				if !ok {
+					log.Printf("Connecton is not TLS")
+					return
+				}
+				state := tlsconn.ConnectionState()
+				if !state.HandshakeComplete {
+					eCh <- errors.New("TLS Handshake not completed")
+					return
+				}
+				firstTime = false
+			}
 			// send data if we read some.
 			ch <- data
 		}
-	}(conn, inCh, eCh)
+	}(conn, doTls, inCh, eCh)
 
 	remote := conn.RemoteAddr().String()
 	if debug || verbose {
@@ -63,7 +79,7 @@ func handleConnection(conn net.Conn, disconnectTime time.Duration) {
 	for {
 		var exitLoop = false
 		if debug {
-			log.Printf("%s: Waiting %d seconds for something to happen\n", remote, disconnectTime)
+			log.Printf("%s: Waiting %d seconds for something to happen\n", remote, disconnectTime/time.Second)
 		}
 		select {
 		// This case means we recieved data on the connection
@@ -125,6 +141,9 @@ func main() {
 	var minWaitTime int
 	var maxWaitTime int
 	var logFileName string
+	var certFile string
+	var keyFile string	
+	var certChainFile string
 	var bindAddress string
 	var printMemPeriodic int
 
@@ -137,6 +156,9 @@ func main() {
 	flag.BoolVar(&verbose, "v", false, "Verbose")
 	flag.BoolVar(&help, "h", false, "Verbose")
 	flag.IntVar(&printMemPeriodic, "mem", 0, "print memory periodically mode in seconds")
+	flag.StringVar(&certFile, "cert", "", "TLS server Cert")
+	flag.StringVar(&keyFile, "key", "", "TLS server Keypair")
+	flag.StringVar(&certChainFile, "chain", "", "TLS server cert chain")
 
 	flag.Parse()
 	if help {
@@ -172,10 +194,37 @@ func main() {
 	log.SetOutput(logOutput)
 
 	dialString := fmt.Sprintf("%s:%d", bindAddress, port)
+	var ln net.Listener
+	var err error
+	var doTls bool
+	if certFile != "" || keyFile != "" {
+		if certFile == "" || keyFile == "" {
+			fmt.Fprintln(os.Stderr, "Need both -cert and -key (and optionally -chain)")
+			os.Exit(1)
+		}
+		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Could not read cert and key files")
+			os.Exit(1)
+		}
+		
+		config := tls.Config{Certificates: []tls.Certificate{cert}}
+		if certChainFile != ""{
+			log.Println("-chan not yet implemented")
+		}
+		if debug {
+			log.Println("Opening listener for TLS")
+		}
+		ln, err = tls.Listen("tcp", dialString, &config)
+		doTls = true
+	} else {
+		ln, err = net.Listen("tcp", dialString)
+		doTls = false
+	}
 	if verbose {
 		log.Printf("Listening on %s\n", dialString)
 	}
-	ln, err := net.Listen("tcp", dialString)
+	
 	if err != nil {
 		log.Println("Could not open connection", err.Error())
 		os.Exit(1)
@@ -203,6 +252,6 @@ func main() {
 			disconnectTime = time.Duration(randomInt(minWaitTime, maxWaitTime)) *time.Second
 		}
 		// this adds 2 goroutines per connection. One the handleConnection itself, which then launches a read-goroutine
-		go handleConnection(conn, disconnectTime)
+		go handleConnection(conn, disconnectTime, doTls)
 	}
 }

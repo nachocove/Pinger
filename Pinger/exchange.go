@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+	"crypto/tls"
 )
 
 // ExchangeClient A client with type exchange.
@@ -28,6 +29,7 @@ func exchangehandler(data []byte) {
 var rng *rand.Rand
 
 func init() {
+	rand.Seed( time.Now().UTC().UnixNano())	
 	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 }
 
@@ -39,15 +41,15 @@ func (ex *ExchangeClient) periodicCheck() {
 	data := fmt.Sprintf("Greetings from %s", ex.client.connection.LocalAddr().String())
 
 	for {
+		if ex.debug {
+			log.Println("ExchangeClient sending", data)
+		}
+		ex.client.outgoing <- []byte(data)
 		sleepTime := randomInt(10, 30)
 		if ex.debug {
 			log.Printf("Sleeping %d\n", sleepTime)
 		}
 		time.Sleep(time.Duration(sleepTime) * time.Second)
-		if ex.debug {
-			log.Println("ExchangeClient sending", data)
-		}
-		ex.client.outgoing <- []byte(data)
 	}
 }
 
@@ -56,17 +58,17 @@ func (ex *ExchangeClient) periodicCheck() {
 func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) error {
 	// Listen launches 2 goroutines
 	err := ex.client.Listen(wait)
-	if ex.pingPeriodicity > 0 {
+	if err == nil && ex.pingPeriodicity > 0 {
 		go ex.periodicCheck()
 	}
-	return err // no error
+	return err  // could be nil
 }
 
 // TODO This really ought to just be a method/interface thing
 
 // NewExchangeClient set up a new exchange client
-func NewExchangeClient(dialString string, pingPeriodicity int, debug bool) *ExchangeClient {
-	client := NewClient(dialString, debug)
+func NewExchangeClient(dialString string, pingPeriodicity int, reopenConnection bool, tlsConfig *tls.Config, debug bool) *ExchangeClient {
+	client := NewClient(dialString, reopenConnection, tlsConfig, debug)
 	if client == nil {
 		log.Println("Could not get Client")
 		return nil
