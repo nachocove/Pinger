@@ -8,16 +8,15 @@ import (
 )
 
 func init() {
-	router.HandleFunc("/", homePage)
+	httpsRouter.HandleFunc("/", homePage)
 }
-
 func homePage(w http.ResponseWriter, r *http.Request) {
-	serverConfig := GetServerConfig(r)
-	mainTemplate := path.Join(serverConfig.templateDir, "main.tmpl")
+	config := GetConfig(r)
+	mainTemplate := path.Join(config.Server.TemplateDir, "main.tmpl")
 	fmt.Println(mainTemplate)
 	t, err := template.ParseFiles(mainTemplate)
 	if err != nil {
 		panic("could not open template file")
 	}
-	t.Execute(w, fmt.Sprintf("%d", serverConfig.port))
+	t.Execute(w, fmt.Sprintf("%d", config.Server.Port))
 }

@@ -29,7 +29,6 @@ func exchangehandler(data []byte) {
 var rng *rand.Rand
 
 func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
 	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 }
 
@@ -45,7 +44,7 @@ func (ex *ExchangeClient) periodicCheck() {
 			log.Println("ExchangeClient sending", data)
 		}
 		ex.client.outgoing <- []byte(data)
-		sleepTime := randomInt(10, 30)
+		sleepTime := ex.pingPeriodicity + randomInt(1, 5)
 		if ex.debug {
 			log.Printf("Sleeping %d\n", sleepTime)
 		}
@@ -67,8 +66,8 @@ func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) error {
 // TODO This really ought to just be a method/interface thing
 
 // NewExchangeClient set up a new exchange client
-func NewExchangeClient(dialString string, pingPeriodicity int, reopenConnection bool, tlsConfig *tls.Config, debug bool) *ExchangeClient {
-	client := NewClient(dialString, reopenConnection, tlsConfig, debug)
+func NewExchangeClient(dialString string, pingPeriodicity int, reopenConnection bool, tlsConfig *tls.Config, tcpKeepAlive int, debug bool) *ExchangeClient {
+	client := NewClient(dialString, reopenConnection, tlsConfig, tcpKeepAlive, debug)
 	if client == nil {
 		log.Println("Could not get Client")
 		return nil

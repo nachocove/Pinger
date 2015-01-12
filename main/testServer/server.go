@@ -2,11 +2,14 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/felixge/tcpkeepalive"
 	"github.com/nachocove/Pinger/Pinger"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
@@ -28,12 +31,43 @@ func randomInt(x, y int) int {
 var activeConnections int
 
 // handleConnection Creates channels for incoming data and error, starts a single goroutine, and echoes all data received back.
-func handleConnection(conn *tls.Conn, disconnectTime time.Duration) {
+func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration, TLSconfig *tls.Config) {
 	defer conn.Close()
+	tc, ok := conn.(*net.TCPConn)
+	if !ok {
+		log.Println("ERROR: Could not grab tcp conn")
+		return
+	}
+	if tcpKeepAlive != 0 {
+		tc.SetKeepAlive(true)
+		tc.SetKeepAlivePeriod(tcpKeepAlive)
+		if debug {
+			log.Printf("Set TCP-keepalive to %ds\n", tcpKeepAlive)
+		}
+		tcpkeep, err := tcpkeepalive.EnableKeepAlive(tc)
+		if err != nil {
+			log.Println("Could not set tcpkeepalive.EnableKeepAlive")
+			return
+		}
+		tcpkeep.SetKeepAliveIdle(time.Duration(tcpKeepAlive) * time.Second)
+	} else {
+		tc.SetKeepAlive(false)
+	}
+	if TLSconfig != nil {
+		if debug {
+			log.Println("Accepted TLS connection")
+		}
+		conn = tls.Server(conn, TLSconfig)
+	} else {
+		if debug {
+			log.Println("WARNING: Accepted TCP-only connection")
+		}
+	}
+
 	inCh := make(chan []byte)
 	eCh := make(chan error)
 	// Start a goroutine to read from our net connection
-	go func(conn *tls.Conn, ch chan []byte, eCh chan error) {
+	go func(conn net.Conn, ch chan []byte, eCh chan error) {
 		data := make([]byte, 512)
 		firstTime := true
 		for {
@@ -45,10 +79,13 @@ func handleConnection(conn *tls.Conn, disconnectTime time.Duration) {
 				return
 			}
 			if firstTime {
-				state := conn.ConnectionState()
-				if !state.HandshakeComplete {
-					eCh <- errors.New("TLS Handshake not completed")
-					return
+				tlsconn, ok := conn.(*tls.Conn)
+				if ok {
+					state := tlsconn.ConnectionState()
+					if !state.HandshakeComplete {
+						eCh <- errors.New("TLS Handshake not completed")
+						return
+					}
 				}
 				firstTime = false
 			}
@@ -140,6 +177,7 @@ func main() {
 	var certChainFile string
 	var bindAddress string
 	var printMemPeriodic int
+	var tcpKeepAlive int
 
 	flag.IntVar(&port, "p", 8082, "Listen port")
 	flag.IntVar(&minWaitTime, "min", 0, "min wait time")
@@ -153,6 +191,7 @@ func main() {
 	flag.StringVar(&certFile, "cert", "", "TLS server Cert")
 	flag.StringVar(&keyFile, "key", "", "TLS server Keypair")
 	flag.StringVar(&certChainFile, "chain", "", "TLS server cert chain")
+	flag.IntVar(&tcpKeepAlive, "tcpkeepalive", 0, "TCP Keepalive in seconds (0 is disabled)")
 
 	flag.Parse()
 	if help {
@@ -187,36 +226,51 @@ func main() {
 	logOutput = io.Writer(os.Stdout)
 	log.SetOutput(logOutput)
 
-	dialString := fmt.Sprintf("%s:%d", bindAddress, port)
-	var ln net.Listener
 	var err error
-	if certFile == "" || keyFile == "" {
-		fmt.Fprintln(os.Stderr, "Need both -cert and -key (and optionally -chain)")
-		os.Exit(1)
+	var TLSconfig *tls.Config
+
+	if certFile != "" || keyFile != "" {
+		if certFile == "" || keyFile == "" {
+			fmt.Fprintln(os.Stderr, "Need both -cert and -key (and optionally -chain)")
+			os.Exit(1)
+		}
+
+		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Could not read cert and key files")
+			os.Exit(1)
+		}
+
+		TLSconfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+		if certChainFile != "" {
+			caCertChain, err := ioutil.ReadFile(certChainFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Open %s: %v\n", certChainFile, err)
+				os.Exit(1)
+			}
+			pool := x509.NewCertPool()
+			ok := pool.AppendCertsFromPEM(caCertChain)
+			if !ok {
+				fmt.Fprintf(os.Stderr, "Could not parse certfile %s\n", certChainFile)
+				os.Exit(1)
+			}
+			TLSconfig.RootCAs = pool
+		}
 	}
 
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	dialString := fmt.Sprintf("%s:%d", bindAddress, port)
+	addr, err := net.ResolveTCPAddr("tcp", dialString)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Could not read cert and key files")
+		fmt.Fprintf(os.Stderr, "Could not resolve address %s: %v\n", dialString, err)
 		os.Exit(1)
 	}
-
-	config := tls.Config{Certificates: []tls.Certificate{cert}}
-	if certChainFile != "" {
-		log.Println("-chan not yet implemented")
-	}
-	if debug {
-		log.Println("Opening listener for TLS")
-	}
-	ln, err = tls.Listen("tcp", dialString, &config)
-	if verbose {
-		log.Printf("Listening on %s\n", dialString)
-	}
-
+	addr.Port = port
+	TCPLn, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		log.Println("Could not open connection", err.Error())
+		fmt.Fprintf(os.Stderr, "Could not listen in %s: %v\n", dialString, err)
 		os.Exit(1)
 	}
+
 	var memstats *Pinger.MemStats
 	if printMemPeriodic > 0 {
 		memstats = Pinger.NewMemStats(memStatsExtraInfo, debug, false)
@@ -224,26 +278,27 @@ func main() {
 	}
 
 	if debug {
+		log.Printf("Listening on %s\n", dialString)
 		log.Printf("Min %d, Max %d\n", minWaitTime, maxWaitTime)
 	}
 	if memstats != nil {
 		memstats.SetBaseMemStats()
 	}
 	for {
-		conn, err := ln.Accept()
+		conn, err := TCPLn.Accept()
 		if err != nil {
-			log.Println("Could not accept connection", err.Error())
+			log.Println("ERROR: Could not accept connection", err.Error())
 			continue
 		}
-		disconnectTime := time.Duration(24) * time.Hour
+		var disconnectTime time.Duration
 		if minWaitTime > 0 || maxWaitTime > 0 {
 			disconnectTime = time.Duration(randomInt(minWaitTime, maxWaitTime)) * time.Second
+		} else {
+			disconnectTime = time.Duration(24) * time.Hour
 		}
-		tlsconn, ok := conn.(*tls.Conn)
-		if !ok {
-			log.Printf("Connecton is not TLS")
-			return
-		} // this adds 2 goroutines per connection. One the handleConnection itself, which then launches a read-goroutine
-		go handleConnection(tlsconn, disconnectTime)
+		tcpKeepAliveDur := time.Duration(tcpKeepAlive) * time.Second
+
+		// this adds 2 goroutines per connection. One the handleConnection itself, which then launches a read-goroutine
+		go handleConnection(conn, disconnectTime, tcpKeepAliveDur, TLSconfig)
 	}
 }

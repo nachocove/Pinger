@@ -74,5 +74,8 @@ func (stats *MemStats) printMemStatsAndRestartTimer() {
 	} else {
 		stats.PrintMemStats()
 	}
+	if stats.printMemStatsTimer != nil {
+		stats.printMemStatsTimer.Stop()
+	}
 	stats.printMemStatsTimer = time.AfterFunc(time.Duration(stats.sleepTime)*time.Second, stats.printMemStatsAndRestartTimer)
 }

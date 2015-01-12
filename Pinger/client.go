@@ -4,8 +4,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/felixge/tcpkeepalive"
 	"io"
 	"log"
+	"net"
 	"sync"
 	"time"
 )
@@ -26,7 +28,8 @@ const (
 
 // Client The client structure for tracking a particular endpoint
 type Client struct {
-	connection      *tls.Conn
+	connection      net.Conn
+	buffer          []byte
 	incoming        chan []byte
 	outgoing        chan []byte
 	command         chan int
@@ -37,10 +40,11 @@ type Client struct {
 	dialString      string
 	reopenOnClose   bool
 	tlsConfig       *tls.Config
+	tcpKeepAlive    int
 }
 
 // NewClient Set up a new client
-func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, debug bool) *Client {
+func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, tcpKeepAlive int, debug bool) *Client {
 	client := &Client{
 		dialString:      dialString,
 		connection:      nil,
@@ -53,6 +57,7 @@ func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, deb
 		incomingHandler: printIncoming,
 		reopenOnClose:   reopenOnClose,
 		tlsConfig:       tlsConfig,
+		tcpKeepAlive:    tcpKeepAlive,
 	}
 	return client
 }
@@ -81,7 +86,9 @@ func (client *Client) Done() {
 }
 
 func (client *Client) connectionReader(command <-chan int) {
-	data := make([]byte, 512)
+	if client.buffer == nil {
+		client.buffer = make([]byte, 512)
+	}
 	for {
 		if client.connection == nil {
 			time.Sleep(1)
@@ -98,14 +105,14 @@ func (client *Client) connectionReader(command <-chan int) {
 			}
 		}
 		// try to read the data
-		_, err := client.connection.Read(data)
+		_, err := client.connection.Read(client.buffer)
 		if err != nil {
 			// send an error if it's encountered
 			client.err <- err
 			return
 		}
 		// send data if we read some.
-		client.incoming <- data
+		client.incoming <- client.buffer
 	}
 }
 
@@ -119,7 +126,7 @@ func (client *Client) wait() {
 	defer client.closeConn()
 
 	// Start a goroutine to read from our net connection
-	connectionCommand := make(chan int)
+	connectionCommand := make(chan int, 1)
 	go client.connectionReader(connectionCommand)
 	defer func(command chan<- int) {
 		command <- Stop
@@ -135,7 +142,7 @@ func (client *Client) wait() {
 		}
 		select {
 		case data := <-client.incoming:
-			// just write the data back. We are the ultimate echo.
+			// if there's a handler, call it for the incoming data
 			if client.incomingHandler != nil {
 				client.incomingHandler(data)
 			}
@@ -186,12 +193,31 @@ func printIncoming(data []byte) {
 }
 
 func (client *Client) openConn() error {
-	if client.tlsConfig == nil {
-		return errors.New("tlsConfig can not be nil")
-	}
-	connection, err := tls.Dial("tcp", client.dialString, client.tlsConfig)
+	connection, err := net.Dial("tcp", client.dialString)
 	if err != nil {
 		return err
+	}
+	tcpconn := connection.(*net.TCPConn)
+	if client.tcpKeepAlive != 0 {
+		tcpconn.SetKeepAlive(true)
+		tcpconn.SetKeepAlivePeriod(time.Duration(client.tcpKeepAlive) * time.Second)
+		tcpkeep, err := tcpkeepalive.EnableKeepAlive(tcpconn)
+		if err != nil {
+			return errors.New("Could not set tcpkeepalive.EnableKeepAlive")
+		}
+		tcpkeep.SetKeepAliveIdle(time.Duration(client.tcpKeepAlive) * time.Second)
+	} else {
+		tcpconn.SetKeepAlive(false)
+	}
+	if client.tlsConfig != nil {
+		connection = tls.Client(connection, client.tlsConfig)
+		if client.debug {
+			log.Println("Opened TLS Connection")
+		}
+	} else {
+		if client.debug {
+			log.Println("WARNING: Opened TCP-only Connection")
+		}
 	}
 	client.connection = connection
 	if client.connection == nil {

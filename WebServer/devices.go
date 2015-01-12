@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	router.HandleFunc("/register/{deviceid}/{platform:ios|android}", registerDevice)
+	httpsRouter.HandleFunc("/register/{deviceid}/{platform:ios|android}", registerDevice)
 }
 
 // TODO Need to figure out Auth

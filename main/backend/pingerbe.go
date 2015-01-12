@@ -8,6 +8,8 @@ import (
 	"github.com/nachocove/Pinger/Pinger"
 	"io/ioutil"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path"
 	"runtime"
@@ -25,8 +27,8 @@ var usage = func() {
 func memStatsExtraInfo(stats *Pinger.MemStats) string {
 	k := float64(1024.0)
 	if Pinger.ActiveClientCount > 0 {
-		allocM := (float64(stats.Memstats.Alloc) - float64(stats.Basememstats.Alloc)) / k
-		return fmt.Sprintf("number of connections: %d (est. mem/conn %fk)", Pinger.ActiveClientCount, allocM/float64(Pinger.ActiveClientCount))
+		allocM := float64(int64(stats.Memstats.Alloc)-int64(stats.Basememstats.Alloc)) / k
+		return fmt.Sprintf("number of connections: %d  (est. mem/conn %fk)", Pinger.ActiveClientCount, allocM/float64(Pinger.ActiveClientCount))
 	}
 	return fmt.Sprintf("number of connections: %d", Pinger.ActiveClientCount)
 }
@@ -41,15 +43,17 @@ func main() {
 	var connectionString string
 	var noReopenConnections bool
 	var caCertChainFile string
+	var tcpKeepAlive int
 
 	flag.IntVar(&maxConnection, "n", 1000, "Number of connections to make")
+	flag.IntVar(&tcpKeepAlive, "tcpkeepalive", 0, "TCP Keepalive in seconds")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&help, "h", false, "Verbose")
 	flag.BoolVar(&tlsCheckHostname, "tlscheckhost", false, "Verify the hostname to the certificate")
 	flag.BoolVar(&noReopenConnections, "no-reopen", false, "Verbose")
 	flag.BoolVar(&printMem, "m", false, "print memory mode")
 	flag.IntVar(&printMemPeriodic, "mem", 0, "print memory periodically mode in seconds")
-	flag.IntVar(&pingPeriodic, "ping", 0, "ping server")
+	flag.IntVar(&pingPeriodic, "ping", 0, "ping server in seconds (plus fudge factor)")
 	flag.StringVar(&caCertChainFile, "cachain", "", "File containing one or more ca certs")
 
 	flag.Parse()
@@ -63,22 +67,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	if caCertChainFile == "" {
-		fmt.Fprintln(os.Stderr, "Need a ca cert chain file")
-		os.Exit(1)
+	var TLSConfig *tls.Config
+	if caCertChainFile != "" {
+		caCertChain, err := ioutil.ReadFile(caCertChainFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Open %s: %v\n", caCertChainFile, err)
+			os.Exit(1)
+		}
+		pool := x509.NewCertPool()
+		ok := pool.AppendCertsFromPEM(caCertChain)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "Could not parse certfile %s\n", caCertChainFile)
+			os.Exit(1)
+		}
+		TLSConfig = &tls.Config{RootCAs: pool}
+		if tlsCheckHostname {
+			TLSConfig.InsecureSkipVerify = false
+		} else {
+			TLSConfig.InsecureSkipVerify = true
+		}
 	}
-	caCertChain, err := ioutil.ReadFile(caCertChainFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Open %s: %v\n", caCertChainFile, err)
-		os.Exit(1)
-	}
-	pool := x509.NewCertPool()
-	ok := pool.AppendCertsFromPEM(caCertChain)
-	if !ok {
-		fmt.Fprintf(os.Stderr, "Could not parse certfile %s\n", caCertChainFile)
-		os.Exit(1)
-	}
-
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	log.Printf("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
 
@@ -96,6 +104,12 @@ func main() {
 	connectionString = flag.Arg(0)
 	var wg sync.WaitGroup
 
+	if memstats != nil {
+		memstats.SetBaseMemStats()
+	}
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	for i := 0; i < maxConnection; i++ {
 		if debug {
 			log.Println("Opening connection to", connectionString)
@@ -106,13 +120,7 @@ func main() {
 		} else {
 			reopen = true
 		}
-		config := &tls.Config{RootCAs: pool}
-		if tlsCheckHostname {
-			config.InsecureSkipVerify = false
-		} else {
-			config.InsecureSkipVerify = true
-		}
-		client := Pinger.NewExchangeClient(connectionString, pingPeriodic, reopen, config, debug)
+		client := Pinger.NewExchangeClient(connectionString, pingPeriodic, reopen, TLSConfig, tcpKeepAlive, debug)
 		// this launches either 2 or 3 goroutines per connection. 3 if pingPeriodic > 0, 2 otherwise.
 		if client != nil {
 			err := client.Listen(&wg)
