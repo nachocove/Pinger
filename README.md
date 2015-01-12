@@ -27,12 +27,17 @@ Links about performance and scaling:
 
 Recommends just sticking with one goroutine per connection. Seems it can handle 100K (but didn't say how much memory that uses).
 
-Web server Dependencies:
+Web server Dependencies (will get pulled in with 'go get ...' during the initial pull of Pinger):
 
 ```
-go get github.com/codegangsta/negroni
-go get github.com/gorilla/context
-go get github.com/gorilla/mux
+code.google.com/p/gcfg
+code.google.com/p/gcfg/scanner
+code.google.com/p/gcfg/token
+code.google.com/p/gcfg/types
+github.com/codegangsta/negroni
+github.com/gorilla/context
+github.com/gorilla/mux
+github.com/op/go-logging
 ```
 
 To get the list of dependencies, use:
