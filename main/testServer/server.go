@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/felixge/tcpkeepalive"
 	"github.com/nachocove/Pinger/Pinger"
+	"github.com/op/go-logging"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -15,7 +16,6 @@ import (
 	"os"
 	"path"
 	"time"
-	"github.com/op/go-logging"
 )
 
 var rng *rand.Rand
@@ -198,10 +198,10 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
-	logFile, err := os.OpenFile(logFileName, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-	   	fmt.Fprintf(os.Stderr, "error opening file %s: %v", logFileName, err)
-   	}
+		fmt.Fprintf(os.Stderr, "error opening file %s: %v", logFileName, err)
+	}
 	var screenLogging = false
 	var screenLevel = logging.ERROR
 	if debug || verbose {
@@ -209,7 +209,7 @@ func main() {
 		switch {
 		case debug:
 			screenLevel = logging.DEBUG
-			
+
 		case verbose:
 			screenLevel = logging.INFO
 		}
