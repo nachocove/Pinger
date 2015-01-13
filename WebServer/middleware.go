@@ -1,10 +1,10 @@
 package WebServer
 
 import (
+	"fmt"
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/context"
 	"net/http"
-	"fmt"
 	"strings"
 )
 
@@ -58,12 +58,13 @@ type RedirectMiddleWare struct {
 	redirectPort int
 	redirectHost string
 }
+
 func (redir *RedirectMiddleWare) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	var host string
 	switch {
 	case redir.redirectHost != "":
 		host = redir.redirectHost
-		
+
 	case r.Host != "":
 		host = strings.Split(r.Host, ":")[0]
 	}
@@ -79,5 +80,5 @@ func (redir *RedirectMiddleWare) ServeHTTP(rw http.ResponseWriter, r *http.Reque
 }
 
 func NewRedirectMiddleware(host string, port int) *RedirectMiddleWare {
-	return &RedirectMiddleWare{redirectPort: port, redirectHost: host,}
+	return &RedirectMiddleWare{redirectPort: port, redirectHost: host}
 }

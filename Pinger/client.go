@@ -95,8 +95,8 @@ func (client *Client) connectionReader(command <-chan int) {
 			continue
 		}
 
-		select {
-		case cmd := <-command:
+		if len(command) > 0 {
+			cmd := <-command
 			if cmd == Stop {
 				if client.debug {
 					log.Println("Was told to stop. Exiting")
@@ -105,12 +105,16 @@ func (client *Client) connectionReader(command <-chan int) {
 			}
 		}
 		// try to read the data
-		_, err := client.connection.Read(client.buffer)
+		n, err := client.connection.Read(client.buffer)
 		if err != nil {
 			// send an error if it's encountered
 			client.err <- err
 			return
 		}
+		if n <= 0 {
+			log.Printf("ERROR: Read %d bytes\n", n)
+		}
+
 		// send data if we read some.
 		client.incoming <- client.buffer
 	}

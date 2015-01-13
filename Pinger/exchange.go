@@ -23,7 +23,7 @@ func (ex *ExchangeClient) String() string {
 
 // Exchangehandler the incoming data handler
 func exchangehandler(data []byte) {
-	//fmt.Println("ExchangeClient received", string(data))
+	fmt.Println("ExchangeClient received", string(data))
 }
 
 var rng *rand.Rand

@@ -14,35 +14,35 @@ import (
 
 var loggerName = "nacho-pinger"
 var log = logging.MustGetLogger(loggerName)
-var format = logging.MustStringFormatter("%{time:15:04:05.000} %{level} %{shortfunc}:%{message}",)
+var format = logging.MustStringFormatter("%{time:15:04:05.000} %{level} %{shortfunc}:%{message}")
 
 const (
-	defaultPort              = 443
-	defaultBindAddress       = "0.0.0.0"
-	defaultTemplateDir       = "templates"
-	defaultDebugging         = false
-	defaultserverCertFile    = ""
-	defaultserverKeyFile     = ""
-	defaultDebug             = false
-	defaultNonTLSPort        = 80
-	defaultDevelopment       = false
-	defaultLogDir            = "/var/log/"
+	defaultPort           = 443
+	defaultBindAddress    = "0.0.0.0"
+	defaultTemplateDir    = "templates"
+	defaultDebugging      = false
+	defaultserverCertFile = ""
+	defaultserverKeyFile  = ""
+	defaultDebug          = false
+	defaultNonTLSPort     = 80
+	defaultDevelopment    = false
+	defaultLogDir         = "/var/log/"
 )
 
 // ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
 type ServerConfiguration struct {
-	Port              int
-	BindAddress       string
-	TemplateDir       string
-	ServerCertFile    string
-	ServerKeyFile     string
-	Non_TLS_Port      int  // underscores here, because this reflects the config-file key 'non-tls-port'
+	Port           int
+	BindAddress    string
+	TemplateDir    string
+	ServerCertFile string
+	ServerKeyFile  string
+	Non_TLS_Port   int // underscores here, because this reflects the config-file key 'non-tls-port'
 }
 
 type GlobalConfiguration struct {
-	Debug bool
+	Debug       bool
 	Development bool
-	LogDir string
+	LogDir      string
 }
 
 // Configuration - The top level configuration structure.
@@ -57,17 +57,17 @@ func (config *Configuration) Read(filename string) error {
 
 func NewConfiguration() *Configuration {
 	return &Configuration{Server: ServerConfiguration{
-		Port:              defaultPort,
-		BindAddress:       defaultBindAddress,
-		TemplateDir:       defaultTemplateDir,
-		ServerCertFile:    defaultserverCertFile,
-		ServerKeyFile:     defaultserverKeyFile,
-		Non_TLS_Port:      defaultNonTLSPort,
+		Port:           defaultPort,
+		BindAddress:    defaultBindAddress,
+		TemplateDir:    defaultTemplateDir,
+		ServerCertFile: defaultserverCertFile,
+		ServerKeyFile:  defaultserverKeyFile,
+		Non_TLS_Port:   defaultNonTLSPort,
 	},
 		Global: GlobalConfiguration{
-			Debug: defaultDebug,
+			Debug:       defaultDebug,
 			Development: defaultDevelopment,
-			LogDir: defaultLogDir,
+			LogDir:      defaultLogDir,
 		},
 	}
 }
@@ -77,11 +77,15 @@ var usage = func() {
 	flag.PrintDefaults()
 }
 
-func exists(path string) (bool) {
-    _, err := os.Stat(path)
-    if err == nil { return true }
-    if os.IsNotExist(err) { return false }
-    return false
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	return false
 }
 
 // GetConfigAndRun process command line arguments and run the server
@@ -93,7 +97,7 @@ func GetConfigAndRun() {
 	var bindAddress string
 	var err error
 
-    logging.SetFormatter(format)
+	logging.SetFormatter(format)
 
 	flag.IntVar(&port, "p", defaultPort, "The port to bind to")
 	flag.StringVar(&bindAddress, "host", defaultBindAddress, "The IP address to bind to")
@@ -138,11 +142,11 @@ func GetConfigAndRun() {
 		log.Error("%v\n", err)
 		os.Exit(1)
 	}
-    fileLogger := logging.AddModuleLevel(logging.NewLogBackend(logFile, "", 0))
-    fileLogger.SetLevel(logging.INFO, "")
+	fileLogger := logging.AddModuleLevel(logging.NewLogBackend(logFile, "", 0))
+	fileLogger.SetLevel(logging.INFO, "")
 	if config.Global.Debug {
-    	screenLogger := logging.AddModuleLevel(logging.NewLogBackend(os.Stdout, "", 0))
-	    logging.SetBackend(fileLogger, screenLogger)
+		screenLogger := logging.AddModuleLevel(logging.NewLogBackend(os.Stdout, "", 0))
+		logging.SetBackend(fileLogger, screenLogger)
 	} else {
 		logging.SetBackend(fileLogger)
 	}
@@ -179,7 +183,7 @@ func (config *Configuration) run() error {
 			negroni.NewRecovery(),
 			negroni.NewLogger(),
 			NewRedirectMiddleware("", config.Server.Port),
-			)
+		)
 		httpRouter := mux.NewRouter()
 		httpMiddlewares.UseHandler(httpRouter)
 		addr := fmt.Sprintf("%s:%d", config.Server.BindAddress, config.Server.Non_TLS_Port)
