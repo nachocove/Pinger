@@ -44,3 +44,9 @@ To get the list of dependencies, use:
 ```
 go list -f '{{join .Deps "\n"}}' ./... |  xargs go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}'
 ```
+
+To install all dependencies (assuming they didn't get pull in in the initial fetch, or perhaps you're updating):
+```
+go list -f '{{join .Deps "\n"}}' ./... |  xargs go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}' | xargs go get
+```
+

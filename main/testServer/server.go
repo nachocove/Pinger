@@ -10,12 +10,12 @@ import (
 	"github.com/nachocove/Pinger/Pinger"
 	"io"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net"
 	"os"
 	"path"
 	"time"
+	"github.com/op/go-logging"
 )
 
 var rng *rand.Rand
@@ -35,18 +35,16 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 	defer conn.Close()
 	tc, ok := conn.(*net.TCPConn)
 	if !ok {
-		log.Println("ERROR: Could not grab tcp conn")
+		logger.Error("Could not grab tcp conn")
 		return
 	}
 	if tcpKeepAlive != 0 {
 		tc.SetKeepAlive(true)
 		tc.SetKeepAlivePeriod(tcpKeepAlive)
-		if debug {
-			log.Printf("Set TCP-keepalive to %ds\n", tcpKeepAlive)
-		}
+		logger.Debug("Set TCP-keepalive to %ds\n", tcpKeepAlive)
 		tcpkeep, err := tcpkeepalive.EnableKeepAlive(tc)
 		if err != nil {
-			log.Println("Could not set tcpkeepalive.EnableKeepAlive")
+			logger.Error("Could not set tcpkeepalive.EnableKeepAlive")
 			return
 		}
 		tcpkeep.SetKeepAliveIdle(time.Duration(tcpKeepAlive) * time.Second)
@@ -55,12 +53,12 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 	}
 	if TLSconfig != nil {
 		if debug {
-			log.Println("Accepted TLS connection")
+			logger.Info("Accepted TLS connection")
 		}
 		conn = tls.Server(conn, TLSconfig)
 	} else {
 		if debug {
-			log.Println("WARNING: Accepted TCP-only connection")
+			logger.Warning("Accepted TCP-only connection")
 		}
 	}
 
@@ -95,14 +93,12 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 	}(conn, inCh, eCh)
 
 	remote := conn.RemoteAddr().String()
-	if debug || verbose {
-		log.Printf("%s: Got connection\n", remote)
-	}
+	logger.Info("%s: Got connection\n", remote)
 	activeConnections++
 
 	var timer *time.Timer
 	if disconnectTime <= 0 {
-		log.Fatalln("disconnectTime must be > 0")
+		logger.Fatal("disconnectTime must be > 0")
 	}
 	timer = time.NewTimer(disconnectTime)
 	defer timer.Stop()
@@ -110,43 +106,40 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 	// continuously read from the connection
 	for {
 		var exitLoop = false
-		if debug {
-			log.Printf("%s: Waiting %d seconds for something to happen\n", remote, disconnectTime/time.Second)
-		}
+		logger.Debug("%s: Waiting %d seconds for something to happen\n", remote, disconnectTime/time.Second)
 		select {
 		// This case means we recieved data on the connection
 		case data := <-inCh:
 			// just write the data back. We are the ultimate echo.
 			if debug {
-				log.Printf("Received data and sending it back: %s\n", string(data))
+				logger.Debug("Received data and sending it back: %s\n", string(data))
 			}
-			conn.Write(data)
+			n, err := conn.Write(data)
+			if err != nil {
+				logger.Error("%v\n", err)
+			} else {
+				logger.Debug("Sent %d bytes\n", n)
+			}
 
 		// This case means we got an error and the goroutine has finished
 		case err := <-eCh:
 			// handle our error then exit for loop
 			if err == io.EOF {
-				if debug || verbose {
-					log.Printf("%s: Connection closed\n", remote)
-				}
+				logger.Debug("%s: Connection closed\n", remote)
 			} else {
-				log.Printf("%s: Error %s\n", remote, err.Error())
+				logger.Error("%s: %s\n", remote, err.Error())
 			}
 			exitLoop = true
 
 		case <-timer.C:
-			if debug {
-				log.Printf("%s: Timer expired.\n", remote)
-			}
+			logger.Debug("%s: Timer expired.\n", remote)
 			exitLoop = true
 		}
 		if exitLoop {
 			break
 		}
 	}
-	if debug || verbose {
-		log.Printf("%s: Closing connection\n", remote)
-	}
+	logger.Info("%s: Closing connection\n", remote)
 	activeConnections--
 }
 
@@ -165,6 +158,8 @@ func memStatsExtraInfo(stats *Pinger.MemStats) string {
 	}
 	return fmt.Sprintf("number of connections: %d", activeConnections)
 }
+
+var logger *logging.Logger
 
 func main() {
 	var port int
@@ -203,30 +198,24 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
-	var logOutput io.Writer
+	logFile, err := os.OpenFile(logFileName, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if err != nil {
+	   	fmt.Fprintf(os.Stderr, "error opening file %s: %v", logFileName, err)
+   	}
+	var screenLogging = false
+	var screenLevel = logging.ERROR
+	if debug || verbose {
+		screenLogging = true
+		switch {
+		case debug:
+			screenLevel = logging.DEBUG
+			
+		case verbose:
+			screenLevel = logging.INFO
+		}
+	}
+	logger = Pinger.InitLogging("TestServer", logFile, logging.DEBUG, screenLogging, screenLevel)
 
-	//	if logFileName != "" {
-	//		var logFile *os.File
-	//		logFile, err := os.OpenFile(logFileName, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
-	//		if err != nil {
-	//	    	log.Fatalf("error opening file %s: %v", logFileName, err)
-	//		}
-	//		defer logFile.Close()
-	//		logOutput = io.Writer(logFile)
-	//	} else {
-	//		logFile, err := os.OpenFile("/dev/null", os.O_RDWR, 0666)
-	//		if err != nil {
-	//	    	log.Fatalf("error opening /dev/null %s: %v", logFileName, err)
-	//		}
-	//		logOutput = io.Writer(logFile)
-	//	}
-	//	if verbose || debug {
-	//		logOutput = io.MultiWriter(os.Stdout, logOutput)
-	//	}
-	logOutput = io.Writer(os.Stdout)
-	log.SetOutput(logOutput)
-
-	var err error
 	var TLSconfig *tls.Config
 
 	if certFile != "" || keyFile != "" {
@@ -277,17 +266,16 @@ func main() {
 		memstats.PrintMemStatsPeriodic(printMemPeriodic)
 	}
 
-	if debug {
-		log.Printf("Listening on %s\n", dialString)
-		log.Printf("Min %d, Max %d\n", minWaitTime, maxWaitTime)
-	}
+	logger.Info("Listening on %s\n", dialString)
+	logger.Debug("Min %d, Max %d\n", minWaitTime, maxWaitTime)
+
 	if memstats != nil {
 		memstats.SetBaseMemStats()
 	}
 	for {
 		conn, err := TCPLn.Accept()
 		if err != nil {
-			log.Println("ERROR: Could not accept connection", err.Error())
+			logger.Error("Could not accept connection", err.Error())
 			continue
 		}
 		var disconnectTime time.Duration

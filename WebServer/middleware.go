@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/context"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -19,12 +21,12 @@ const (
 func GetConfig(r *http.Request) *Configuration {
 	val, ok := context.GetOk(r, configKey)
 	if !ok {
-		log.Fatal("No template in context")
+		logger.Fatal("No template in context")
 	}
 
 	config, ok := val.(*Configuration)
 	if !ok {
-		log.Fatal("No string template in context")
+		logger.Fatal("No string template in context")
 	}
 
 	return config
@@ -54,6 +56,15 @@ func NewStatic(directory, prefix, index string) *negroni.Static {
 	}
 }
 
+func NewRecovery(printStack bool) *negroni.Recovery {
+	return &negroni.Recovery{
+		Logger:     log.New(os.Stdout, "[negroni] ", 0),
+		PrintStack: printStack,
+		StackAll:   false,
+		StackSize:  1024 * 8,
+	}
+}
+
 type RedirectMiddleWare struct {
 	redirectPort int
 	redirectHost string
@@ -75,7 +86,7 @@ func (redir *RedirectMiddleWare) ServeHTTP(rw http.ResponseWriter, r *http.Reque
 		portString = ""
 	}
 	redirAddr := fmt.Sprintf("https://%s%s%s", host, portString, r.RequestURI)
-	log.Info("Redirecting to %s\n", redirAddr)
+	logger.Info("Redirecting to %s\n", redirAddr)
 	http.Redirect(rw, r, redirAddr, http.StatusMovedPermanently)
 }
 

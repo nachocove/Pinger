@@ -6,15 +6,12 @@ import (
 	"fmt"
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
+	"github.com/nachocove/Pinger/Pinger"
 	"github.com/op/go-logging"
 	"net/http"
 	"os"
 	"path"
 )
-
-var loggerName = "nacho-pinger"
-var log = logging.MustGetLogger(loggerName)
-var format = logging.MustStringFormatter("%{time:15:04:05.000} %{level} %{shortfunc}:%{message}")
 
 const (
 	defaultPort           = 443
@@ -97,8 +94,6 @@ func GetConfigAndRun() {
 	var bindAddress string
 	var err error
 
-	logging.SetFormatter(format)
-
 	flag.IntVar(&port, "p", defaultPort, "The port to bind to")
 	flag.StringVar(&bindAddress, "host", defaultBindAddress, "The IP address to bind to")
 	flag.BoolVar(&debug, "d", defaultDebug, "Debug")
@@ -113,7 +108,7 @@ func GetConfigAndRun() {
 	if configFile != "" {
 		err = config.Read(configFile)
 		if err != nil {
-			log.Error("Error reading config file:\n%v\n", err)
+			Pinger.Log.Error("Error reading config file:\n%v\n", err)
 			os.Exit(1)
 		}
 	}
@@ -130,44 +125,42 @@ func GetConfigAndRun() {
 		config.Global.Debug = debug
 	}
 	if config.Server.TemplateDir == "" {
-		log.Error("No template directory specified!")
+		Pinger.Log.Error("No template directory specified!")
 		os.Exit(1)
 	}
 	if !exists(config.Global.LogDir) {
-		log.Error("Logging directory %s does not exist.\n", config.Global.LogDir)
+		Pinger.Log.Error("Logging directory %s does not exist.\n", config.Global.LogDir)
 		os.Exit(1)
 	}
+
 	logFile, err := os.OpenFile(path.Join(config.Global.LogDir, "webserver.log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
-		log.Error("%v\n", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
-	fileLogger := logging.AddModuleLevel(logging.NewLogBackend(logFile, "", 0))
-	fileLogger.SetLevel(logging.INFO, "")
-	if config.Global.Debug {
-		screenLogger := logging.AddModuleLevel(logging.NewLogBackend(os.Stdout, "", 0))
-		logging.SetBackend(fileLogger, screenLogger)
-	} else {
-		logging.SetBackend(fileLogger)
+	var screenLogging = false
+	var screenLevel = logging.ERROR
+	if debug {
+		screenLogging = true
+		screenLevel = logging.DEBUG
 	}
+	logger = Pinger.InitLogging("pinger-webfe", logFile, logging.DEBUG, screenLogging, screenLevel)
 
 	err = config.run()
 	if err != nil {
-		log.Error("Could not run server!")
+		Pinger.Log.Error("Could not run server!")
 		os.Exit(1)
 	}
-	log.Info("Exiting Server.\n")
+	Pinger.Log.Info("Exiting Server.\n")
 	os.Exit(0)
 }
 
 var httpsRouter = mux.NewRouter()
+var logger *logging.Logger
 
 func (config *Configuration) run() error {
-	if config.Global.Debug {
-		logging.SetLevel(logging.DEBUG, loggerName)
-	}
 	httpsMiddlewares := negroni.New(
-		negroni.NewRecovery(),
+		NewRecovery(config.Global.Debug),
 		negroni.NewLogger(),
 		NewStatic("/public", "/static", ""),
 		NewContextMiddleWare(config))
@@ -175,12 +168,11 @@ func (config *Configuration) run() error {
 	httpsMiddlewares.UseHandler(httpsRouter)
 
 	addr := fmt.Sprintf("%s:%d", config.Server.BindAddress, config.Server.Port)
-
-	log.Info("Listening on %s (redirecting from %d)\n", addr, config.Server.Non_TLS_Port)
+	logger.Info("Listening on %s (redirecting from %d)\n", addr, config.Server.Non_TLS_Port)
 	// start the server on the non-tls port to redirect
 	go func() {
 		httpMiddlewares := negroni.New(
-			negroni.NewRecovery(),
+			NewRecovery(config.Global.Debug),
 			negroni.NewLogger(),
 			NewRedirectMiddleware("", config.Server.Port),
 		)
@@ -189,7 +181,7 @@ func (config *Configuration) run() error {
 		addr := fmt.Sprintf("%s:%d", config.Server.BindAddress, config.Server.Non_TLS_Port)
 		err := http.ListenAndServe(addr, httpMiddlewares)
 		if err != nil {
-			log.Fatalf("Could not start server on port %d\n", config.Server.Non_TLS_Port)
+			Pinger.Log.Fatalf("Could not start server on port %d\n", config.Server.Non_TLS_Port)
 		}
 	}()
 	// start the https server

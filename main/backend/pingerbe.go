@@ -6,8 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
+	"github.com/op/go-logging"
 	"io/ioutil"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -32,6 +32,8 @@ func memStatsExtraInfo(stats *Pinger.MemStats) string {
 	}
 	return fmt.Sprintf("number of connections: %d", Pinger.ActiveClientCount)
 }
+
+var logger *logging.Logger
 
 func main() {
 	var printMemPeriodic int
@@ -87,8 +89,21 @@ func main() {
 			TLSConfig.InsecureSkipVerify = true
 		}
 	}
+
+	logFile, err := os.OpenFile("pinger-backend.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+	var screenLogging = false
+	var screenLevel = logging.ERROR
+	if debug {
+		screenLogging = true
+		screenLevel = logging.DEBUG
+	}
+	logger = Pinger.InitLogging("pinger-be", logFile, logging.DEBUG, screenLogging, screenLevel)
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	log.Printf("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
+	logger.Info("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
 
 	var memstats *Pinger.MemStats
 	if printMemPeriodic > 0 || printMem {
@@ -108,11 +123,11 @@ func main() {
 		memstats.SetBaseMemStats()
 	}
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		logger.Error("%v\n", http.ListenAndServe("localhost:6060", nil))
 	}()
 	for i := 0; i < maxConnection; i++ {
 		if debug {
-			log.Println("Opening connection to", connectionString)
+			logger.Info("Opening connection to", connectionString)
 		}
 		var reopen bool
 		if noReopenConnections {
@@ -120,26 +135,26 @@ func main() {
 		} else {
 			reopen = true
 		}
-		client := Pinger.NewExchangeClient(connectionString, pingPeriodic, reopen, TLSConfig, tcpKeepAlive, debug)
+		client := Pinger.NewExchangeClient(connectionString, pingPeriodic, reopen, TLSConfig, tcpKeepAlive, debug, logger)
 		// this launches either 2 or 3 goroutines per connection. 3 if pingPeriodic > 0, 2 otherwise.
 		if client != nil {
 			err := client.Listen(&wg)
 			if err != nil {
-				log.Println("Could not open connection", i, err.Error())
+				logger.Error("Could not open connection %d %v\n", i, err.Error())
 			}
 		}
 	}
 	wg.Wait()
 	defer func() {
-		log.Printf("All Connections closed: ")
+		logger.Info("All Connections closed: ")
 		if memstats != nil {
 			memstats.PrintMemStats()
 		}
 		profileFile := "/tmp/memprofile.pprof"
-		log.Printf("Writing memory profile: %s\n", profileFile)
+		logger.Info("Writing memory profile: %s\n", profileFile)
 		f, err := os.Create(profileFile)
 		if err != nil {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 		pprof.WriteHeapProfile(f)
 	}()

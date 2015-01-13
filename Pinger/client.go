@@ -4,21 +4,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/felixge/tcpkeepalive"
+	"github.com/op/go-logging"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"time"
 )
-
-// HandlerFunc Function used to handle incoming data on a channel.
-type HandlerFunc func([]byte)
-
-// HandleIncoming set the incoming data handler
-func (client *Client) HandleIncoming(handler HandlerFunc) {
-	client.incomingHandler = handler
-}
 
 const (
 	noCommand = iota
@@ -28,36 +19,36 @@ const (
 
 // Client The client structure for tracking a particular endpoint
 type Client struct {
-	connection      net.Conn
-	buffer          []byte
-	incoming        chan []byte
-	outgoing        chan []byte
-	command         chan int
-	err             chan error
-	waitGroup       *sync.WaitGroup
-	debug           bool
-	incomingHandler HandlerFunc
-	dialString      string
-	reopenOnClose   bool
-	tlsConfig       *tls.Config
-	tcpKeepAlive    int
+	connection    net.Conn
+	buffer        []byte
+	incoming      chan []byte
+	outgoing      chan []byte
+	command       chan int
+	err           chan error
+	waitGroup     *sync.WaitGroup
+	debug         bool
+	dialString    string
+	reopenOnClose bool
+	tlsConfig     *tls.Config
+	tcpKeepAlive  int
+	logger        *logging.Logger
 }
 
 // NewClient Set up a new client
-func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, tcpKeepAlive int, debug bool) *Client {
+func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, tcpKeepAlive int, debug bool, logger *logging.Logger) *Client {
 	client := &Client{
-		dialString:      dialString,
-		connection:      nil,
-		incoming:        make(chan []byte),
-		outgoing:        make(chan []byte),
-		command:         make(chan int, 2),
-		err:             make(chan error),
-		waitGroup:       nil,
-		debug:           debug,
-		incomingHandler: printIncoming,
-		reopenOnClose:   reopenOnClose,
-		tlsConfig:       tlsConfig,
-		tcpKeepAlive:    tcpKeepAlive,
+		dialString:    dialString,
+		connection:    nil,
+		incoming:      make(chan []byte, 2),
+		outgoing:      make(chan []byte, 2),
+		command:       make(chan int, 2),
+		err:           make(chan error),
+		waitGroup:     nil,
+		debug:         debug,
+		reopenOnClose: reopenOnClose,
+		tlsConfig:     tlsConfig,
+		tcpKeepAlive:  tcpKeepAlive,
+		logger:        logger,
 	}
 	return client
 }
@@ -77,7 +68,7 @@ func (client *Client) String() string {
 // Done The client is exiting. Cleanup and alert anyone waiting.
 func (client *Client) Done() {
 	if client.debug {
-		log.Println("Finished with Client")
+		client.logger.Info("Finished with Client")
 	}
 	if client.waitGroup != nil {
 		client.waitGroup.Done()
@@ -99,7 +90,7 @@ func (client *Client) connectionReader(command <-chan int) {
 			cmd := <-command
 			if cmd == Stop {
 				if client.debug {
-					log.Println("Was told to stop. Exiting")
+					client.logger.Info("Was told to stop. Exiting")
 				}
 				return
 			}
@@ -112,7 +103,7 @@ func (client *Client) connectionReader(command <-chan int) {
 			return
 		}
 		if n <= 0 {
-			log.Printf("ERROR: Read %d bytes\n", n)
+			client.logger.Error("Read %d bytes\n", n)
 		}
 
 		// send data if we read some.
@@ -125,7 +116,7 @@ func (client *Client) connectionReader(command <-chan int) {
 func (client *Client) wait() {
 	defer client.Done()
 	if client.connection == nil {
-		log.Fatalln("Wait called without an open connection")
+		client.logger.Fatal("Wait called without an open connection")
 	}
 	defer client.closeConn()
 
@@ -140,22 +131,16 @@ func (client *Client) wait() {
 		var exitLoop = false
 		if client.connection == nil {
 			if client.debug {
-				log.Println("reopening connection")
+				client.logger.Debug("reopening connection")
 			}
 			client.openConn()
 		}
 		select {
-		case data := <-client.incoming:
-			// if there's a handler, call it for the incoming data
-			if client.incomingHandler != nil {
-				client.incomingHandler(data)
-			}
-
 		case data := <-client.outgoing:
 			// write data to the connection
 			_, err := client.connection.Write(data)
 			if err != nil {
-				log.Printf("ERROR on write: %s\n", err.Error())
+				client.logger.Error("write: %s\n", err.Error())
 				client.closeConn()
 				if client.reopenOnClose == false {
 					exitLoop = true
@@ -165,9 +150,9 @@ func (client *Client) wait() {
 		case err := <-client.err:
 			// handle our error then exit for loop
 			if err == io.EOF {
-				log.Printf("Connection closed\n")
+				client.logger.Info("Connection closed\n")
 			} else {
-				log.Printf("Error from channel: %s\n", err.Error())
+				client.logger.Error("channel: %s\n", err.Error())
 			}
 			exitLoop = true
 
@@ -175,7 +160,7 @@ func (client *Client) wait() {
 			switch cmd {
 			case Stop:
 				if client.debug {
-					log.Println("Stopping")
+					client.logger.Debug("Stopping")
 				}
 				exitLoop = true
 				// don't try to reopen anything. We're outta here.
@@ -192,10 +177,6 @@ func (client *Client) wait() {
 	}
 }
 
-func printIncoming(data []byte) {
-	log.Println(data)
-}
-
 func (client *Client) openConn() error {
 	connection, err := net.Dial("tcp", client.dialString)
 	if err != nil {
@@ -205,22 +186,17 @@ func (client *Client) openConn() error {
 	if client.tcpKeepAlive != 0 {
 		tcpconn.SetKeepAlive(true)
 		tcpconn.SetKeepAlivePeriod(time.Duration(client.tcpKeepAlive) * time.Second)
-		tcpkeep, err := tcpkeepalive.EnableKeepAlive(tcpconn)
-		if err != nil {
-			return errors.New("Could not set tcpkeepalive.EnableKeepAlive")
-		}
-		tcpkeep.SetKeepAliveIdle(time.Duration(client.tcpKeepAlive) * time.Second)
 	} else {
 		tcpconn.SetKeepAlive(false)
 	}
 	if client.tlsConfig != nil {
 		connection = tls.Client(connection, client.tlsConfig)
 		if client.debug {
-			log.Println("Opened TLS Connection")
+			client.logger.Info("Opened TLS Connection")
 		}
 	} else {
 		if client.debug {
-			log.Println("WARNING: Opened TCP-only Connection")
+			client.logger.Warning("Opened TCP-only Connection")
 		}
 	}
 	client.connection = connection
@@ -240,9 +216,7 @@ func (client *Client) closeConn() {
 // Listen Set up the go routine for monitoring the connection. Also mark the client as running in case anyone is waiting.
 // This function creates a go routine (Wait()), which itself adds 1 goroutines for listening.
 func (client *Client) Listen(wait *sync.WaitGroup) error {
-	if client.debug {
-		log.Println("Starting client")
-	}
+	client.logger.Debug("Starting client")
 	client.waitGroup = wait
 	err := client.openConn()
 	if err != nil {
