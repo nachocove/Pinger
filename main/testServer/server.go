@@ -177,7 +177,7 @@ func main() {
 	flag.IntVar(&port, "p", 8082, "Listen port")
 	flag.IntVar(&minWaitTime, "min", 0, "min wait time")
 	flag.IntVar(&maxWaitTime, "max", 0, "max wait time")
-	flag.StringVar(&logFileName, "l", "", "log file")
+	flag.StringVar(&logFileName, "l", "testServer.log", "log file")
 	flag.StringVar(&bindAddress, "b", "", "bind address")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
@@ -223,7 +223,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Need both -cert and -key (and optionally -chain)")
 			os.Exit(1)
 		}
-
+		logger.Info("Loading cert and key: %s, %s\n", certFile, keyFile)
 		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Could not read cert and key files")
