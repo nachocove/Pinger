@@ -47,7 +47,7 @@ func (ex *ExchangeClient) periodicCheck() {
 		select {
 		case incomingData := <-ex.client.incoming:
 			responseTime := time.Since(dataSentTime)
-			Log.Debug("Got response in %f ms\n", responseTime.Seconds()*float64(time.Millisecond))
+			Log.Debug("Got response in %fms\n", responseTime.Seconds()*1000.00)
 			incomingString := string(bytes.Trim(incomingData, "\000"))
 			if incomingString != data {
 				Log.Debug("Received data does not match: \n (%d) %s\n (%d) %s\n", len(incomingString), incomingString, len(data), data)
