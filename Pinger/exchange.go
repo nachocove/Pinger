@@ -33,36 +33,37 @@ func randomInt(x, y int) int {
 }
 
 func (ex *ExchangeClient) periodicCheck() {
-	data := fmt.Sprintf("%s: Greetings from %s", time.Now(), ex.client.connection.LocalAddr().String())
+	localAddr := ex.client.connection.LocalAddr().String()
+	data := fmt.Sprintf("%s: Greetings from %s", time.Now(), localAddr)
 
 	for {
 		if ex.debug {
-			Log.Debug("ExchangeClient sending \"%s\"", data)
+			Log.Debug("%s: ExchangeClient sending \"%s\"", localAddr, data)
 		}
 		receiveTimeout := time.NewTimer(time.Duration(60) * time.Second)
 		dataSentTime := time.Now()
 		ex.client.outgoing <- []byte(data)
 
-		Log.Debug("Waiting for response")
+		Log.Debug("%s: Waiting for response", localAddr)
 		select {
 		case incomingData := <-ex.client.incoming:
 			responseTime := time.Since(dataSentTime)
-			Log.Debug("Got response in %fms\n", responseTime.Seconds()*1000.00)
+			Log.Debug("%s: Got response in %fms\n", localAddr, responseTime.Seconds()*1000.00)
 			incomingString := string(bytes.Trim(incomingData, "\000"))
 			if incomingString != data {
-				Log.Debug("Received data does not match: \n (%d) %s\n (%d) %s\n", len(incomingString), incomingString, len(data), data)
+				Log.Debug("%s: Received data does not match: \n (%d) %s\n (%d) %s\n", localAddr, len(incomingString), incomingString, len(data), data)
 				continue
 			} else {
-				Log.Debug("Received string matches")
+				Log.Debug("%s: Received string matches", localAddr)
 			}
 			receiveTimeout.Stop()
 
 		case <-receiveTimeout.C:
-			Log.Error("No response in allotted time")
+			Log.Error("%s: No response in allotted time", localAddr)
 		}
 		sleepTime := ex.pingPeriodicity + randomInt(1, 5)
 		if ex.debug {
-			Log.Debug("Sleeping %d\n", sleepTime)
+			Log.Debug("%s: Sleeping %d\n", localAddr, sleepTime)
 		}
 		time.Sleep(time.Duration(sleepTime) * time.Second)
 	}
