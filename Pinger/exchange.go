@@ -32,7 +32,7 @@ func randomInt(x, y int) int {
 	return rand.Intn(y-x) + x
 }
 
-type responseTimeStruct struct {
+type statStruct struct {
 	min   float64
 	max   float64
 	sum   float64
@@ -40,8 +40,8 @@ type responseTimeStruct struct {
 	count int
 }
 
-func newResponseTimeStruct() * responseTimeStruct {
-	return &responseTimeStruct{
+func newStatStruct() * statStruct {
+	return &statStruct{
 		min: 1000000.00,
 		max: 0,
 		avg: 0,
@@ -50,7 +50,7 @@ func newResponseTimeStruct() * responseTimeStruct {
 		}
 }
 
-func (r *responseTimeStruct) addDataPoint(responseTime float64) {
+func (r *statStruct) addDataPoint(responseTime float64) {
 	if responseTime < r.min {
 		r.min = responseTime
 	}
@@ -61,7 +61,7 @@ func (r *responseTimeStruct) addDataPoint(responseTime float64) {
 	r.sum = r.sum + responseTime
 }
 
-func (r *responseTimeStruct) log(prefix string) {
+func (r *statStruct) log(prefix string) {
 	if r.count > 0 {
 		r.avg = r.sum / float64(r.count)
 		tallyLogger.Info("%s(min/avg/max): %8.2fms / %8.2fms / %8.2fms (connections: %7d,  messages: %7d)\n", prefix, r.min*1000.00, r.avg*1000.00, r.max*1000.00, ActiveClientCount, r.count)
@@ -70,39 +70,40 @@ func (r *responseTimeStruct) log(prefix string) {
 
 var responseTimeCh chan float64
 var firstTimeResponseTimeCh chan float64
+var overageSleepTimeCh chan float64
 var tallyLogger *logging.Logger
 
 func tallyResponseTimes() {
-	var responseTime float64
-	normalResponseTimes := newResponseTimeStruct()
-	firstResponseTimes := newResponseTimeStruct()
-	count := 0
+	var data float64
+	normalResponseTimes := newStatStruct()
+	firstResponseTimes := newStatStruct()
+	sleepTimeStats := newStatStruct()
 	logTimeout := time.Duration(5*time.Second)
 	logTimer := time.NewTimer(logTimeout)
 	for {
 		select {
-		case responseTime = <-responseTimeCh:
-			normalResponseTimes.addDataPoint(responseTime)
-			count++
+		case data = <-responseTimeCh:
+			normalResponseTimes.addDataPoint(data)
 
-		case responseTime = <-firstTimeResponseTimeCh:
-			firstResponseTimes.addDataPoint(responseTime)
-			count++
+		case data = <-firstTimeResponseTimeCh:
+			firstResponseTimes.addDataPoint(data)
+			
+		case data = <- overageSleepTimeCh:
+			sleepTimeStats.addDataPoint(data)
 		
 		case <- logTimer.C:
-			firstResponseTimes.log(" first")
-			normalResponseTimes.log("normal")
+			firstResponseTimes.log("    first")
+			normalResponseTimes.log("   normal")
+			normalResponseTimes.log("sleepOver")
 			logTimer.Reset(logTimeout)
 		}
 	}
 }
 
-func logResponseTimes() {
-	
-}
 func init() {
 	responseTimeCh = make(chan float64, 1000)
 	firstTimeResponseTimeCh = make(chan float64, 1000)
+	overageSleepTimeCh = make(chan float64, 1000)
 	go tallyResponseTimes()
 }
 
@@ -113,6 +114,7 @@ func (ex *ExchangeClient) periodicCheck() {
 	if tallyLogger == nil {
 		tallyLogger = ex.client.logger
 	}
+	
 	for {
 		count++
 		data := fmt.Sprintf("%d: Greetings from %s", count, localAddr)
@@ -136,7 +138,7 @@ func (ex *ExchangeClient) periodicCheck() {
 			}
 			incomingString := string(bytes.Trim(incomingData, "\000"))
 			if incomingString != data {
-				ex.client.logger.Debug("%s: Received data does not match: \n (%d) %s\n (%d) %s\n", localAddr, len(incomingString), incomingString, len(data), data)
+				ex.client.logger.Warning("%s: Received data does not match: \n (%d) %s\n (%d) %s\n", localAddr, len(incomingString), incomingString, len(data), data)
 				continue
 			} else {
 				ex.client.logger.Debug("%s: Received string matches", localAddr)
@@ -150,7 +152,12 @@ func (ex *ExchangeClient) periodicCheck() {
 		if ex.debug {
 			ex.client.logger.Debug("%s: Sleeping %d\n", localAddr, sleepTime)
 		}
+		t1 := time.Now()
 		time.Sleep(time.Duration(sleepTime) * time.Second)
+		t2 := time.Now()
+		diff := t2.Sub(t1).Seconds()
+		ex.client.logger.Debug("%s: Should have slept for %d. Slept for %f", localAddr, sleepTime, diff)  
+		overageSleepTimeCh <- diff-float64(sleepTime)
 	}
 }
 
