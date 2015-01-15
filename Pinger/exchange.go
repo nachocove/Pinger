@@ -40,14 +40,14 @@ type statStruct struct {
 	count int
 }
 
-func newStatStruct() * statStruct {
+func newStatStruct() *statStruct {
 	return &statStruct{
-		min: 1000000.00,
-		max: 0,
-		avg: 0,
+		min:   1000000.00,
+		max:   0,
+		avg:   0,
 		count: 0,
-		sum: 0,
-		}
+		sum:   0,
+	}
 }
 
 func (r *statStruct) addDataPoint(responseTime float64) {
@@ -78,7 +78,7 @@ func tallyResponseTimes() {
 	normalResponseTimes := newStatStruct()
 	firstResponseTimes := newStatStruct()
 	sleepTimeStats := newStatStruct()
-	logTimeout := time.Duration(5*time.Second)
+	logTimeout := time.Duration(5 * time.Second)
 	logTimer := time.NewTimer(logTimeout)
 	for {
 		select {
@@ -87,14 +87,14 @@ func tallyResponseTimes() {
 
 		case data = <-firstTimeResponseTimeCh:
 			firstResponseTimes.addDataPoint(data)
-			
-		case data = <- overageSleepTimeCh:
+
+		case data = <-overageSleepTimeCh:
 			sleepTimeStats.addDataPoint(data)
-		
-		case <- logTimer.C:
+
+		case <-logTimer.C:
 			firstResponseTimes.log("    first")
 			normalResponseTimes.log("   normal")
-			normalResponseTimes.log("sleepOver")
+			sleepTimeStats.log("sleepOver")
 			logTimer.Reset(logTimeout)
 		}
 	}
@@ -114,7 +114,7 @@ func (ex *ExchangeClient) periodicCheck() {
 	if tallyLogger == nil {
 		tallyLogger = ex.client.logger
 	}
-	
+
 	for {
 		count++
 		data := fmt.Sprintf("%d: Greetings from %s", count, localAddr)
@@ -155,8 +155,8 @@ func (ex *ExchangeClient) periodicCheck() {
 		t1 := time.Now()
 		time.Sleep(time.Duration(sleepTime) * time.Second)
 		slept := time.Since(t1).Seconds()
-		ex.client.logger.Debug("%s: Should have slept for %d. Slept for %f", localAddr, sleepTime, slept)  
-		overTime := slept-float64(sleepTime)
+		ex.client.logger.Debug("%s: Should have slept for %d. Slept for %f", localAddr, sleepTime, slept)
+		overTime := slept - float64(sleepTime)
 		if overTime > 0 {
 			overageSleepTimeCh <- overTime
 		} else {
@@ -175,7 +175,6 @@ func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) error {
 	}
 	return err // could be nil
 }
-
 
 // TODO This really ought to just be a method/interface thing
 
