@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/op/go-logging"
-	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -78,6 +77,8 @@ func tallyResponseTimes() {
 	normalResponseTimes := newResponseTimeStruct()
 	firstResponseTimes := newResponseTimeStruct()
 	count := 0
+	logTimeout := time.Duration(5*time.Second)
+	logTimer := time.NewTimer(logTimeout)
 	for {
 		select {
 		case responseTime = <-responseTimeCh:
@@ -87,14 +88,18 @@ func tallyResponseTimes() {
 		case responseTime = <-firstTimeResponseTimeCh:
 			firstResponseTimes.addDataPoint(responseTime)
 			count++
-		}
-		if math.Mod(float64(count), 10) == 0 {
+		
+		case <- logTimer.C:
 			firstResponseTimes.log(" first")
 			normalResponseTimes.log("normal")
+			logTimer.Reset(logTimeout)
 		}
 	}
 }
 
+func logResponseTimes() {
+	
+}
 func init() {
 	responseTimeCh = make(chan float64, 1000)
 	firstTimeResponseTimeCh = make(chan float64, 1000)
