@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/op/go-logging"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -32,11 +33,68 @@ func randomInt(x, y int) int {
 	return rand.Intn(y-x) + x
 }
 
+type responseTimeStruct struct {
+	min   float64
+	max   float64
+	sum   float64
+	avg   float64
+	count int
+}
+
+func (r *responseTimeStruct) addDataPoint(responseTime float64) {
+	if responseTime < r.min {
+		r.min = responseTime
+	}
+	if responseTime > r.max {
+		r.max = responseTime
+	}
+	r.count++
+	r.sum = r.sum + responseTime
+}
+
+func (r *responseTimeStruct) log(prefix string) {
+	r.avg = r.sum / float64(r.count)
+	Log.Info("%s(min/avg/max): %fms / %fms / %fms\n", prefix, r.min*1000.00, r.avg*1000.00, r.max*1000.00)
+}
+
+var responseTimeCh chan float64
+var firstTimeResponseTimeCh chan float64
+
+func tallyResponseTimes() {
+	var responseTime float64
+	normalResponseTimes := &responseTimeStruct{min: 1000000.00}
+	firstResponseTimes := &responseTimeStruct{min: 1000000.00}
+	count := 0
+	for {
+		select {
+		case responseTime = <-responseTimeCh:
+			normalResponseTimes.addDataPoint(responseTime)
+			count++
+
+		case responseTime = <-firstTimeResponseTimeCh:
+			firstResponseTimes.addDataPoint(responseTime)
+			count++
+		}
+		if math.Mod(float64(count), 10) == 0 {
+			firstResponseTimes.log(" first")
+			normalResponseTimes.log("normal")
+		}
+	}
+}
+
+func init() {
+	responseTimeCh = make(chan float64, 1000)
+	firstTimeResponseTimeCh = make(chan float64, 1000)
+	go tallyResponseTimes()
+}
+
 func (ex *ExchangeClient) periodicCheck() {
 	localAddr := ex.client.connection.LocalAddr().String()
-	data := fmt.Sprintf("%s: Greetings from %s", time.Now(), localAddr)
-
+	firstTime := true
+	count := 0
 	for {
+		count++
+		data := fmt.Sprintf("%d: Greetings from %s", count, localAddr)
 		if ex.debug {
 			Log.Debug("%s: ExchangeClient sending \"%s\"", localAddr, data)
 		}
@@ -49,6 +107,12 @@ func (ex *ExchangeClient) periodicCheck() {
 		case incomingData := <-ex.client.incoming:
 			responseTime := time.Since(dataSentTime)
 			Log.Debug("%s: Got response in %fms\n", localAddr, responseTime.Seconds()*1000.00)
+			if firstTime {
+				firstTime = false
+				firstTimeResponseTimeCh <- responseTime.Seconds()
+			} else {
+				responseTimeCh <- responseTime.Seconds()
+			}
 			incomingString := string(bytes.Trim(incomingData, "\000"))
 			if incomingString != data {
 				Log.Debug("%s: Received data does not match: \n (%d) %s\n (%d) %s\n", localAddr, len(incomingString), incomingString, len(data), data)
