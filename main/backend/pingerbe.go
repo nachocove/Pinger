@@ -56,7 +56,7 @@ func main() {
 	flag.IntVar(&tcpKeepAlive, "tcpkeepalive", 0, "TCP Keepalive in seconds")
 	flag.StringVar(&logFileName, "log-file", "pinger-backend.log", "log-file to log to")
 	flag.StringVar(&logFileLevel, "log-level", "WARNING", "Logging level for the logfile (DEBUG, INFO, WARN, NOTICE, ERROR, CRITICAL)")
-	flag.IntVar(&sleepBetweenOpens, "sleep-after-open", 0, "Sleep n seconds after each connection opened.")
+	flag.IntVar(&sleepBetweenOpens, "sleep-after-open", 0, "Sleep n milliseconds after each connection opened.")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
 	flag.BoolVar(&help, "h", false, "Verbose")
@@ -176,7 +176,7 @@ func main() {
 			}
 		}
 		if sleepBetweenOpens > 0 {
-			time.Sleep(time.Duration(sleepBetweenOpens)*time.Second)
+			time.Sleep(time.Duration(sleepBetweenOpens)*time.Millisecond)
 		}
 	}
 	wg.Wait()
