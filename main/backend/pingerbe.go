@@ -127,7 +127,7 @@ func main() {
 	}()
 	for i := 0; i < maxConnection; i++ {
 		if debug {
-			logger.Info("Opening connection to", connectionString)
+			logger.Info("Opening connection to %s", connectionString)
 		}
 		var reopen bool
 		if noReopenConnections {
