@@ -49,9 +49,13 @@ func main() {
 	var tcpKeepAlive int
 	var verbose bool
 	var sleepBetweenOpens int
+	var logFileLevel string
+	var logFileName string
 
 	flag.IntVar(&maxConnection, "n", 1000, "Number of connections to make")
 	flag.IntVar(&tcpKeepAlive, "tcpkeepalive", 0, "TCP Keepalive in seconds")
+	flag.StringVar(&logFileName, "log-file", "pinger-backend.log", "log-file to log to")
+	flag.StringVar(&logFileLevel, "log-level", "WARNING", "Logging level for the logfile (DEBUG, INFO, WARN, NOTICE, ERROR, CRITICAL)")
 	flag.IntVar(&sleepBetweenOpens, "sleep-after-open", 0, "Sleep n seconds after each connection opened.")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
@@ -95,7 +99,10 @@ func main() {
 		}
 	}
 
-	logFile, err := os.OpenFile("pinger-backend.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+	if logFileName == "" {
+		logFileName = "/dev/null"
+	}
+	logFile, err := os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
@@ -110,7 +117,23 @@ func main() {
 			screenLevel = logging.INFO
 		}
 	}
-	logger = Pinger.InitLogging("pinger-be", logFile, logging.DEBUG, screenLogging, screenLevel)
+	var fileLevel logging.Level
+	switch {
+	case logFileLevel == "WARNING":
+		fileLevel = logging.WARNING
+	case logFileLevel == "ERROR":
+		fileLevel = logging.ERROR
+	case logFileLevel == "DEBUG":
+		fileLevel = logging.DEBUG
+	case logFileLevel == "INFO":
+		fileLevel = logging.INFO
+	case logFileLevel == "CRITICAL":
+		fileLevel = logging.CRITICAL
+	case logFileLevel == "NOTICE":
+		fileLevel = logging.NOTICE
+	}
+		
+	logger = Pinger.InitLogging("pinger-be", logFile, fileLevel, screenLogging, screenLevel)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	logger.Info("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
 
