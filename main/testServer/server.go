@@ -178,7 +178,7 @@ func main() {
 	flag.IntVar(&port, "p", 8082, "Listen port")
 	flag.IntVar(&minWaitTime, "min", 0, "min wait time")
 	flag.IntVar(&maxWaitTime, "max", 0, "max wait time")
-	flag.StringVar(&logFileName, "l", "testServer.log", "log file")
+	flag.StringVar(&logFileName, "log-file", "testServer.log", "log file")
 	flag.StringVar(&logFileLevel, "log-level", "WARNING", "Logging level for the logfile (DEBUG, INFO, WARN, NOTICE, ERROR, CRITICAL)")
 	flag.StringVar(&bindAddress, "b", "", "bind address")
 	flag.BoolVar(&debug, "d", false, "Debugging")
