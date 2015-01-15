@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"log"
 )
 
 const (
@@ -108,7 +109,7 @@ func GetConfigAndRun() {
 	if configFile != "" {
 		err = config.Read(configFile)
 		if err != nil {
-			Pinger.Log.Error("Error reading config file:\n%v\n", err)
+			log.Fatalf("Error reading config file:\n%v\n", err)
 			os.Exit(1)
 		}
 	}
@@ -125,17 +126,17 @@ func GetConfigAndRun() {
 		config.Global.Debug = debug
 	}
 	if config.Server.TemplateDir == "" {
-		Pinger.Log.Error("No template directory specified!")
+		log.Fatalf("No template directory specified!")
 		os.Exit(1)
 	}
 	if !exists(config.Global.LogDir) {
-		Pinger.Log.Error("Logging directory %s does not exist.\n", config.Global.LogDir)
+		log.Fatalf("Logging directory %s does not exist.\n", config.Global.LogDir)
 		os.Exit(1)
 	}
 
 	logFile, err := os.OpenFile(path.Join(config.Global.LogDir, "webserver.log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		log.Fatalf("%v\n", err)
 		os.Exit(1)
 	}
 	var screenLogging = false
@@ -148,10 +149,10 @@ func GetConfigAndRun() {
 
 	err = config.run()
 	if err != nil {
-		Pinger.Log.Error("Could not run server!")
+		logger.Error("Could not run server!")
 		os.Exit(1)
 	}
-	Pinger.Log.Info("Exiting Server.\n")
+	logger.Info("Exiting Server.\n")
 	os.Exit(0)
 }
 
@@ -181,7 +182,7 @@ func (config *Configuration) run() error {
 		addr := fmt.Sprintf("%s:%d", config.Server.BindAddress, config.Server.Non_TLS_Port)
 		err := http.ListenAndServe(addr, httpMiddlewares)
 		if err != nil {
-			Pinger.Log.Fatalf("Could not start server on port %d\n", config.Server.Non_TLS_Port)
+			logger.Fatalf("Could not start server on port %d\n", config.Server.Non_TLS_Port)
 		}
 	}()
 	// start the https server

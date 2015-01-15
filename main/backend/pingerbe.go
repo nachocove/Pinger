@@ -46,10 +46,12 @@ func main() {
 	var noReopenConnections bool
 	var caCertChainFile string
 	var tcpKeepAlive int
+	var verbose bool
 
 	flag.IntVar(&maxConnection, "n", 1000, "Number of connections to make")
 	flag.IntVar(&tcpKeepAlive, "tcpkeepalive", 0, "TCP Keepalive in seconds")
 	flag.BoolVar(&debug, "d", false, "Debugging")
+	flag.BoolVar(&verbose, "v", false, "Verbose")
 	flag.BoolVar(&help, "h", false, "Verbose")
 	flag.BoolVar(&tlsCheckHostname, "tlscheckhost", false, "Verify the hostname to the certificate")
 	flag.BoolVar(&noReopenConnections, "no-reopen", false, "Verbose")
@@ -97,9 +99,13 @@ func main() {
 	}
 	var screenLogging = false
 	var screenLevel = logging.ERROR
-	if debug {
+	if debug || verbose{
 		screenLogging = true
-		screenLevel = logging.DEBUG
+		if debug {
+			screenLevel = logging.DEBUG
+		} else {
+			screenLevel = logging.INFO
+		}
 	}
 	logger = Pinger.InitLogging("pinger-be", logFile, logging.DEBUG, screenLogging, screenLevel)
 	runtime.GOMAXPROCS(runtime.NumCPU())

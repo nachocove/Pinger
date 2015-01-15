@@ -54,11 +54,12 @@ func (r *responseTimeStruct) addDataPoint(responseTime float64) {
 
 func (r *responseTimeStruct) log(prefix string) {
 	r.avg = r.sum / float64(r.count)
-	Log.Info("%s(min/avg/max): %fms / %fms / %fms\n", prefix, r.min*1000.00, r.avg*1000.00, r.max*1000.00)
+	tallyLogger.Info("%s(min/avg/max): %fms / %fms / %fms\n", prefix, r.min*1000.00, r.avg*1000.00, r.max*1000.00)
 }
 
 var responseTimeCh chan float64
 var firstTimeResponseTimeCh chan float64
+var tallyLogger *logging.Logger
 
 func tallyResponseTimes() {
 	var responseTime float64
@@ -92,21 +93,24 @@ func (ex *ExchangeClient) periodicCheck() {
 	localAddr := ex.client.connection.LocalAddr().String()
 	firstTime := true
 	count := 0
+	if tallyLogger == nil {
+		tallyLogger = ex.client.logger
+	}
 	for {
 		count++
 		data := fmt.Sprintf("%d: Greetings from %s", count, localAddr)
 		if ex.debug {
-			Log.Debug("%s: ExchangeClient sending \"%s\"", localAddr, data)
+			ex.client.logger.Debug("%s: ExchangeClient sending \"%s\"", localAddr, data)
 		}
 		receiveTimeout := time.NewTimer(time.Duration(60) * time.Second)
 		dataSentTime := time.Now()
 		ex.client.outgoing <- []byte(data)
 
-		Log.Debug("%s: Waiting for response", localAddr)
+		ex.client.logger.Debug("%s: Waiting for response", localAddr)
 		select {
 		case incomingData := <-ex.client.incoming:
 			responseTime := time.Since(dataSentTime)
-			Log.Debug("%s: Got response in %fms\n", localAddr, responseTime.Seconds()*1000.00)
+			ex.client.logger.Debug("%s: Got response in %fms\n", localAddr, responseTime.Seconds()*1000.00)
 			if firstTime {
 				firstTime = false
 				firstTimeResponseTimeCh <- responseTime.Seconds()
@@ -115,19 +119,19 @@ func (ex *ExchangeClient) periodicCheck() {
 			}
 			incomingString := string(bytes.Trim(incomingData, "\000"))
 			if incomingString != data {
-				Log.Debug("%s: Received data does not match: \n (%d) %s\n (%d) %s\n", localAddr, len(incomingString), incomingString, len(data), data)
+				ex.client.logger.Debug("%s: Received data does not match: \n (%d) %s\n (%d) %s\n", localAddr, len(incomingString), incomingString, len(data), data)
 				continue
 			} else {
-				Log.Debug("%s: Received string matches", localAddr)
+				ex.client.logger.Debug("%s: Received string matches", localAddr)
 			}
 			receiveTimeout.Stop()
 
 		case <-receiveTimeout.C:
-			Log.Error("%s: No response in allotted time", localAddr)
+			ex.client.logger.Error("%s: No response in allotted time", localAddr)
 		}
 		sleepTime := ex.pingPeriodicity + randomInt(1, 5)
 		if ex.debug {
-			Log.Debug("%s: Sleeping %d\n", localAddr, sleepTime)
+			ex.client.logger.Debug("%s: Sleeping %d\n", localAddr, sleepTime)
 		}
 		time.Sleep(time.Duration(sleepTime) * time.Second)
 	}
@@ -144,13 +148,13 @@ func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) error {
 	return err // could be nil
 }
 
-var Log = GetLogger("exchange-client")
 
 // TODO This really ought to just be a method/interface thing
 
 // NewExchangeClient set up a new exchange client
 func NewExchangeClient(dialString string, pingPeriodicity int, reopenConnection bool, tlsConfig *tls.Config, tcpKeepAlive int, debug bool, logger *logging.Logger) *ExchangeClient {
 	client := NewClient(dialString, reopenConnection, tlsConfig, tcpKeepAlive, debug, logger)
+	var Log = GetLogger("exchange-client")
 	if client == nil {
 		Log.Error("Could not get Client")
 		return nil

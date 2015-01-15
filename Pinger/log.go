@@ -14,7 +14,6 @@ func InitLogging(loggerName string, logFile io.Writer, fileLevel logging.Level, 
 		screenLogger := logging.AddModuleLevel(logging.NewLogBackend(os.Stdout, "", 0))
 		screenLogger.SetLevel(screenLevel, "")
 		logging.SetBackend(fileLogger, screenLogger)
-		logging.SetLevel(logging.DEBUG, loggerName)
 	} else {
 		logging.SetBackend(fileLogger)
 	}
