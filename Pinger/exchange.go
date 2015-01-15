@@ -88,7 +88,6 @@ func tallyResponseTimes() {
 			firstResponseTimes.addDataPoint(responseTime)
 			count++
 		}
-		fmt.Println(math.Mod(float64(count), 10))
 		if math.Mod(float64(count), 1000) == 0 {
 			firstResponseTimes.log(" first")
 			normalResponseTimes.log("normal")
