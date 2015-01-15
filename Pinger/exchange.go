@@ -65,7 +65,7 @@ func (r *responseTimeStruct) addDataPoint(responseTime float64) {
 func (r *responseTimeStruct) log(prefix string) {
 	if r.count > 0 {
 		r.avg = r.sum / float64(r.count)
-		tallyLogger.Info("%s(min/avg/max): %fms / %fms / %fms\n", prefix, r.min*1000.00, r.avg*1000.00, r.max*1000.00)
+		tallyLogger.Info("%s(min/avg/max): %fms / %fms / %fms (connection count %d)\n", prefix, r.min*1000.00, r.avg*1000.00, r.max*1000.00, ActiveClientCount)
 	}
 }
 
@@ -88,7 +88,7 @@ func tallyResponseTimes() {
 			firstResponseTimes.addDataPoint(responseTime)
 			count++
 		}
-		if math.Mod(float64(count), 1000) == 0 {
+		if math.Mod(float64(count), 10) == 0 {
 			firstResponseTimes.log(" first")
 			normalResponseTimes.log("normal")
 		}
