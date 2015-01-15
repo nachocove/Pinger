@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sync"
+	"time"
 )
 
 var debug bool
@@ -47,9 +48,11 @@ func main() {
 	var caCertChainFile string
 	var tcpKeepAlive int
 	var verbose bool
+	var sleepBetweenOpens int
 
 	flag.IntVar(&maxConnection, "n", 1000, "Number of connections to make")
 	flag.IntVar(&tcpKeepAlive, "tcpkeepalive", 0, "TCP Keepalive in seconds")
+	flag.IntVar(&sleepBetweenOpens, "sleep-after-open", 0, "Sleep n seconds after each connection opened.")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
 	flag.BoolVar(&help, "h", false, "Verbose")
@@ -148,6 +151,9 @@ func main() {
 			if err != nil {
 				logger.Error("Could not open connection %d %v\n", i, err.Error())
 			}
+		}
+		if sleepBetweenOpens > 0 {
+			time.Sleep(time.Duration(sleepBetweenOpens)*time.Second)
 		}
 	}
 	wg.Wait()
