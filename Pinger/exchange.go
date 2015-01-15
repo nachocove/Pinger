@@ -41,6 +41,16 @@ type responseTimeStruct struct {
 	count int
 }
 
+func newResponseTimeStruct() * responseTimeStruct {
+	return &responseTimeStruct{
+		min: 1000000.00,
+		max: 0,
+		avg: 0,
+		count: 0,
+		sum: 0,
+		}
+}
+
 func (r *responseTimeStruct) addDataPoint(responseTime float64) {
 	if responseTime < r.min {
 		r.min = responseTime
@@ -53,8 +63,10 @@ func (r *responseTimeStruct) addDataPoint(responseTime float64) {
 }
 
 func (r *responseTimeStruct) log(prefix string) {
-	r.avg = r.sum / float64(r.count)
-	tallyLogger.Info("%s(min/avg/max): %fms / %fms / %fms\n", prefix, r.min*1000.00, r.avg*1000.00, r.max*1000.00)
+	if r.count > 0 {
+		r.avg = r.sum / float64(r.count)
+		tallyLogger.Info("%s(min/avg/max): %fms / %fms / %fms\n", prefix, r.min*1000.00, r.avg*1000.00, r.max*1000.00)
+	}
 }
 
 var responseTimeCh chan float64
@@ -63,20 +75,23 @@ var tallyLogger *logging.Logger
 
 func tallyResponseTimes() {
 	var responseTime float64
-	normalResponseTimes := &responseTimeStruct{min: 1000000.00}
-	firstResponseTimes := &responseTimeStruct{min: 1000000.00}
+	normalResponseTimes := newResponseTimeStruct()
+	firstResponseTimes := newResponseTimeStruct()
 	count := 0
 	for {
 		select {
 		case responseTime = <-responseTimeCh:
+			fmt.Printf("Normal: %f", responseTime)
 			normalResponseTimes.addDataPoint(responseTime)
 			count++
 
 		case responseTime = <-firstTimeResponseTimeCh:
+			fmt.Printf("First: %f", responseTime)
 			firstResponseTimes.addDataPoint(responseTime)
 			count++
 		}
-		if math.Mod(float64(count), 10) == 0 {
+		fmt.Println(math.Mod(float64(count), 10))
+		if math.Mod(float64(count), 1000) == 0 {
 			firstResponseTimes.log(" first")
 			normalResponseTimes.log("normal")
 		}
@@ -84,6 +99,7 @@ func tallyResponseTimes() {
 }
 
 func init() {
+	fmt.Printf("Setting up response time tallyer\n")
 	responseTimeCh = make(chan float64, 1000)
 	firstTimeResponseTimeCh = make(chan float64, 1000)
 	go tallyResponseTimes()
