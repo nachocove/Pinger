@@ -81,12 +81,10 @@ func tallyResponseTimes() {
 	for {
 		select {
 		case responseTime = <-responseTimeCh:
-			fmt.Printf("Normal: %f", responseTime)
 			normalResponseTimes.addDataPoint(responseTime)
 			count++
 
 		case responseTime = <-firstTimeResponseTimeCh:
-			fmt.Printf("First: %f", responseTime)
 			firstResponseTimes.addDataPoint(responseTime)
 			count++
 		}
@@ -99,7 +97,6 @@ func tallyResponseTimes() {
 }
 
 func init() {
-	fmt.Printf("Setting up response time tallyer\n")
 	responseTimeCh = make(chan float64, 1000)
 	firstTimeResponseTimeCh = make(chan float64, 1000)
 	go tallyResponseTimes()
