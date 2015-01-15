@@ -154,10 +154,14 @@ func (ex *ExchangeClient) periodicCheck() {
 		}
 		t1 := time.Now()
 		time.Sleep(time.Duration(sleepTime) * time.Second)
-		t2 := time.Now()
-		diff := t2.Sub(t1).Seconds()
-		ex.client.logger.Debug("%s: Should have slept for %d. Slept for %f", localAddr, sleepTime, diff)  
-		overageSleepTimeCh <- diff-float64(sleepTime)
+		slept := time.Since(t1).Seconds()
+		ex.client.logger.Debug("%s: Should have slept for %d. Slept for %f", localAddr, sleepTime, slept)  
+		overTime := slept-float64(sleepTime)
+		if overTime > 0 {
+			overageSleepTimeCh <- overTime
+		} else {
+			ex.client.logger.Info("%s: EARLY: Woke up %fms before allotted time.", localAddr, overTime)
+		}
 	}
 }
 
