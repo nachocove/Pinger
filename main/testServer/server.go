@@ -167,6 +167,7 @@ func main() {
 	var minWaitTime int
 	var maxWaitTime int
 	var logFileName string
+	var logFileLevel string
 	var certFile string
 	var keyFile string
 	var certChainFile string
@@ -178,6 +179,7 @@ func main() {
 	flag.IntVar(&minWaitTime, "min", 0, "min wait time")
 	flag.IntVar(&maxWaitTime, "max", 0, "max wait time")
 	flag.StringVar(&logFileName, "l", "testServer.log", "log file")
+	flag.StringVar(&logFileLevel, "log-level", "WARNING", "Logging level for the logfile (DEBUG, INFO, WARN, NOTICE, ERROR, CRITICAL)")
 	flag.StringVar(&bindAddress, "b", "", "bind address")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
@@ -214,7 +216,23 @@ func main() {
 			screenLevel = logging.INFO
 		}
 	}
-	logger = Pinger.InitLogging("TestServer", logFile, logging.DEBUG, screenLogging, screenLevel)
+	var fileLevel logging.Level
+	switch {
+	case logFileLevel == "WARNING":
+		fileLevel = logging.WARNING
+	case logFileLevel == "ERROR":
+		fileLevel = logging.ERROR
+	case logFileLevel == "DEBUG":
+		fileLevel = logging.DEBUG
+	case logFileLevel == "INFO":
+		fileLevel = logging.INFO
+	case logFileLevel == "CRITICAL":
+		fileLevel = logging.CRITICAL
+	case logFileLevel == "NOTICE":
+		fileLevel = logging.NOTICE
+	}
+		
+	logger = Pinger.InitLogging("TestServer", logFile, fileLevel, screenLogging, screenLevel)
 
 	var TLSconfig *tls.Config
 
