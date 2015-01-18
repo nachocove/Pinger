@@ -26,6 +26,16 @@ func decodePost(data []byte) (map[string]interface{}, error) {
 }
 
 // TODO Need to figure out Auth
+// Protocol: POST device=<json-encoded deviceInfo>
+// deviceInfo is map/dict with keys:
+//     DeviceID = Nacho Device ID, i.e. NchoXYZ
+//     AWSPushToken = The AWS PushToken
+//     MailProtocol = exchange, imap, pop...
+// if platform is iOS, extra keys are:
+//     Topic = the APNS Push Topic
+//     PushToken = APNS Push Token
+//     ResetToken = the APNS Reset Token
+// if platform is anything else: Not defined yet.
 func registerDevice(w http.ResponseWriter, r *http.Request) {
 	context := GetContext(r)
 	if r.Method != "POST" {
@@ -65,6 +75,10 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	return
 }
+
+////////////////////////////////////////////////////////////////////////
+// Helper functions
+////////////////////////////////////////////////////////////////////////
 
 func getString(myMap map[string]interface{}, key string) string {
 	x, ok := myMap[key]
