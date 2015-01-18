@@ -184,7 +184,7 @@ func saveDeviceInfo(context *Context, clientId, platform string, deviceInfo map[
 		if err != nil {
 			return err
 		}
-		err = di.Insert(context.Dbm)
+		err = context.Dbm.Insert(di)
 		if err != nil {
 			return err
 		}
@@ -195,7 +195,7 @@ func saveDeviceInfo(context *Context, clientId, platform string, deviceInfo map[
 			return err
 		}
 		if changed {
-			n, err := di.Update(context.Dbm)
+			n, err := context.Dbm.Update(di)
 			if err != nil {
 				return err
 			}

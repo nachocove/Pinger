@@ -182,6 +182,8 @@ func GetConfigAndRun() {
 		logger.Error("Could not open DB Connection")
 		os.Exit(1)
 	}
+	defer dbm.Db.Close()
+
 	context := NewContext(config, dbm, logger)
 	err = context.run()
 	if err != nil {

@@ -46,6 +46,25 @@ const (
 	DeviceTableName string = "DeviceInfo"
 )
 
+func addDeviceInfoTable(dbmap *gorp.DbMap) error {
+	tMap := dbmap.AddTableWithName(DeviceInfo{}, DeviceTableName)
+	if tMap.SetKeys(true, "Id") == nil {
+		log.Fatalf("Could not create key on DeviceInfo:ID")
+	}
+	cMap := tMap.ColMap("ClientId")
+	cMap.SetUnique(true)
+	cMap.SetNotNull(true)
+
+	cMap = tMap.ColMap("AWSPushToken")
+	cMap.SetUnique(true)
+	cMap.SetNotNull(true)
+
+	cMap = tMap.ColMap("Info")
+	cMap.SetNotNull(true)
+	cMap.SetMaxSize(1024)
+	return nil
+}
+
 func (di *DeviceInfo) Validate() error {
 	if di.ClientId == "" {
 		return errors.New("ClientID can not be empty")
@@ -75,8 +94,6 @@ func NewDeviceInfo(clientID, deviceID, pushToken, platform, mailClientType strin
 		return nil, err
 	}
 	di := &DeviceInfo{
-		Created:        time.Now().Unix(),
-		Updated:        time.Now().Unix(),
 		ClientId:       clientID,
 		DeviceId:       deviceID,
 		AWSPushToken:   pushToken,
@@ -121,21 +138,15 @@ func GetDeviceInfo(dbm *gorp.DbMap, clientId string) (*DeviceInfo, error) {
 	}
 }
 
-func (di *DeviceInfo) Update(dbm *gorp.DbMap) (int64, error) {
-	err := di.Validate()
-	if err != nil {
-		return 0, err
-	}
-	di.Updated = time.Now().Unix()
-	return dbm.Update(di)
+func (di *DeviceInfo) PreUpdate(s gorp.SqlExecutor) error {
+	di.Updated = time.Now().UnixNano()
+	return di.Validate()
 }
 
-func (di *DeviceInfo) Insert(dbm *gorp.DbMap) error {
-	err := di.Validate()
-	if err != nil {
-		return err
-	}
-	return dbm.Insert(di)
+func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
+	di.Created = time.Now().UnixNano()
+	di.Updated = di.Created
+	return di.Validate()
 }
 
 func IOSDeviceInfoMap(topic, pushToken, resetToken string) map[string]string {
@@ -156,6 +167,7 @@ func NewDeviceInfoIOS(clientId, deviceID, pushToken, topic, resetToken, mailClie
 		IOSDeviceInfoMap(topic, pushToken, resetToken))
 }
 
+/////////////////////////////////////////////////////////////////////////////////
 type EncryptedData []byte
 
 func (enc EncryptedData) Decrypt(encryptionKey []byte) string {
@@ -169,6 +181,7 @@ func NewEncryptedData(data string, encryptionKey []byte) (EncryptedData, error) 
 	return EncryptedData(fmt.Sprintf("enc:%s", data)), nil
 }
 
+/////////////////////////////////////////////////////////////////////////////////
 type IOSAPNSInfo struct {
 	Id          int64         `db:"id"`
 	Created     int64         `db:"created"`
@@ -178,6 +191,30 @@ type IOSAPNSInfo struct {
 	Key         EncryptedData `db:"key"`
 }
 
+func addIOSAPNSInfoTable(dbmap *gorp.DbMap) error {
+	tMap := dbmap.AddTable(IOSAPNSInfo{})
+	if tMap.SetKeys(true, "Id") == nil {
+		log.Fatalf("Could not create key on IOSAPNSInfo:ID")
+	}
+	return nil
+}
+
+func (info *IOSAPNSInfo) Validate() error {
+	return nil
+}
+
+func (info *IOSAPNSInfo) PreUpdate(s gorp.SqlExecutor) error {
+	info.Updated = time.Now().UnixNano()
+	return info.Validate()
+}
+
+func (info *IOSAPNSInfo) PreInsert(s gorp.SqlExecutor) error {
+	info.Created = time.Now().UnixNano()
+	info.Updated = info.Created
+	return info.Validate()
+}
+
+/////////////////////////////////////////////////////////////////////////////////
 func InitDB(dbconfig *DBConfiguration, init bool) *gorp.DbMap {
 	var dbmap *gorp.DbMap
 
@@ -185,8 +222,7 @@ func InitDB(dbconfig *DBConfiguration, init bool) *gorp.DbMap {
 	case dbconfig.Type == "mysql":
 		dbmap = initDbMySql(dbconfig)
 
-	case dbconfig.Type == "sqlite":
-		//	case dbconfig.Type == "sqlite3":
+	case dbconfig.Type == "sqlite" || dbconfig.Type == "sqlite3":
 		dbmap = initDbSqlite(dbconfig)
 
 	default:
@@ -197,16 +233,11 @@ func InitDB(dbconfig *DBConfiguration, init bool) *gorp.DbMap {
 		log.Fatalf("Could not get dbmap")
 	}
 
-	tMap := dbmap.AddTableWithName(DeviceInfo{}, DeviceTableName)
-	if tMap.SetKeys(true, "Id") == nil {
-		log.Fatalf("Could not create key on DeviceInfo:ID")
-	}
-
-	tMap = dbmap.AddTable(IOSAPNSInfo{})
-	if tMap.SetKeys(true, "Id") == nil {
-		log.Fatalf("Could not create key on IOSAPNSInfo:ID")
-	}
-	log.Printf("Finished setting Keys")
+	///////////////
+	// map tables
+	///////////////
+	addDeviceInfoTable(dbmap)
+	addIOSAPNSInfoTable(dbmap)
 
 	if init {
 		// create the table. in a production system you'd generally
@@ -218,35 +249,37 @@ func InitDB(dbconfig *DBConfiguration, init bool) *gorp.DbMap {
 	}
 	return dbmap
 }
+
 func initDbSqlite(dbconfig *DBConfiguration) *gorp.DbMap {
 	db, err := sql.Open("sqlite3", dbconfig.Filename)
 	if err != nil {
 		// DO NOT LOG THE PASSWORD!
 		log.Fatalf("Failed to open sqlite3 DB: %s\n%v", dbconfig.Filename, err)
 	}
-	//err := db.Ping()
-	//if err != nil {
-	//	log.Fatalf("Could not ping database: %v", err)
-	//}
 	return &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}
 }
 
-const (
-	mysqlDBInitString string = "%s:%s@%s:%d/%s"
-)
-
 func initDbMySql(dbConfig *DBConfiguration) *gorp.DbMap {
+	//const mysqlDBInitString string = "%s:%s@tcp(%s:%d)/%s/collation=utf8_general_ci&autocommit=true"
+	const mysqlDBInitString string = "%s:%s@tcp(%s:%d)/%s"
 	// connect to db using standard Go database/sql API
-	db, err := sql.Open("mysql", fmt.Sprintf(mysqlDBInitString, dbConfig.Username, dbConfig.Password, dbConfig.Host, dbConfig.Port, dbConfig.Name))
+	connectString := fmt.Sprintf(
+		mysqlDBInitString,
+		dbConfig.Username,
+		dbConfig.Password,
+		dbConfig.Host,
+		dbConfig.Port,
+		dbConfig.Name,
+	)
+	fmt.Println(connectString)
+	db, err := sql.Open("mysql", connectString)
 	if err != nil {
 		// DO NOT LOG THE PASSWORD!
 		log.Fatalf("Failed to open DB: %s\n", fmt.Sprintf(mysqlDBInitString, dbConfig.Username, "XXXXXXX", dbConfig.Host, dbConfig.Port, dbConfig.Name))
 	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Could not ping database: %v", err)
+	}
 	return &gorp.DbMap{Db: db, Dialect: gorp.MySQLDialect{"InnoDB", "UTF8"}}
 }
-
-//func init() {
-//	// initialize the DbMap
-//	dbmap := initDbMySql()
-//	defer dbmap.Db.Close()
-//}
