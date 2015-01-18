@@ -109,7 +109,7 @@ func main() {
 	}
 	var screenLogging = false
 	var screenLevel = logging.ERROR
-	if debug || verbose{
+	if debug || verbose {
 		screenLogging = true
 		if debug {
 			screenLevel = logging.DEBUG
@@ -132,7 +132,7 @@ func main() {
 	case logFileLevel == "NOTICE":
 		fileLevel = logging.NOTICE
 	}
-		
+
 	logger = Pinger.InitLogging("pinger-be", logFile, fileLevel, screenLogging, screenLevel)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	logger.Info("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
@@ -173,10 +173,11 @@ func main() {
 			err := client.Listen(&wg)
 			if err != nil {
 				logger.Error("Could not open connection %d %v\n", i, err.Error())
+				i-- // don't count this one
 			}
 		}
 		if sleepBetweenOpens > 0 {
-			time.Sleep(time.Duration(sleepBetweenOpens)*time.Millisecond)
+			time.Sleep(time.Duration(sleepBetweenOpens) * time.Millisecond)
 		}
 	}
 	wg.Wait()

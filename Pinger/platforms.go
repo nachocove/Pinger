@@ -14,14 +14,15 @@ const (
 	PlatfromAndroid DevicePlatform = iota
 )
 
-var devicePlatforms = [...]string{
+// DevicePlatforms the known device platforms
+var DevicePlatforms = [...]string{
 	"UNKNOWN",
 	"iOS",
 	"ANDROID",
 }
 
 func (platform DevicePlatform) String() string {
-	return devicePlatforms[platform]
+	return DevicePlatforms[platform]
 }
 
 // Device the various items to track a device

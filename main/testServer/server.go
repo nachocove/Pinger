@@ -6,9 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/felixge/tcpkeepalive"
-	"github.com/nachocove/Pinger/Pinger"
-	"github.com/op/go-logging"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -16,6 +13,10 @@ import (
 	"os"
 	"path"
 	"time"
+
+	"github.com/felixge/tcpkeepalive"
+	"github.com/nachocove/Pinger/Pinger"
+	"github.com/op/go-logging"
 )
 
 var rng *rand.Rand
@@ -38,7 +39,7 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 		logger.Error("Could not grab tcp conn")
 		return
 	}
-	if tcpKeepAlive != 0 {
+	if tcpKeepAlive > 0 {
 		tc.SetKeepAlive(true)
 		tc.SetKeepAlivePeriod(tcpKeepAlive)
 		logger.Debug("Set TCP-keepalive to %ds\n", tcpKeepAlive)
@@ -97,16 +98,19 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 	activeConnections++
 
 	var timer *time.Timer
-	if disconnectTime <= 0 {
-		logger.Fatal("disconnectTime must be > 0")
+	if disconnectTime > 0 {
+		timer = time.NewTimer(disconnectTime)
+	} else {
+		timer = time.NewTimer(time.Duration(1000000 * time.Hour)) // let's call this infinity
 	}
-	timer = time.NewTimer(disconnectTime)
 	defer timer.Stop()
 
 	// continuously read from the connection
 	for {
 		var exitLoop = false
-		logger.Debug("%s: Waiting %d seconds for something to happen\n", remote, disconnectTime/time.Second)
+		if disconnectTime > 0 {
+			logger.Debug("%s: Waiting %d seconds for something to happen\n", remote, disconnectTime/time.Second)
+		}
 		select {
 		// This case means we recieved data on the connection
 		case data := <-inCh:
@@ -125,14 +129,14 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 		case err := <-eCh:
 			// handle our error then exit for loop
 			if err == io.EOF {
-				logger.Debug("%s: Connection closed\n", remote)
+				logger.Info("%s: Connection closed\n", remote)
 			} else {
 				logger.Error("%s: %s\n", remote, err.Error())
 			}
 			exitLoop = true
 
 		case <-timer.C:
-			logger.Debug("%s: Timer expired.\n", remote)
+			logger.Info("%s: Timer expired.\n", remote)
 			exitLoop = true
 		}
 		if exitLoop {
@@ -231,7 +235,7 @@ func main() {
 	case logFileLevel == "NOTICE":
 		fileLevel = logging.NOTICE
 	}
-		
+
 	logger = Pinger.InitLogging("TestServer", logFile, fileLevel, screenLogging, screenLevel)
 
 	var TLSconfig *tls.Config
@@ -300,7 +304,7 @@ func main() {
 		if minWaitTime > 0 || maxWaitTime > 0 {
 			disconnectTime = time.Duration(randomInt(minWaitTime, maxWaitTime)) * time.Second
 		} else {
-			disconnectTime = time.Duration(24) * time.Hour
+			disconnectTime = 0
 		}
 		tcpKeepAliveDur := time.Duration(tcpKeepAlive) * time.Second
 

@@ -2,49 +2,50 @@ package WebServer
 
 import (
 	"fmt"
-	"github.com/codegangsta/negroni"
-	"github.com/gorilla/context"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/codegangsta/negroni"
+	"github.com/gorilla/context"
 )
 
 type contextKey int
 
 // Define keys that support equality.
 const (
-	configKey contextKey = iota
+	serverContext contextKey = iota
 )
 
 // GetServerConfig get the server config from the context
-func GetConfig(r *http.Request) *Configuration {
-	val, ok := context.GetOk(r, configKey)
+func GetContext(r *http.Request) *Context {
+	val, ok := context.GetOk(r, serverContext)
 	if !ok {
-		logger.Fatal("No template in context")
+		log.Fatal("No template in context")
 	}
 
-	config, ok := val.(*Configuration)
+	context, ok := val.(*Context)
 	if !ok {
-		logger.Fatal("No string template in context")
+		log.Fatal("No string template in context")
 	}
 
-	return config
+	return context
 }
 
 // ContextMiddleWare placeholder to attach methods to
 type ContextMiddleWare struct {
-	config *Configuration
+	context *Context
 }
 
 func (c *ContextMiddleWare) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	context.Set(r, configKey, c.config)
+	context.Set(r, serverContext, c.context)
 	next(rw, r)
 }
 
 // NewContextMiddleWare create new ContextMiddleWare
-func NewContextMiddleWare(config *Configuration) *ContextMiddleWare {
-	return &ContextMiddleWare{config: config}
+func NewContextMiddleWare(context *Context) *ContextMiddleWare {
+	return &ContextMiddleWare{context: context}
 }
 
 // NewStatic create a new negroni.Static router.
@@ -86,7 +87,6 @@ func (redir *RedirectMiddleWare) ServeHTTP(rw http.ResponseWriter, r *http.Reque
 		portString = ""
 	}
 	redirAddr := fmt.Sprintf("https://%s%s%s", host, portString, r.RequestURI)
-	logger.Info("Redirecting to %s\n", redirAddr)
 	http.Redirect(rw, r, redirAddr, http.StatusMovedPermanently)
 }
 

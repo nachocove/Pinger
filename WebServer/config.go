@@ -1,17 +1,19 @@
 package WebServer
 
 import (
-	"code.google.com/p/gcfg"
 	"flag"
 	"fmt"
-	"github.com/codegangsta/negroni"
-	"github.com/gorilla/mux"
-	"github.com/nachocove/Pinger/Pinger"
-	"github.com/op/go-logging"
+	"log"
 	"net/http"
 	"os"
 	"path"
-	"log"
+
+	"code.google.com/p/gcfg"
+	"github.com/codegangsta/negroni"
+	"github.com/coopernurse/gorp"
+	"github.com/gorilla/mux"
+	"github.com/nachocove/Pinger/Pinger"
+	"github.com/op/go-logging"
 )
 
 const (
@@ -25,6 +27,7 @@ const (
 	defaultNonTLSPort     = 80
 	defaultDevelopment    = false
 	defaultLogDir         = "/var/log/"
+	defaultLogFileName    = "webserver.log"
 )
 
 // ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
@@ -34,19 +37,21 @@ type ServerConfiguration struct {
 	TemplateDir    string
 	ServerCertFile string
 	ServerKeyFile  string
-	Non_TLS_Port   int // underscores here, because this reflects the config-file key 'non-tls-port'
+	NonTlsPort     int `gcfg:"non-tls-port"`
 }
 
 type GlobalConfiguration struct {
 	Debug       bool
 	Development bool
 	LogDir      string
+	LogFileName string
 }
 
 // Configuration - The top level configuration structure.
 type Configuration struct {
 	Server ServerConfiguration
 	Global GlobalConfiguration
+	DB     Pinger.DBConfiguration
 }
 
 func (config *Configuration) Read(filename string) error {
@@ -60,18 +65,29 @@ func NewConfiguration() *Configuration {
 		TemplateDir:    defaultTemplateDir,
 		ServerCertFile: defaultserverCertFile,
 		ServerKeyFile:  defaultserverKeyFile,
-		Non_TLS_Port:   defaultNonTLSPort,
+		NonTlsPort:     defaultNonTLSPort,
 	},
 		Global: GlobalConfiguration{
 			Debug:       defaultDebug,
 			Development: defaultDevelopment,
 			LogDir:      defaultLogDir,
+			LogFileName: defaultLogFileName,
+		},
+		DB: Pinger.DBConfiguration{
+			Type:        "sqlite",
+			Filename:    "pinger.db",
+			Host:        "",
+			Port:        0,
+			Name:        "",
+			Username:    "",
+			Password:    "",
+			Certificate: "",
 		},
 	}
 }
 
-var usage = func() {
-	fmt.Fprintf(os.Stderr, "USAGE: %s ....\n", path.Base(os.Args[0]))
+func usage() {
+	fmt.Fprintf(os.Stderr, "USAGE: %s [args] <config file>\n Args:\n", path.Base(os.Args[0]))
 	flag.PrintDefaults()
 }
 
@@ -84,6 +100,20 @@ func exists(path string) bool {
 		return false
 	}
 	return false
+}
+
+type Context struct {
+	Config *Configuration
+	Dbm    *gorp.DbMap
+	Logger *logging.Logger
+}
+
+func NewContext(config *Configuration, dbm *gorp.DbMap, logger *logging.Logger) *Context {
+	return &Context{
+		Config: config,
+		Dbm:    dbm,
+		Logger: logger,
+	}
 }
 
 // GetConfigAndRun process command line arguments and run the server
@@ -99,6 +129,7 @@ func GetConfigAndRun() {
 	flag.StringVar(&bindAddress, "host", defaultBindAddress, "The IP address to bind to")
 	flag.BoolVar(&debug, "d", defaultDebug, "Debug")
 	flag.BoolVar(&development, "devel", defaultDebug, "In Development")
+	flag.Usage = usage
 	flag.Parse()
 	if len(flag.Args()) != 1 {
 		usage()
@@ -134,7 +165,7 @@ func GetConfigAndRun() {
 		os.Exit(1)
 	}
 
-	logFile, err := os.OpenFile(path.Join(config.Global.LogDir, "webserver.log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+	logFile, err := os.OpenFile(path.Join(config.Global.LogDir, config.Global.LogFileName), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		log.Fatalf("%v\n", err)
 		os.Exit(1)
@@ -145,9 +176,14 @@ func GetConfigAndRun() {
 		screenLogging = true
 		screenLevel = logging.DEBUG
 	}
-	logger = Pinger.InitLogging("pinger-webfe", logFile, logging.DEBUG, screenLogging, screenLevel)
-
-	err = config.run()
+	logger := Pinger.InitLogging("pinger-webfe", logFile, logging.DEBUG, screenLogging, screenLevel)
+	dbm := Pinger.InitDB(&config.DB, true)
+	if dbm == nil {
+		logger.Error("Could not open DB Connection")
+		os.Exit(1)
+	}
+	context := NewContext(config, dbm, logger)
+	err = context.run()
 	if err != nil {
 		logger.Error("Could not run server!")
 		os.Exit(1)
@@ -157,19 +193,19 @@ func GetConfigAndRun() {
 }
 
 var httpsRouter = mux.NewRouter()
-var logger *logging.Logger
 
-func (config *Configuration) run() error {
+func (context *Context) run() error {
+	config := context.Config
 	httpsMiddlewares := negroni.New(
 		NewRecovery(config.Global.Debug),
 		negroni.NewLogger(),
 		NewStatic("/public", "/static", ""),
-		NewContextMiddleWare(config))
+		NewContextMiddleWare(context))
 
 	httpsMiddlewares.UseHandler(httpsRouter)
 
 	addr := fmt.Sprintf("%s:%d", config.Server.BindAddress, config.Server.Port)
-	logger.Info("Listening on %s (redirecting from %d)\n", addr, config.Server.Non_TLS_Port)
+	context.Logger.Info("Listening on %s (redirecting from %d)\n", addr, config.Server.NonTlsPort)
 	// start the server on the non-tls port to redirect
 	go func() {
 		httpMiddlewares := negroni.New(
@@ -179,10 +215,10 @@ func (config *Configuration) run() error {
 		)
 		httpRouter := mux.NewRouter()
 		httpMiddlewares.UseHandler(httpRouter)
-		addr := fmt.Sprintf("%s:%d", config.Server.BindAddress, config.Server.Non_TLS_Port)
+		addr := fmt.Sprintf("%s:%d", config.Server.BindAddress, config.Server.NonTlsPort)
 		err := http.ListenAndServe(addr, httpMiddlewares)
 		if err != nil {
-			logger.Fatalf("Could not start server on port %d\n", config.Server.Non_TLS_Port)
+			context.Logger.Fatalf("Could not start server on port %d\n", config.Server.NonTlsPort)
 		}
 	}()
 	// start the https server
