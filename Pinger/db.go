@@ -2,13 +2,11 @@ package Pinger
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"reflect"
 	"regexp"
-	"strings"
 	"time"
 
 	_ "github.com/Go-SQL-Driver/MySQL"
@@ -34,12 +32,12 @@ type DeviceInfo struct {
 	Id             int64  `db:"id"`
 	Created        int64  `db:"created"`
 	Updated        int64  `db:"updated"`
-	ClientId       string `db:"client_id"` // us-east-1a-XXXXXXXX
-	DeviceId       string `db:"device_id"` // "NchoXXXXXX"
-	AWSPushToken   string `db:"aws_push_token"`
+	ClientId       string `db:"client_id"`       // us-east-1a-XXXXXXXX
+	DeviceId       string `db:"device_id"`       // "NchoXXXXXX"
 	Platform       string `db:"device_platform"` // "ios", "android", etc..
+	PushToken      string `db:"push_token"`
+	PushService    string `db:"push_service"` // AWS, APNS, GCM, ...
 	MailClientType string `db:"mail_client_type"`
-	Info           string `db:"info"` // free-form attr/value field for platform-push specific values, i.e. APNS Token, Topic, etc..
 }
 
 const (
@@ -55,13 +53,10 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 	cMap.SetUnique(true)
 	cMap.SetNotNull(true)
 
-	cMap = tMap.ColMap("AWSPushToken")
+	cMap = tMap.ColMap("PushToken")
 	cMap.SetUnique(true)
 	cMap.SetNotNull(true)
 
-	cMap = tMap.ColMap("Info")
-	cMap.SetNotNull(true)
-	cMap.SetMaxSize(1024)
 	return nil
 }
 
@@ -83,25 +78,18 @@ func (di *DeviceInfo) Validate() error {
 			return errors.New(fmt.Sprintf("Platform %s is not known", di.Platform))
 		}
 	}
-	if di.Info == "" {
-		di.Info = "{}"
-	}
 	return nil
 }
-func NewDeviceInfo(clientID, deviceID, pushToken, platform, mailClientType string, info map[string]string) (*DeviceInfo, error) {
-	infoString, err := json.Marshal(info)
-	if err != nil {
-		return nil, err
-	}
+func NewDeviceInfo(clientID, deviceID, pushToken, pushService, platform, mailClientType string) (*DeviceInfo, error) {
 	di := &DeviceInfo{
 		ClientId:       clientID,
 		DeviceId:       deviceID,
-		AWSPushToken:   pushToken,
+		PushToken:      pushToken,
+		PushService:    pushService,
 		Platform:       platform,
-		Info:           string(infoString),
 		MailClientType: mailClientType,
 	}
-	err = di.Validate()
+	err := di.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -149,71 +137,6 @@ func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
 	return di.Validate()
 }
 
-func IOSDeviceInfoMap(topic, pushToken, resetToken string) map[string]string {
-	info := make(map[string]string)
-	info["Topic"] = topic
-	info["PushToken"] = pushToken
-	info["ResetToken"] = resetToken
-	return info
-}
-
-func NewDeviceInfoIOS(clientId, deviceID, pushToken, topic, resetToken, mailClientType string) (*DeviceInfo, error) {
-	return NewDeviceInfo(
-		clientId,
-		deviceID,
-		pushToken,
-		"ios",
-		mailClientType,
-		IOSDeviceInfoMap(topic, pushToken, resetToken))
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-type EncryptedData []byte
-
-func (enc EncryptedData) Decrypt(encryptionKey []byte) string {
-	// TODO Need to decrypt this.
-	s := strings.Split(string(enc), ":")
-	return string(s[1])
-}
-
-func NewEncryptedData(data string, encryptionKey []byte) (EncryptedData, error) {
-	// TODO Need to encrypt!
-	return EncryptedData(fmt.Sprintf("enc:%s", data)), nil
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-type IOSAPNSInfo struct {
-	Id          int64         `db:"id"`
-	Created     int64         `db:"created"`
-	Updated     int64         `db:"updated"`
-	Topic       string        `db:"topic"`
-	Certificate string        `db:"certificate"`
-	Key         EncryptedData `db:"key"`
-}
-
-func addIOSAPNSInfoTable(dbmap *gorp.DbMap) error {
-	tMap := dbmap.AddTable(IOSAPNSInfo{})
-	if tMap.SetKeys(true, "Id") == nil {
-		log.Fatalf("Could not create key on IOSAPNSInfo:ID")
-	}
-	return nil
-}
-
-func (info *IOSAPNSInfo) Validate() error {
-	return nil
-}
-
-func (info *IOSAPNSInfo) PreUpdate(s gorp.SqlExecutor) error {
-	info.Updated = time.Now().UnixNano()
-	return info.Validate()
-}
-
-func (info *IOSAPNSInfo) PreInsert(s gorp.SqlExecutor) error {
-	info.Created = time.Now().UnixNano()
-	info.Updated = info.Created
-	return info.Validate()
-}
-
 /////////////////////////////////////////////////////////////////////////////////
 func InitDB(dbconfig *DBConfiguration, init bool) *gorp.DbMap {
 	var dbmap *gorp.DbMap
@@ -237,7 +160,6 @@ func InitDB(dbconfig *DBConfiguration, init bool) *gorp.DbMap {
 	// map tables
 	///////////////
 	addDeviceInfoTable(dbmap)
-	addIOSAPNSInfoTable(dbmap)
 
 	if init {
 		// create the table. in a production system you'd generally

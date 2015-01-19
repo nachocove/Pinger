@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -29,13 +28,10 @@ func decodePost(data []byte) (map[string]interface{}, error) {
 // Protocol: POST device=<json-encoded deviceInfo>
 // deviceInfo is map/dict with keys:
 //     DeviceID = Nacho Device ID, i.e. NchoXYZ
-//     AWSPushToken = The AWS PushToken
+//     PushService = AWS|APNS|GCM|....
+//     PushToken = The PushToken. For AWS: Endpoint ARN. For APNS, the PushToken
 //     MailProtocol = exchange, imap, pop...
-// if platform is iOS, extra keys are:
-//     Topic = the APNS Push Topic
-//     PushToken = APNS Push Token
-//     ResetToken = the APNS Reset Token
-// if platform is anything else: Not defined yet.
+//     MailCredentials = json-encoded information. usually username and password.
 func registerDevice(w http.ResponseWriter, r *http.Request) {
 	context := GetContext(r)
 	if r.Method != "POST" {
@@ -67,12 +63,16 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = saveDeviceInfo(context, clientid, platform, deviceInfo)
+	di, err := saveDeviceInfo(context, clientid, platform, deviceInfo)
 	if err != nil {
 		context.Logger.Warning("Could not save deviceInfo: %v", err)
 		http.Error(w, "MISSING DATA", http.StatusBadRequest)
 		return
 	}
+	context.Logger.Debug("created/updated device info %s", di.ClientId)
+	// TODO Need to now punt this (and the un-saved mail credentials) to a go routine. Need
+	// to be able to look up whether a goroutine already exists, so we don't create a new one
+	// for every identical call
 	return
 }
 
@@ -91,19 +91,15 @@ func getString(myMap map[string]interface{}, key string) string {
 func newDeviceInfoFromMap(clientID, platform string, deviceInfo map[string]interface{}) (*Pinger.DeviceInfo, error) {
 	var di *Pinger.DeviceInfo
 	var err error
-	switch {
-	case platform == "ios":
-		di, err = Pinger.NewDeviceInfoIOS(clientID,
-			getString(deviceInfo, "DeviceID"),
-			getString(deviceInfo, "PushToken"),
-			getString(deviceInfo, "Topic"),
-			getString(deviceInfo, "ResetToken"),
-			getString(deviceInfo, "MailProtocol"))
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.New(fmt.Sprintf("Unhandled platform %s", platform))
+	di, err = Pinger.NewDeviceInfo(
+		clientID,
+		getString(deviceInfo, "DeviceID"),
+		getString(deviceInfo, "PushToken"),
+		getString(deviceInfo, "PushService"),
+		platform,
+		getString(deviceInfo, "MailProtocol"))
+	if err != nil {
+		return nil, err
 	}
 	if di == nil {
 		return nil, errors.New("Could not create DeviceInfo")
@@ -112,92 +108,70 @@ func newDeviceInfoFromMap(clientID, platform string, deviceInfo map[string]inter
 }
 
 func updateDeviceInfoFromMap(di *Pinger.DeviceInfo, deviceInfo map[string]interface{}) (bool, error) {
-	switch {
-	case di.Platform == "ios":
-		return updateDeviceInfoFromIOSMap(di, deviceInfo)
-	}
-	return false, errors.New(fmt.Sprintf("Unknown platform %s", di.Platform))
-}
-
-func updateDeviceInfoFromIOSMap(di *Pinger.DeviceInfo, deviceInfo map[string]interface{}) (bool, error) {
 	changed := false
-	info := Pinger.IOSDeviceInfoMap("", "", "")
+	// TODO Figure out how to do all this with introspected/reflection/whatever
 	for key, value := range deviceInfo {
 		switch {
 		case strings.EqualFold(key, "DeviceID"):
 			value := value.(string)
 			if di.DeviceId != value {
-				fmt.Printf("Changed DeviceID %s -> %s\n", di.DeviceId, value)
 				di.DeviceId = value
-				changed = true
-			}
-
-		case strings.EqualFold(key, "AWSPushToken"):
-			value := value.(string)
-			if di.AWSPushToken != value {
-				fmt.Printf("Changed AWSPushToken %s -> %s\n", di.AWSPushToken, value)
-				di.AWSPushToken = value
 				changed = true
 			}
 
 		case strings.EqualFold(key, "MailProtocol"):
 			value := value.(string)
 			if di.MailClientType != value {
-				fmt.Printf("Changed MailProtocol %s -> %s\n", di.MailClientType, value)
 				di.MailClientType = value
 				changed = true
 			}
 
+		case strings.EqualFold(key, "PushToken"):
+			value := value.(string)
+			if di.PushToken != value {
+				di.PushToken = value
+				changed = true
+			}
+
+		case strings.EqualFold(key, "PushService"):
+			value := value.(string)
+			if di.PushService != value {
+				di.PushService = value
+				changed = true
+			}
+
 		default:
-			matched, err := regexp.MatchString("(PushToken|Topic|ResetToken)", key)
-			if err != nil {
-				return false, err
-			}
-			if matched {
-				info[key] = value.(string)
-			} else {
-				return false, errors.New(fmt.Sprintf("Not a valid Field %s", key))
-			}
+			return false, errors.New(fmt.Sprintf("Not a valid Field %s", key))
 		}
-	}
-	infoMarshaled, err := json.Marshal(info)
-	if err != nil {
-		return false, err
-	}
-	infoString := string(infoMarshaled)
-	if infoString != di.Info {
-		fmt.Printf("Changed Info %s -> %s\n", di.Info, infoString)
-		di.Info = string(infoString)
-		changed = true
 	}
 	return changed, nil
 }
 
-func saveDeviceInfo(context *Context, clientId, platform string, deviceInfo map[string]interface{}) error {
+func saveDeviceInfo(context *Context, clientId, platform string, deviceInfo map[string]interface{}) (*Pinger.DeviceInfo, error) {
 	var err error
 	di, err := Pinger.GetDeviceInfo(context.Dbm, clientId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if di == nil {
 		di, err = newDeviceInfoFromMap(clientId, platform, deviceInfo)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		err = context.Dbm.Insert(di)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		context.Logger.Debug("Created new entry for %s", clientId)
 	} else {
 		changed, err := updateDeviceInfoFromMap(di, deviceInfo)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if changed {
 			n, err := context.Dbm.Update(di)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if n > 0 {
 				context.Logger.Debug("Updated %s (%d rows)", clientId, n)
@@ -206,5 +180,5 @@ func saveDeviceInfo(context *Context, clientId, platform string, deviceInfo map[
 			context.Logger.Debug("No change from %s. No DB action take.", clientId)
 		}
 	}
-	return nil
+	return di, nil
 }

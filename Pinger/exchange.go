@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"github.com/op/go-logging"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/op/go-logging"
 )
 
 // ExchangeClient A client with type exchange.
@@ -32,79 +33,19 @@ func randomInt(x, y int) int {
 	return rand.Intn(y-x) + x
 }
 
-type statStruct struct {
-	min   float64
-	max   float64
-	sum   float64
-	avg   float64
-	count int
+func getExchangeStatusMsg(localAddr string, count int) []byte {
+	data := fmt.Sprintf("%d: Greetings from %s", count, localAddr)
+	return []byte(data)
 }
 
-func newStatStruct() *statStruct {
-	return &statStruct{
-		min:   1000000.00,
-		max:   0,
-		avg:   0,
-		count: 0,
-		sum:   0,
+func (ex *ExchangeClient) doStats(t1 time.Time, firstTime bool) {
+	dur := time.Since(t1)
+	ex.client.logger.Debug("%s: Got response in %fms\n", ex.client.connection.LocalAddr().String(), dur.Seconds()*1000.00)
+	if firstTime {
+		firstTimeResponseTimeCh <- dur.Seconds()
+	} else {
+		responseTimeCh <- dur.Seconds()
 	}
-}
-
-func (r *statStruct) addDataPoint(responseTime float64) {
-	if responseTime < r.min {
-		r.min = responseTime
-	}
-	if responseTime > r.max {
-		r.max = responseTime
-	}
-	r.count++
-	r.sum = r.sum + responseTime
-}
-
-func (r *statStruct) log(prefix string) {
-	if r.count > 0 {
-		r.avg = r.sum / float64(r.count)
-		tallyLogger.Info("%s(min/avg/max): %8.2fms / %8.2fms / %8.2fms (connections: %7d,  messages: %7d)\n", prefix, r.min*1000.00, r.avg*1000.00, r.max*1000.00, ActiveClientCount, r.count)
-	}
-}
-
-var responseTimeCh chan float64
-var firstTimeResponseTimeCh chan float64
-var overageSleepTimeCh chan float64
-var tallyLogger *logging.Logger
-
-func tallyResponseTimes() {
-	var data float64
-	normalResponseTimes := newStatStruct()
-	firstResponseTimes := newStatStruct()
-	sleepTimeStats := newStatStruct()
-	logTimeout := time.Duration(5 * time.Second)
-	logTimer := time.NewTimer(logTimeout)
-	for {
-		select {
-		case data = <-responseTimeCh:
-			normalResponseTimes.addDataPoint(data)
-
-		case data = <-firstTimeResponseTimeCh:
-			firstResponseTimes.addDataPoint(data)
-
-		case data = <-overageSleepTimeCh:
-			sleepTimeStats.addDataPoint(data)
-
-		case <-logTimer.C:
-			firstResponseTimes.log("    first")
-			normalResponseTimes.log("   normal")
-			sleepTimeStats.log("sleepOver")
-			logTimer.Reset(logTimeout)
-		}
-	}
-}
-
-func init() {
-	responseTimeCh = make(chan float64, 1000)
-	firstTimeResponseTimeCh = make(chan float64, 1000)
-	overageSleepTimeCh = make(chan float64, 1000)
-	go tallyResponseTimes()
 }
 
 func (ex *ExchangeClient) periodicCheck() {
@@ -117,27 +58,21 @@ func (ex *ExchangeClient) periodicCheck() {
 
 	for {
 		count++
-		data := fmt.Sprintf("%d: Greetings from %s", count, localAddr)
+		data := getExchangeStatusMsg(localAddr, count)
 		if ex.debug {
 			ex.client.logger.Debug("%s: ExchangeClient sending \"%s\"", localAddr, data)
 		}
 		receiveTimeout := time.NewTimer(time.Duration(60) * time.Second)
 		dataSentTime := time.Now()
-		ex.client.outgoing <- []byte(data)
 
+		ex.client.outgoing <- data
 		ex.client.logger.Debug("%s: Waiting for response", localAddr)
 		select {
 		case incomingData := <-ex.client.incoming:
-			responseTime := time.Since(dataSentTime)
-			ex.client.logger.Debug("%s: Got response in %fms\n", localAddr, responseTime.Seconds()*1000.00)
-			if firstTime {
-				firstTime = false
-				firstTimeResponseTimeCh <- responseTime.Seconds()
-			} else {
-				responseTimeCh <- responseTime.Seconds()
-			}
+			ex.doStats(dataSentTime, firstTime)
+			firstTime = false
 			incomingString := string(bytes.Trim(incomingData, "\000"))
-			if incomingString != data {
+			if incomingString != string(data) {
 				ex.client.logger.Warning("%s: Received data does not match: \n (%d) %s\n (%d) %s\n", localAddr, len(incomingString), incomingString, len(data), data)
 				continue
 			} else {
