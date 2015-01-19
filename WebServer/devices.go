@@ -70,6 +70,17 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	context.Logger.Debug("created/updated device info %s", di.ClientId)
+
+	// TODO Need to properly define and fill this in
+	mailEndpointInfo := ""
+
+	err = di.StartPoll(context.RpcConnectString, mailEndpointInfo)
+	if err != nil {
+		context.Logger.Warning("Could not start polling for device %s: %v", di.ClientId, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	context.Logger.Debug("Re/Started Polling for %s", di.ClientId)
 	// TODO Need to now punt this (and the un-saved mail credentials) to a go routine. Need
 	// to be able to look up whether a goroutine already exists, so we don't create a new one
 	// for every identical call

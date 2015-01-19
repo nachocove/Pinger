@@ -1,21 +1,14 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"flag"
 	"fmt"
-	"github.com/nachocove/Pinger/Pinger"
-	"github.com/op/go-logging"
-	"io/ioutil"
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"path"
 	"runtime"
-	"runtime/pprof"
-	"sync"
-	"time"
+
+	"github.com/nachocove/Pinger/Pinger"
+	"github.com/op/go-logging"
 )
 
 var debug bool
@@ -39,64 +32,27 @@ var logger *logging.Logger
 func main() {
 	var printMemPeriodic int
 	var pingPeriodic int
-	var maxConnection int
 	var printMem bool
-	var tlsCheckHostname bool
 	var help bool
-	var connectionString string
 	var noReopenConnections bool
-	var caCertChainFile string
-	var tcpKeepAlive int
 	var verbose bool
-	var sleepBetweenOpens int
 	var logFileLevel string
 	var logFileName string
 
-	flag.IntVar(&maxConnection, "n", 1000, "Number of connections to make")
-	flag.IntVar(&tcpKeepAlive, "tcpkeepalive", 0, "TCP Keepalive in seconds")
 	flag.StringVar(&logFileName, "log-file", "pinger-backend.log", "log-file to log to")
 	flag.StringVar(&logFileLevel, "log-level", "WARNING", "Logging level for the logfile (DEBUG, INFO, WARN, NOTICE, ERROR, CRITICAL)")
-	flag.IntVar(&sleepBetweenOpens, "sleep-after-open", 0, "Sleep n milliseconds after each connection opened.")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
-	flag.BoolVar(&help, "h", false, "Verbose")
-	flag.BoolVar(&tlsCheckHostname, "tlscheckhost", false, "Verify the hostname to the certificate")
+	flag.BoolVar(&help, "h", false, "Help")
 	flag.BoolVar(&noReopenConnections, "no-reopen", false, "Verbose")
 	flag.BoolVar(&printMem, "m", false, "print memory mode")
 	flag.IntVar(&printMemPeriodic, "mem", 0, "print memory periodically mode in seconds")
 	flag.IntVar(&pingPeriodic, "ping", 0, "ping server in seconds (plus fudge factor)")
-	flag.StringVar(&caCertChainFile, "cachain", "", "File containing one or more ca certs")
 
 	flag.Parse()
 	if help {
 		usage()
 		os.Exit(0)
-	}
-
-	if len(flag.Args()) != 1 {
-		usage()
-		os.Exit(1)
-	}
-
-	var TLSConfig *tls.Config
-	if caCertChainFile != "" {
-		caCertChain, err := ioutil.ReadFile(caCertChainFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Open %s: %v\n", caCertChainFile, err)
-			os.Exit(1)
-		}
-		pool := x509.NewCertPool()
-		ok := pool.AppendCertsFromPEM(caCertChain)
-		if !ok {
-			fmt.Fprintf(os.Stderr, "Could not parse certfile %s\n", caCertChainFile)
-			os.Exit(1)
-		}
-		TLSConfig = &tls.Config{RootCAs: pool}
-		if tlsCheckHostname {
-			TLSConfig.InsecureSkipVerify = false
-		} else {
-			TLSConfig.InsecureSkipVerify = true
-		}
 	}
 
 	if logFileName == "" {
@@ -135,7 +91,7 @@ func main() {
 
 	logger = Pinger.InitLogging("pinger-be", logFile, fileLevel, screenLogging, screenLevel)
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	logger.Info("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
+	logger.Info("Running with %d Processors", runtime.NumCPU())
 
 	var memstats *Pinger.MemStats
 	if printMemPeriodic > 0 || printMem {
@@ -148,50 +104,8 @@ func main() {
 		}
 	}
 
-	connectionString = flag.Arg(0)
-	var wg sync.WaitGroup
-
 	if memstats != nil {
 		memstats.SetBaseMemStats()
 	}
-	go func() {
-		logger.Error("%v\n", http.ListenAndServe("localhost:6060", nil))
-	}()
-	for i := 0; i < maxConnection; i++ {
-		if debug {
-			logger.Info("Opening connection to %s", connectionString)
-		}
-		var reopen bool
-		if noReopenConnections {
-			reopen = false
-		} else {
-			reopen = true
-		}
-		client := Pinger.NewExchangeClient(connectionString, pingPeriodic, reopen, TLSConfig, tcpKeepAlive, debug, logger)
-		// this launches either 2 or 3 goroutines per connection. 3 if pingPeriodic > 0, 2 otherwise.
-		if client != nil {
-			err := client.Listen(&wg)
-			if err != nil {
-				logger.Error("Could not open connection %d %v\n", i, err.Error())
-				i-- // don't count this one
-			}
-		}
-		if sleepBetweenOpens > 0 {
-			time.Sleep(time.Duration(sleepBetweenOpens) * time.Millisecond)
-		}
-	}
-	wg.Wait()
-	defer func() {
-		logger.Info("All Connections closed: ")
-		if memstats != nil {
-			memstats.PrintMemStats()
-		}
-		profileFile := "/tmp/memprofile.pprof"
-		logger.Info("Writing memory profile: %s\n", profileFile)
-		f, err := os.Create(profileFile)
-		if err != nil {
-			logger.Fatal(err)
-		}
-		pprof.WriteHeapProfile(f)
-	}()
+	Pinger.StartPollingRPCServer(logger) // will also include the pprof server
 }

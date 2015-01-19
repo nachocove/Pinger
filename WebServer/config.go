@@ -47,11 +47,17 @@ type GlobalConfiguration struct {
 	LogFileName string
 }
 
+type RPCServerConfiguration struct {
+	Hostname string
+	Port     int
+}
+
 // Configuration - The top level configuration structure.
 type Configuration struct {
 	Server ServerConfiguration
 	Global GlobalConfiguration
 	DB     Pinger.DBConfiguration
+	Rpc    RPCServerConfiguration
 }
 
 func (config *Configuration) Read(filename string) error {
@@ -83,6 +89,10 @@ func NewConfiguration() *Configuration {
 			Password:    "",
 			Certificate: "",
 		},
+		Rpc: RPCServerConfiguration{
+			Hostname: "localhost",
+			Port:     Pinger.RPCPort,
+		},
 	}
 }
 
@@ -103,16 +113,18 @@ func exists(path string) bool {
 }
 
 type Context struct {
-	Config *Configuration
-	Dbm    *gorp.DbMap
-	Logger *logging.Logger
+	Config           *Configuration
+	Dbm              *gorp.DbMap
+	Logger           *logging.Logger
+	RpcConnectString string
 }
 
-func NewContext(config *Configuration, dbm *gorp.DbMap, logger *logging.Logger) *Context {
+func NewContext(config *Configuration, dbm *gorp.DbMap, logger *logging.Logger, rpcConnectString string) *Context {
 	return &Context{
-		Config: config,
-		Dbm:    dbm,
-		Logger: logger,
+		Config:           config,
+		Dbm:              dbm,
+		Logger:           logger,
+		RpcConnectString: rpcConnectString,
 	}
 }
 
@@ -184,7 +196,7 @@ func GetConfigAndRun() {
 	}
 	defer dbm.Db.Close()
 
-	context := NewContext(config, dbm, logger)
+	context := NewContext(config, dbm, logger, fmt.Sprintf("%s:%d", config.Rpc.Hostname, config.Rpc.Port))
 	err = context.run()
 	if err != nil {
 		logger.Error("Could not run server!")
