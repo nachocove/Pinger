@@ -6,3 +6,7 @@ type pollMapItem struct {
 }
 
 var pollMap map[string]*pollMapItem
+
+func init() {
+	pollMap = make(map[string]*pollMapItem)
+}

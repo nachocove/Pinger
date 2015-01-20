@@ -57,9 +57,9 @@ func NewStatic(directory, prefix, index string) *negroni.Static {
 	}
 }
 
-func NewRecovery(printStack bool) *negroni.Recovery {
+func NewRecovery(name string, printStack bool) *negroni.Recovery {
 	return &negroni.Recovery{
-		Logger:     log.New(os.Stdout, "[negroni] ", 0),
+		Logger:     log.New(os.Stdout, fmt.Sprintf("[%s] ", name), 0),
 		PrintStack: printStack,
 		StackAll:   false,
 		StackSize:  1024 * 8,

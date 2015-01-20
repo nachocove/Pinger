@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/nachocove/Pinger/Pinger"
 	"github.com/op/go-logging"
+    "github.com/gorilla/sessions"
 )
 
 const (
@@ -38,6 +39,7 @@ type ServerConfiguration struct {
 	ServerCertFile string
 	ServerKeyFile  string
 	NonTlsPort     int `gcfg:"non-tls-port"`
+	SessionSecret string	`gcfg:"session-secret"`
 }
 
 type GlobalConfiguration struct {
@@ -72,6 +74,7 @@ func NewConfiguration() *Configuration {
 		ServerCertFile: defaultserverCertFile,
 		ServerKeyFile:  defaultserverKeyFile,
 		NonTlsPort:     defaultNonTLSPort,
+		SessionSecret:  "",
 	},
 		Global: GlobalConfiguration{
 			Debug:       defaultDebug,
@@ -117,14 +120,21 @@ type Context struct {
 	Dbm              *gorp.DbMap
 	Logger           *logging.Logger
 	RpcConnectString string
+	SessionStore *sessions.CookieStore
 }
 
-func NewContext(config *Configuration, dbm *gorp.DbMap, logger *logging.Logger, rpcConnectString string) *Context {
+func NewContext(
+	config *Configuration,
+	dbm *gorp.DbMap,
+	logger *logging.Logger,
+	rpcConnectString string,
+	sessionstore *sessions.CookieStore) *Context {
 	return &Context{
 		Config:           config,
 		Dbm:              dbm,
 		Logger:           logger,
 		RpcConnectString: rpcConnectString,
+		SessionStore: sessionstore,
 	}
 }
 
@@ -196,7 +206,12 @@ func GetConfigAndRun() {
 	}
 	defer dbm.Db.Close()
 
-	context := NewContext(config, dbm, logger, fmt.Sprintf("%s:%d", config.Rpc.Hostname, config.Rpc.Port))
+	context := NewContext(
+		config,
+		dbm,
+		logger,
+		fmt.Sprintf("%s:%d", config.Rpc.Hostname, config.Rpc.Port),
+		sessions.NewCookieStore([]byte(config.Server.SessionSecret)))
 	err = context.run()
 	if err != nil {
 		logger.Error("Could not run server!")
@@ -211,7 +226,7 @@ var httpsRouter = mux.NewRouter()
 func (context *Context) run() error {
 	config := context.Config
 	httpsMiddlewares := negroni.New(
-		NewRecovery(config.Global.Debug),
+		NewRecovery("Pinger-web", config.Global.Debug),
 		negroni.NewLogger(),
 		NewStatic("/public", "/static", ""),
 		NewContextMiddleWare(context))
@@ -223,7 +238,7 @@ func (context *Context) run() error {
 	// start the server on the non-tls port to redirect
 	go func() {
 		httpMiddlewares := negroni.New(
-			NewRecovery(config.Global.Debug),
+			NewRecovery("Pinger-web", config.Global.Debug),
 			negroni.NewLogger(),
 			NewRedirectMiddleware("", config.Server.Port),
 		)
