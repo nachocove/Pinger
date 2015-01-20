@@ -1,2 +1,5 @@
 .project
 /.settings/
+*.log
+Pinger.sublime-workspace
+.idea
