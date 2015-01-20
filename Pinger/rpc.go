@@ -116,6 +116,7 @@ func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error 
 }
 
 var RpcLogger *logging.Logger
+
 func InitRpc(logger *logging.Logger) {
 	RpcLogger = logger
 }

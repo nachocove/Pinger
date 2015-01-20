@@ -39,19 +39,19 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "UNKNOWN METHOD", http.StatusBadRequest)
 		return
 	}
-    session, err := context.SessionStore.Get(r, "pinger-session")
-    if err != nil {
+	session, err := context.SessionStore.Get(r, "pinger-session")
+	if err != nil {
 		context.Logger.Warning("Could not get session")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
-    }
+	}
 
 	vars := mux.Vars(r)
 	clientid := vars["clientid"]
 	platform := vars["platform"]
-	
-    session.Values["ClientId"] = clientid
-	
+
+	session.Values["ClientId"] = clientid
+
 	r.ParseForm()
 	context.Logger.Debug("Received POST: %v", r.PostForm)
 	devicePost := r.PostForm.Get("device")
@@ -94,12 +94,12 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	// TODO Need to now punt this (and the un-saved mail credentials) to a go routine. Need
 	// to be able to look up whether a goroutine already exists, so we don't create a new one
 	// for every identical call
-    err = session.Save(r, w)
-    if err != nil {
+	err = session.Save(r, w)
+	if err != nil {
 		context.Logger.Warning("Could not save session")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return    	
-    }
+		return
+	}
 	return
 }
 

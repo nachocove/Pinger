@@ -10,7 +10,6 @@ import (
 	"github.com/codegangsta/negroni"
 )
 
-
 // NewStatic create a new negroni.Static router.
 func NewStatic(directory, prefix, index string) *negroni.Static {
 	return &negroni.Static{

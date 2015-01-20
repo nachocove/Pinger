@@ -12,9 +12,9 @@ import (
 	"github.com/codegangsta/negroni"
 	"github.com/coopernurse/gorp"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
 	"github.com/nachocove/Pinger/Pinger"
 	"github.com/op/go-logging"
-    "github.com/gorilla/sessions"
 )
 
 const (
@@ -38,8 +38,8 @@ type ServerConfiguration struct {
 	TemplateDir    string
 	ServerCertFile string
 	ServerKeyFile  string
-	NonTlsPort     int `gcfg:"non-tls-port"`
-	SessionSecret string	`gcfg:"session-secret"`
+	NonTlsPort     int    `gcfg:"non-tls-port"`
+	SessionSecret  string `gcfg:"session-secret"`
 }
 
 type GlobalConfiguration struct {
@@ -120,7 +120,7 @@ type Context struct {
 	Dbm              *gorp.DbMap
 	Logger           *logging.Logger
 	RpcConnectString string
-	SessionStore *sessions.CookieStore
+	SessionStore     *sessions.CookieStore
 }
 
 func NewContext(
@@ -134,7 +134,7 @@ func NewContext(
 		Dbm:              dbm,
 		Logger:           logger,
 		RpcConnectString: rpcConnectString,
-		SessionStore: sessionstore,
+		SessionStore:     sessionstore,
 	}
 }
 
