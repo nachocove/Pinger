@@ -48,7 +48,7 @@ func (ex *ExchangeClient) doStats(t1 time.Time, firstTime bool) {
 	}
 }
 
-func (ex *ExchangeClient) PeriodicCheck() {
+func (ex *ExchangeClient) periodicCheck() {
 	localAddr := ex.client.connection.LocalAddr().String()
 	firstTime := true
 	count := 0
@@ -106,7 +106,7 @@ func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) error {
 	// Listen launches 2 goroutines
 	err := ex.client.Listen(wait)
 	if err == nil && ex.pingPeriodicity > 0 {
-		go ex.PeriodicCheck()
+		go ex.periodicCheck()
 	}
 	return err // could be nil
 }

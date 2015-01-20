@@ -60,9 +60,17 @@ func (t *BackendPolling) Start(args *StartPollArgs, reply *PollingResponse) erro
 		reopenConnection := true
 		debug := false
 		logger := logger
+		var mailserver MailServer
+		switch {
+		case args.Device.MailClientType == "exchange":
+			mailserver = NewExchangeClient(dialString, pingPeriodicity, reopenConnection, nil, 0, debug, logger)
+
+		default:
+			panic(fmt.Sprintf("Unknown/unsupported mailserver type %s", args.Device.MailClientType))
+		}
 		pi := pollMapItem{
 			startArgs:  args,
-			mailServer: NewExchangeClient(dialString, pingPeriodicity, reopenConnection, nil, 0, debug, logger),
+			mailServer: mailserver,
 		}
 		pollMap[args.Device.ClientId] = &pi
 		logger.Debug("Starting polling for %s", args.Device.ClientId)

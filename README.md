@@ -49,7 +49,6 @@ github.com/gorilla/context
 github.com/gorilla/mux
 github.com/gorilla/securecookie
 github.com/gorilla/sessions
-github.com/felixge/tcpkeepalive  (used in the testServer only)
 
 To get the list of dependencies, use:
 ```
@@ -57,6 +56,11 @@ go list -f '{{join .Deps "\n"}}' ./... |  xargs go list -f '{{if not .Standard}}
 ```
 
 To install all dependencies (assuming they didn't get pull in in the initial fetch, or perhaps you're updating):
+```
+go get -u github.com/nachocove/Pinger/...
+```
+
+or
 ```
 go list -f '{{join .Deps "\n"}}' ./... |  xargs go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}' | xargs go get
 ```

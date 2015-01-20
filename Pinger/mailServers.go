@@ -25,7 +25,6 @@ func (mailServer MailServerType) String() string {
 }
 
 type MailServer interface {
-	PeriodicCheck()
 	Listen(wait *sync.WaitGroup) error
 	Action(action int) error
 }
