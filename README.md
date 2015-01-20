@@ -13,6 +13,12 @@ go get github.com/nachocove/Pinger/...
 
 *NOTE: Yes, that's 3 dots. 3 dots ('...') is idiomatic go for 'everything under here'.*
 
+To update:
+
+```
+go get -u github.com/nachocove/Pinger/...
+```
+
 or to get the git repo:
 
 ```
@@ -30,15 +36,20 @@ Recommends just sticking with one goroutine per connection. Seems it can handle 
 Web server Dependencies (will get pulled in with 'go get ...' during the initial pull of Pinger):
 
 ```
+github.com/Go-SQL-Driver/MySQL
+github.com/codegangsta/negroni
+github.com/coopernurse/gorp
+github.com/mattn/go-sqlite3
+github.com/op/go-logging
 code.google.com/p/gcfg
 code.google.com/p/gcfg/scanner
 code.google.com/p/gcfg/token
 code.google.com/p/gcfg/types
-github.com/codegangsta/negroni
 github.com/gorilla/context
 github.com/gorilla/mux
-github.com/op/go-logging
-```
+github.com/gorilla/securecookie
+github.com/gorilla/sessions
+github.com/felixge/tcpkeepalive  (used in the testServer only)
 
 To get the list of dependencies, use:
 ```

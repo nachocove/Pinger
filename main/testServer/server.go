@@ -14,7 +14,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/felixge/tcpkeepalive"
 	"github.com/nachocove/Pinger/Pinger"
 	"github.com/op/go-logging"
 )
@@ -43,12 +42,6 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 		tc.SetKeepAlive(true)
 		tc.SetKeepAlivePeriod(tcpKeepAlive)
 		logger.Debug("Set TCP-keepalive to %ds\n", tcpKeepAlive)
-		tcpkeep, err := tcpkeepalive.EnableKeepAlive(tc)
-		if err != nil {
-			logger.Error("Could not set tcpkeepalive.EnableKeepAlive")
-			return
-		}
-		tcpkeep.SetKeepAliveIdle(time.Duration(tcpKeepAlive) * time.Second)
 	} else {
 		tc.SetKeepAlive(false)
 	}
