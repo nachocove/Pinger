@@ -48,7 +48,7 @@ func (ex *ExchangeClient) doStats(t1 time.Time, firstTime bool) {
 	}
 }
 
-func (ex *ExchangeClient) periodicCheck() {
+func (ex *ExchangeClient) PeriodicCheck() {
 	localAddr := ex.client.connection.LocalAddr().String()
 	firstTime := true
 	count := 0
@@ -106,9 +106,14 @@ func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) error {
 	// Listen launches 2 goroutines
 	err := ex.client.Listen(wait)
 	if err == nil && ex.pingPeriodicity > 0 {
-		go ex.periodicCheck()
+		go ex.PeriodicCheck()
 	}
 	return err // could be nil
+}
+
+func (ex *ExchangeClient) Action(action int) error {
+	ex.client.command <- action
+	return nil
 }
 
 // TODO This really ought to just be a method/interface thing

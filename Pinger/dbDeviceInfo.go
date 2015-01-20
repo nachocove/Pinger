@@ -132,7 +132,7 @@ func (di *DeviceInfo) StartPoll(rpcserver string, mailEndpointInfo string) error
 		return err
 	}
 	args := &StartPollArgs{
-		ClientId:     di.ClientId,
+		Device:       *di,
 		MailEndpoint: mailEndpointInfo,
 	}
 	var reply PollingResponse

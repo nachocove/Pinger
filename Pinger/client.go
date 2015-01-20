@@ -4,17 +4,18 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/op/go-logging"
 	"io"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/op/go-logging"
 )
 
 const (
-	noCommand = iota
+	noCommand = 0
 	// Stop stop the client
-	Stop = iota
+	Stop = 1
 )
 
 // Client The client structure for tracking a particular endpoint
@@ -217,7 +218,7 @@ func (client *Client) closeConn() {
 // This function creates a go routine (Wait()), which itself adds 1 goroutines for listening.
 func (client *Client) Listen(wait *sync.WaitGroup) error {
 	client.logger.Debug("Starting client")
-	client.waitGroup = wait
+	client.waitGroup = wait // can be nil
 	err := client.openConn()
 	if err != nil {
 		return err

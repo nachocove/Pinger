@@ -1,6 +1,6 @@
 package Pinger
 
-import ()
+import "sync"
 
 // MailServerType the type of the mail server
 type MailServerType int
@@ -22,4 +22,10 @@ var mailServers = [...]string{
 
 func (mailServer MailServerType) String() string {
 	return mailServers[mailServer]
+}
+
+type MailServer interface {
+	PeriodicCheck()
+	Listen(wait *sync.WaitGroup) error
+	Action(action int) error
 }
