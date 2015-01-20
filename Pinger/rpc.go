@@ -15,7 +15,7 @@ import (
 type BackendPolling int
 
 type StartPollArgs struct {
-	Device       DeviceInfo
+	Device       *DeviceInfo
 	MailEndpoint string
 }
 
