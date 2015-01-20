@@ -124,8 +124,10 @@ func InitRpc(logger *logging.Logger) {
 func StartPollingRPCServer(l *logging.Logger) {
 	InitRpc(l)
 	pollingAPI := new(BackendPolling)
-	rpc.Register(pollingAPI)
-	rpc.HandleHTTP()
+	rpcServer := rpc.NewServer()
+	rpcServer.Register(pollingAPI)
+	rpcServer.HandleHTTP("/rpc", "/debug/rpc")
+
 	rpcConnectString := fmt.Sprintf("%s:%d", "localhost", RPCPort)
 	RpcLogger.Info("Starting RPC server on %s", rpcConnectString)
 	err := http.ListenAndServe(rpcConnectString, nil)
