@@ -35,7 +35,8 @@ const (
 )
 
 func (t *BackendPolling) Start(args *StartPollArgs, reply *PollingResponse) error {
-	logger.Debug("Received request for for %v", args)
+	defer recoverCrash()
+	logger.Debug("Received request for %s", args.Device.ClientId)
 	replyCode := PollingReplyOK
 	pi, ok := pollMap[args.Device.ClientId]
 	if ok == true {
@@ -51,7 +52,7 @@ func (t *BackendPolling) Start(args *StartPollArgs, reply *PollingResponse) erro
 			panic("Got a pi but ok is false?")
 		}
 	}
-	
+
 	if pi == nil {
 		// nothing started yet. So start it.
 		dialString := ""
@@ -71,8 +72,15 @@ func (t *BackendPolling) Start(args *StartPollArgs, reply *PollingResponse) erro
 	return nil
 }
 
+func recoverCrash() {
+	if r := recover(); r != nil {
+		fmt.Println("Crash:", r)
+	}
+}
+
 func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error {
-	logger.Debug("Received request for for %v", args)
+	defer recoverCrash()
+	logger.Debug("Received request for %s", args.ClientId)
 	replyCode := PollingReplyOK
 	pi, ok := pollMap[args.ClientId]
 	if ok == false {

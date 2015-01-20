@@ -226,9 +226,9 @@ var httpsRouter = mux.NewRouter()
 func (context *Context) run() error {
 	config := context.Config
 	httpsMiddlewares := negroni.New(
-		NewRecovery("Pinger-web", config.Global.Debug),
+		Pinger.NewRecovery("Pinger-web", config.Global.Debug),
 		negroni.NewLogger(),
-		NewStatic("/public", "/static", ""),
+		Pinger.NewStatic("/public", "/static", ""),
 		NewContextMiddleWare(context))
 
 	httpsMiddlewares.UseHandler(httpsRouter)
@@ -238,9 +238,9 @@ func (context *Context) run() error {
 	// start the server on the non-tls port to redirect
 	go func() {
 		httpMiddlewares := negroni.New(
-			NewRecovery("Pinger-web", config.Global.Debug),
+			Pinger.NewRecovery("Pinger-web", config.Global.Debug),
 			negroni.NewLogger(),
-			NewRedirectMiddleware("", config.Server.Port),
+			Pinger.NewRedirectMiddleware("", config.Server.Port),
 		)
 		httpRouter := mux.NewRouter()
 		httpMiddlewares.UseHandler(httpRouter)
