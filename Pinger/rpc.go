@@ -74,7 +74,6 @@ func (t *BackendPolling) start(args *StartPollArgs, reply *PollingResponse) erro
 		pollMap[args.Device.ClientId] = &pi
 		RpcLogger.Debug("Starting polling for %s", args.Device.ClientId)
 		reply.Message = "Started"
-		panic("WWWWW")
 	}
 	reply.Code = replyCode
 	return nil
