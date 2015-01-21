@@ -15,8 +15,8 @@ import (
 type BackendPolling int
 
 type StartPollArgs struct {
-	Device       *DeviceInfo
-	MailEndpoint string
+	Device   *DeviceInfo
+	MailInfo *MailPingInformation
 }
 
 type StopPollArgs struct {
@@ -59,14 +59,7 @@ func (t *BackendPolling) start(args *StartPollArgs, reply *PollingResponse) erro
 		pingPeriodicity := 5
 		reopenConnection := true
 		debug := false
-		var mailserver MailServer
-		switch {
-		case args.Device.MailClientType == "exchange":
-			mailserver = NewExchangeClient(dialString, pingPeriodicity, reopenConnection, nil, 0, debug, RpcLogger)
-
-		default:
-			panic(fmt.Sprintf("Unknown/unsupported mailserver type %s", args.Device.MailClientType))
-		}
+		mailserver := NewExchangeClient(dialString, pingPeriodicity, reopenConnection, nil, 0, debug, RpcLogger)
 		pi := pollMapItem{
 			startArgs:  args,
 			mailServer: mailserver,

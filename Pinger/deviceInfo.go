@@ -8,21 +8,17 @@ import (
 	"regexp"
 	"time"
 
-	"net/rpc"
-
 	"github.com/coopernurse/gorp"
 )
 
 type DeviceInfo struct {
-	Id             int64  `db:"id"`
-	Created        int64  `db:"created"`
-	Updated        int64  `db:"updated"`
-	ClientId       string `db:"client_id"`       // us-east-1a-XXXXXXXX
-	DeviceId       string `db:"device_id"`       // "NchoXXXXXX"
-	Platform       string `db:"device_platform"` // "ios", "android", etc..
-	PushToken      string `db:"push_token"`
-	PushService    string `db:"push_service"` // AWS, APNS, GCM, ...
-	MailClientType string `db:"mail_client_type"`
+	Id          int64  `db:"id"`
+	Created     int64  `db:"created"`
+	Updated     int64  `db:"updated"`
+	ClientId    string `db:"client_id"`       // us-east-1a-XXXXXXXX
+	Platform    string `db:"device_platform"` // "ios", "android", etc..
+	PushToken   string `db:"push_token"`
+	PushService string `db:"push_service"` // AWS, APNS, GCM, ...
 }
 
 const (
@@ -49,9 +45,6 @@ func (di *DeviceInfo) Validate() error {
 	if di.ClientId == "" {
 		return errors.New("ClientID can not be empty")
 	}
-	if di.DeviceId == "" {
-		return errors.New("DeviceId can not be empty")
-	}
 	if di.Platform == "" {
 		return errors.New("Platform can not be empty")
 	} else {
@@ -65,14 +58,12 @@ func (di *DeviceInfo) Validate() error {
 	}
 	return nil
 }
-func NewDeviceInfo(clientID, deviceID, pushToken, pushService, platform, mailClientType string) (*DeviceInfo, error) {
+func NewDeviceInfo(clientID, pushToken, pushService, platform string) (*DeviceInfo, error) {
 	di := &DeviceInfo{
-		ClientId:       clientID,
-		DeviceId:       deviceID,
-		PushToken:      pushToken,
-		PushService:    pushService,
-		Platform:       platform,
-		MailClientType: mailClientType,
+		ClientId:    clientID,
+		PushToken:   pushToken,
+		PushService: pushService,
+		Platform:    platform,
 	}
 	err := di.Validate()
 	if err != nil {
@@ -120,47 +111,4 @@ func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
 	di.Created = time.Now().UnixNano()
 	di.Updated = di.Created
 	return di.Validate()
-}
-
-func rpcClient(rpcserver string) (*rpc.Client, error) {
-	// TODO Need to figure out if we can cache the client, so we don't have to constantly reopen it
-	return rpc.DialHTTP("tcp", rpcserver)
-}
-func (di *DeviceInfo) StartPoll(rpcserver string, mailEndpointInfo string) error {
-	client, err := rpcClient(rpcserver)
-	if err != nil {
-		return err
-	}
-	args := &StartPollArgs{
-		Device:       di,
-		MailEndpoint: mailEndpointInfo,
-	}
-	var reply PollingResponse
-	err = client.Call("BackendPolling.Start", args, &reply)
-	if err != nil {
-		return err
-	}
-	if reply.Code != PollingReplyOK {
-		return errors.New(fmt.Sprintf("RPC server responded with %d:%s", reply.Code, reply.Message))
-	}
-	return nil
-}
-
-func (di *DeviceInfo) StopPoll(rpcserver string) error {
-	client, err := rpcClient(rpcserver)
-	if err != nil {
-		return err
-	}
-	args := &StopPollArgs{
-		ClientId: di.ClientId,
-	}
-	var reply PollingResponse
-	err = client.Call("BackendPolling.Stop", args, &reply)
-	if err != nil {
-		return err
-	}
-	if reply.Code != PollingReplyOK {
-		return errors.New(fmt.Sprintf("RPC server responded with %d:%s", reply.Code, reply.Message))
-	}
-	return nil
 }
