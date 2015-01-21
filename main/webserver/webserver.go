@@ -1,9 +1,5 @@
 package main
 
-import (
-	"github.com/nachocove/Pinger/WebServer"
-)
-
 /*
  Design/Architecture
 
@@ -17,5 +13,5 @@ import (
 */
 
 func main() {
-	WebServer.GetConfigAndRun()
+	GetConfigAndRun()
 }
