@@ -63,9 +63,9 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	context.Logger.Debug("Re/Started Polling for %s", postInfo.ClientId)
-	// TODO Need to now punt this (and the un-saved mail credentials) to a go routine. Need
-	// to be able to look up whether a goroutine already exists, so we don't create a new one
-	// for every identical call
+	
+	postInfo.StartPoll(context.Config.Rpc.String())
+
 	err = session.Save(r, w)
 	if err != nil {
 		context.Logger.Warning("Could not save session")

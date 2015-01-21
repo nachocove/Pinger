@@ -9,26 +9,11 @@ import (
 )
 
 // MailServerType the type of the mail server
-type MailServerType int
+type MailServerType string
 
 const (
-	// MailServerUnknown an unknown mail server
-	MailServerUnknown MailServerType = iota
-	// MailServerExchange Exchange by Microsoft
-	MailServerExchange MailServerType = iota
-	// MailServerHotmail hosted hotmail domain
-	MailServerHotmail MailServerType = iota
+	MailServerExchange MailServerType = "exchange"
 )
-
-var mailServers = [...]string{
-	"UNKNOWN",
-	"EXCHANGE",
-	"HOTMAIL",
-}
-
-func (mailServer MailServerType) String() string {
-	return mailServers[mailServer]
-}
 
 type MailServer interface {
 	Listen(wait *sync.WaitGroup) error
@@ -86,12 +71,8 @@ func (pi *MailPingInformation) StartPoll(rpcserver string) error {
 	if err != nil {
 		return err
 	}
-	args := &StartPollArgs{
-		Device:   pi.deviceInfo,
-		MailInfo: pi,
-	}
 	var reply PollingResponse
-	err = client.Call("BackendPolling.Start", args, &reply)
+	err = client.Call("BackendPolling.Start", &StartPollArgs{MailInfo: pi}, &reply)
 	if err != nil {
 		return err
 	}
@@ -117,5 +98,15 @@ func (pi *MailPingInformation) StopPoll(rpcserver string) error {
 	if reply.Code != PollingReplyOK {
 		return errors.New(fmt.Sprintf("RPC server responded with %d:%s", reply.Code, reply.Message))
 	}
+	return nil
+}
+
+func (pi *MailPingInformation) Start() error {
+	panic("IMPLEMENT ME")
+	return nil
+}
+
+func (pi *MailPingInformation) Stop() error {
+	panic("IMPLEMENT ME")
 	return nil
 }

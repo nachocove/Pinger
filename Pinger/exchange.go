@@ -16,6 +16,7 @@ type ExchangeClient struct {
 	client          *Client
 	pingPeriodicity int
 	debug           bool
+	stats *StatLogger
 }
 
 // String convert the ExchangeClient structure to something printable
@@ -40,22 +41,18 @@ func getExchangeStatusMsg(localAddr string, count int) []byte {
 
 func (ex *ExchangeClient) doStats(t1 time.Time, firstTime bool) {
 	dur := time.Since(t1)
-	ex.client.logger.Debug("%s: Got response in %fms\n", ex.client.connection.LocalAddr().String(), dur.Seconds()*1000.00)
+	ex.client.logger.Debug("%s: Got response in %fms\n", ex.client.Connection.LocalAddr().String(), dur.Seconds()*1000.00)
 	if firstTime {
-		firstTimeResponseTimeCh <- dur.Seconds()
+		ex.stats.FirstTimeResponseTimeCh <- dur.Seconds()
 	} else {
-		responseTimeCh <- dur.Seconds()
+		ex.stats.ResponseTimeCh <- dur.Seconds()
 	}
 }
 
 func (ex *ExchangeClient) periodicCheck() {
-	localAddr := ex.client.connection.LocalAddr().String()
+	localAddr := ex.client.Connection.LocalAddr().String()
 	firstTime := true
 	count := 0
-	if tallyLogger == nil {
-		tallyLogger = ex.client.logger
-	}
-
 	for {
 		count++
 		data := getExchangeStatusMsg(localAddr, count)
@@ -65,10 +62,10 @@ func (ex *ExchangeClient) periodicCheck() {
 		receiveTimeout := time.NewTimer(time.Duration(60) * time.Second)
 		dataSentTime := time.Now()
 
-		ex.client.outgoing <- data
+		ex.client.Outgoing <- data
 		ex.client.logger.Debug("%s: Waiting for response", localAddr)
 		select {
-		case incomingData := <-ex.client.incoming:
+		case incomingData := <-ex.client.Incoming:
 			ex.doStats(dataSentTime, firstTime)
 			firstTime = false
 			incomingString := string(bytes.Trim(incomingData, "\000"))
@@ -93,7 +90,7 @@ func (ex *ExchangeClient) periodicCheck() {
 		ex.client.logger.Debug("%s: Should have slept for %d. Slept for %f", localAddr, sleepTime, slept)
 		overTime := slept - float64(sleepTime)
 		if overTime > 0 {
-			overageSleepTimeCh <- overTime
+			ex.stats.OverageSleepTimeCh <- overTime
 		} else {
 			ex.client.logger.Info("%s: EARLY: Woke up %fms before allotted time.", localAddr, overTime)
 		}
@@ -112,14 +109,17 @@ func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) error {
 }
 
 func (ex *ExchangeClient) Action(action int) error {
-	ex.client.command <- action
+	ex.client.Command <- action
 	return nil
 }
 
-// TODO This really ought to just be a method/interface thing
-
 // NewExchangeClient set up a new exchange client
-func NewExchangeClient(dialString string, pingPeriodicity int, reopenConnection bool, tlsConfig *tls.Config, tcpKeepAlive int, debug bool, logger *logging.Logger) *ExchangeClient {
+func NewExchangeClient(mailInfo *MailPingInformation, debug bool, logger *logging.Logger) *ExchangeClient {
+	panic("Need to implement this better")
+	dialString := ""
+	reopenConnection := true
+	var tlsConfig *tls.Config = nil
+	tcpKeepAlive := 0
 	client := NewClient(dialString, reopenConnection, tlsConfig, tcpKeepAlive, debug, logger)
 	var Log = GetLogger("exchange-client")
 	if client == nil {
@@ -128,7 +128,8 @@ func NewExchangeClient(dialString string, pingPeriodicity int, reopenConnection 
 	}
 	return &ExchangeClient{
 		client:          client,
-		pingPeriodicity: pingPeriodicity,
+		pingPeriodicity: 5,
 		debug:           debug,
+		stats: NewStatLogger(logger),
 	}
 }

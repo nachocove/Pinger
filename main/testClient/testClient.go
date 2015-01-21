@@ -168,7 +168,7 @@ func main() {
 		} else {
 			reopen = true
 		}
-		client := Pinger.NewExchangeClient(connectionString, pingPeriodic, reopen, TLSConfig, tcpKeepAlive, debug, logger)
+		client := NewTestClient(connectionString, pingPeriodic, reopen, debug, tcpKeepAlive, TLSConfig, logger)
 		// this launches either 2 or 3 goroutines per connection. 3 if pingPeriodic > 0, 2 otherwise.
 		if client != nil {
 			err := client.Listen(&wg)

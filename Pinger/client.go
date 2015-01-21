@@ -20,12 +20,14 @@ const (
 
 // Client The client structure for tracking a particular endpoint
 type Client struct {
-	connection    net.Conn
+	Connection    net.Conn
+	Incoming      chan []byte
+	Outgoing      chan []byte
+	Command       chan int
+	Err           chan error
+	
+	// private
 	buffer        []byte
-	incoming      chan []byte
-	outgoing      chan []byte
-	command       chan int
-	err           chan error
 	waitGroup     *sync.WaitGroup
 	debug         bool
 	dialString    string
@@ -38,12 +40,14 @@ type Client struct {
 // NewClient Set up a new client
 func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, tcpKeepAlive int, debug bool, logger *logging.Logger) *Client {
 	client := &Client{
+		Connection:    nil,
+		Incoming:      make(chan []byte, 2),
+		Outgoing:      make(chan []byte, 2),
+		Command:       make(chan int, 2),
+		Err:           make(chan error),
+		
+		// private
 		dialString:    dialString,
-		connection:    nil,
-		incoming:      make(chan []byte, 2),
-		outgoing:      make(chan []byte, 2),
-		command:       make(chan int, 2),
-		err:           make(chan error),
 		waitGroup:     nil,
 		debug:         debug,
 		reopenOnClose: reopenOnClose,
@@ -63,7 +67,7 @@ func init() {
 
 // String Convert the client structure into a printable string
 func (client *Client) String() string {
-	return fmt.Sprintf("Client %s (debug %t)", client.connection.RemoteAddr().String(), client.debug)
+	return fmt.Sprintf("Client %s (debug %t)", client.Connection.RemoteAddr().String(), client.debug)
 }
 
 // Done The client is exiting. Cleanup and alert anyone waiting.
@@ -77,18 +81,18 @@ func (client *Client) Done() {
 	ActiveClientCount--
 }
 
-func (client *Client) connectionReader(command <-chan int) {
+func (client *Client) connectionReader(Command <-chan int) {
 	if client.buffer == nil {
 		client.buffer = make([]byte, 512)
 	}
 	for {
-		if client.connection == nil {
+		if client.Connection == nil {
 			time.Sleep(1)
 			continue
 		}
 
-		if len(command) > 0 {
-			cmd := <-command
+		if len(Command) > 0 {
+			cmd := <-Command
 			if cmd == Stop {
 				if client.debug {
 					client.logger.Info("Was told to stop. Exiting")
@@ -97,10 +101,10 @@ func (client *Client) connectionReader(command <-chan int) {
 			}
 		}
 		// try to read the data
-		n, err := client.connection.Read(client.buffer)
+		n, err := client.Connection.Read(client.buffer)
 		if err != nil {
 			// send an error if it's encountered
-			client.err <- err
+			client.Err <- err
 			return
 		}
 		if n <= 0 {
@@ -108,7 +112,7 @@ func (client *Client) connectionReader(command <-chan int) {
 		}
 
 		// send data if we read some.
-		client.incoming <- client.buffer
+		client.Incoming <- client.buffer
 	}
 }
 
@@ -116,7 +120,7 @@ func (client *Client) connectionReader(command <-chan int) {
 // Is itself launched as a goroutine, and adds a single goroutine for listening on the connection
 func (client *Client) wait() {
 	defer client.Done()
-	if client.connection == nil {
+	if client.Connection == nil {
 		client.logger.Fatal("Wait called without an open connection")
 	}
 	defer client.closeConn()
@@ -124,22 +128,22 @@ func (client *Client) wait() {
 	// Start a goroutine to read from our net connection
 	connectionCommand := make(chan int, 1)
 	go client.connectionReader(connectionCommand)
-	defer func(command chan<- int) {
-		command <- Stop
+	defer func(Command chan<- int) {
+		Command <- Stop
 	}(connectionCommand)
 
 	for {
 		var exitLoop = false
-		if client.connection == nil {
+		if client.Connection == nil {
 			if client.debug {
 				client.logger.Debug("reopening connection")
 			}
 			client.openConn()
 		}
 		select {
-		case data := <-client.outgoing:
+		case data := <-client.Outgoing:
 			// write data to the connection
-			_, err := client.connection.Write(data)
+			_, err := client.Connection.Write(data)
 			if err != nil {
 				client.logger.Error("write: %s\n", err.Error())
 				client.closeConn()
@@ -148,7 +152,7 @@ func (client *Client) wait() {
 				}
 			}
 
-		case err := <-client.err:
+		case err := <-client.Err:
 			// handle our error then exit for loop
 			if err == io.EOF {
 				client.logger.Info("Connection closed\n")
@@ -157,7 +161,7 @@ func (client *Client) wait() {
 			}
 			exitLoop = true
 
-		case cmd := <-client.command:
+		case cmd := <-client.Command:
 			switch cmd {
 			case Stop:
 				if client.debug {
@@ -200,17 +204,17 @@ func (client *Client) openConn() error {
 			client.logger.Warning("Opened TCP-only Connection")
 		}
 	}
-	client.connection = connection
-	if client.connection == nil {
+	client.Connection = connection
+	if client.Connection == nil {
 		return errors.New("Could not open connection")
 	}
 	return nil
 }
 
 func (client *Client) closeConn() {
-	if client.connection != nil {
-		client.connection.Close()
-		client.connection = nil
+	if client.Connection != nil {
+		client.Connection.Close()
+		client.Connection = nil
 	}
 }
 

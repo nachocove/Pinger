@@ -1,10 +1,29 @@
 package Pinger
 
 import (
-	"github.com/op/go-logging"
-	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
+	"github.com/op/go-logging"
+  "github.com/stretchr/testify/assert"
 )
+
+type DummyMailServer struct {
+}
+
+func NewDummyMailServer() *DummyMailServer {
+	return &DummyMailServer{}
+}
+func (d *DummyMailServer) Listen(wait *sync.WaitGroup) error {
+	return nil
+}
+func (d *DummyMailServer) Action(action int) error {
+	return nil
+}
+
+func (di *DeviceInfo) NewMailServer(hostname string, port, pingPeriodicity int, ssl, debug bool, logger *logging.Logger) MailServer {
+	fmt.Printf("Called NewMailServer\n");
+	return NewDummyMailServer()
+}
 
 func TestRpcSstart(t *testing.T) {
 	logger, err := logging.GetLogger("Unittests")
@@ -19,13 +38,13 @@ func TestRpcSstart(t *testing.T) {
 		"exchange")
 	assert.Nil(t, err)
 	assert.NotNil(t, di)
-
+	
 	args := StartPollArgs{
 		Device:       di,
 		MailEndpoint: "",
 	}
-	reply := PollingResponse{}
-
+	reply := PollingResponse{} 
+	
 	poll := new(BackendPolling)
-	poll.start(&args, &reply)
+	poll.start(&args, &reply) 
 }

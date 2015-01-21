@@ -15,7 +15,6 @@ import (
 type BackendPolling int
 
 type StartPollArgs struct {
-	Device   *DeviceInfo
 	MailInfo *MailPingInformation
 }
 
@@ -35,15 +34,21 @@ const (
 	PollingReplyError = 0
 )
 
+var pollMap map[string]*MailPingInformation
+
+func init() {
+	pollMap = make(map[string]*MailPingInformation)
+}
+
 func (t *BackendPolling) start(args *StartPollArgs, reply *PollingResponse) error {
-	RpcLogger.Debug("Received request for %s", args.Device.ClientId)
+	RpcLogger.Debug("Received request for %s", args.MailInfo.ClientId)
 	replyCode := PollingReplyOK
-	pi, ok := pollMap[args.Device.ClientId]
+	pi, ok := pollMap[args.MailInfo.ClientId]
 	if ok == true {
 		if pi == nil {
-			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.Device.ClientId))
+			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.MailInfo.ClientId))
 		}
-		RpcLogger.Debug("Already polling for %s", args.Device.ClientId)
+		RpcLogger.Debug("Already polling for %s", args.MailInfo.ClientId)
 		reply.Message = "Running"
 		// TODO Check to see if we're still running. Maybe get a status and return it. Maybe some stats?
 		// If we detect any issues with the polling routine for this client, kill it and set pi to nil.
@@ -51,23 +56,14 @@ func (t *BackendPolling) start(args *StartPollArgs, reply *PollingResponse) erro
 		if pi != nil {
 			panic("Got a pi but ok is false?")
 		}
-	}
-
-	if pi == nil {
 		// nothing started yet. So start it.
-		dialString := ""
-		pingPeriodicity := 5
-		reopenConnection := true
-		debug := false
-		mailserver := NewExchangeClient(dialString, pingPeriodicity, reopenConnection, nil, 0, debug, RpcLogger)
-		pi := pollMapItem{
-			startArgs:  args,
-			mailServer: mailserver,
-		}
-		pollMap[args.Device.ClientId] = &pi
-		RpcLogger.Debug("Starting polling for %s", args.Device.ClientId)
+		pi = args.MailInfo
+		args.MailInfo.Start()
+		pollMap[args.MailInfo.ClientId] = args.MailInfo
+		RpcLogger.Debug("Starting polling for %s", args.MailInfo.ClientId)
 		reply.Message = "Started"
 	}
+
 	reply.Code = replyCode
 	return nil
 }
@@ -83,7 +79,10 @@ func (t *BackendPolling) stop(args *StopPollArgs, reply *PollingResponse) error 
 		if pi == nil {
 			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
 		}
-		pi.mailServer.Action(Stop)
+		err := pi.Stop()
+		if err != nil {
+			return err
+		}
 		reply.Message = "Stopped"
 
 	}
@@ -98,6 +97,7 @@ func recoverCrash() {
 		RpcLogger.Error("Error: %s\n%s", err, stack)
 	}
 }
+
 func (t *BackendPolling) Start(args *StartPollArgs, reply *PollingResponse) error {
 	defer recoverCrash()
 	return t.start(args, reply)
@@ -109,13 +109,15 @@ func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error 
 }
 
 var RpcLogger *logging.Logger
+var debug bool
 
-func InitRpc(logger *logging.Logger) {
+func InitRpc(logger *logging.Logger, deb bool) {
 	RpcLogger = logger
+	debug = deb
 }
 
-func StartPollingRPCServer(l *logging.Logger) {
-	InitRpc(l)
+func StartPollingRPCServer(l *logging.Logger, deb bool) {
+	InitRpc(l, deb)
 	pollingAPI := new(BackendPolling)
 	rpcServer := rpc.NewServer()
 	rpcServer.Register(pollingAPI)
