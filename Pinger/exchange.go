@@ -5,8 +5,8 @@ import (
 	"crypto/tls"
 	"fmt"
 	"math/rand"
-	"sync"
 	"time"
+	"sync"
 
 	"github.com/op/go-logging"
 )
@@ -14,8 +14,10 @@ import (
 // ExchangeClient A client with type exchange.
 type ExchangeClient struct {
 	client          *Client
+	waitBeforeUse   int
 	pingPeriodicity int
 	debug           bool
+	logger	*logging.Logger
 	stats *StatLogger
 }
 
@@ -34,14 +36,9 @@ func randomInt(x, y int) int {
 	return rand.Intn(y-x) + x
 }
 
-func getExchangeStatusMsg(localAddr string, count int) []byte {
-	data := fmt.Sprintf("%d: Greetings from %s", count, localAddr)
-	return []byte(data)
-}
-
 func (ex *ExchangeClient) doStats(t1 time.Time, firstTime bool) {
 	dur := time.Since(t1)
-	ex.client.logger.Debug("%s: Got response in %fms\n", ex.client.Connection.LocalAddr().String(), dur.Seconds()*1000.00)
+	ex.logger.Debug("%s: Got response in %fms\n", ex.client.Connection.LocalAddr().String(), dur.Seconds()*1000.00)
 	if firstTime {
 		ex.stats.FirstTimeResponseTimeCh <- dur.Seconds()
 	} else {
@@ -49,61 +46,65 @@ func (ex *ExchangeClient) doStats(t1 time.Time, firstTime bool) {
 	}
 }
 
-func (ex *ExchangeClient) periodicCheck() {
+func (ex *ExchangeClient) periodicCheck(pi *MailPingInformation) {
 	localAddr := ex.client.Connection.LocalAddr().String()
 	firstTime := true
 	count := 0
 	for {
 		count++
-		data := getExchangeStatusMsg(localAddr, count)
-		if ex.debug {
-			ex.client.logger.Debug("%s: ExchangeClient sending \"%s\"", localAddr, data)
+		
+		if pi.WaitBeforeUse > 0 {
+			time.Sleep(time.Duration(pi.WaitBeforeUse)*time.Second)
 		}
-		receiveTimeout := time.NewTimer(time.Duration(60) * time.Second)
-		dataSentTime := time.Now()
 
-		ex.client.Outgoing <- data
-		ex.client.logger.Debug("%s: Waiting for response", localAddr)
+		receiveTimeout := time.NewTimer(time.Duration(pi.ResponseTimeout)*time.Second)
+		dataSentTime := time.Now()
+		ex.client.Outgoing <- pi.HttpRequestData
+		ex.logger.Debug("%s: Waiting for response", localAddr)
 		select {
 		case incomingData := <-ex.client.Incoming:
 			ex.doStats(dataSentTime, firstTime)
 			firstTime = false
-			incomingString := string(bytes.Trim(incomingData, "\000"))
-			if incomingString != string(data) {
-				ex.client.logger.Warning("%s: Received data does not match: \n (%d) %s\n (%d) %s\n", localAddr, len(incomingString), incomingString, len(data), data)
-				continue
-			} else {
-				ex.client.logger.Debug("%s: Received string matches", localAddr)
+			incomingString := bytes.Trim(incomingData, "\000")
+			switch {
+			case (pi.HttpNoChangeReply != nil && bytes.Compare(incomingString, pi.HttpNoChangeReply) == 0):
+				// go back to polling
+				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", localAddr)
+			
+			case (pi.HttpExpectedReply == nil || (pi.HttpExpectedReply != nil && bytes.Compare(incomingString, pi.HttpExpectedReply) == 0)):
+				// there's new mail!
+				ex.logger.Debug("%s: Reply matched HttpExpectedReply. Send Push", localAddr)
+				panic("Not yet implemented")
 			}
 			receiveTimeout.Stop()
 
 		case <-receiveTimeout.C:
-			ex.client.logger.Error("%s: No response in allotted time", localAddr)
+			ex.logger.Error("%s: No response in allotted time", localAddr)
 		}
 		sleepTime := ex.pingPeriodicity + randomInt(1, 5)
 		if ex.debug {
-			ex.client.logger.Debug("%s: Sleeping %d\n", localAddr, sleepTime)
+			ex.logger.Debug("%s: Sleeping %d\n", localAddr, sleepTime)
 		}
 		t1 := time.Now()
 		time.Sleep(time.Duration(sleepTime) * time.Second)
 		slept := time.Since(t1).Seconds()
-		ex.client.logger.Debug("%s: Should have slept for %d. Slept for %f", localAddr, sleepTime, slept)
+		ex.logger.Debug("%s: Should have slept for %d. Slept for %f", localAddr, sleepTime, slept)
 		overTime := slept - float64(sleepTime)
 		if overTime > 0 {
 			ex.stats.OverageSleepTimeCh <- overTime
 		} else {
-			ex.client.logger.Info("%s: EARLY: Woke up %fms before allotted time.", localAddr, overTime)
+			ex.logger.Info("%s: EARLY: Woke up %fms before allotted time.", localAddr, overTime)
 		}
 	}
 }
 
 // Listen sets up the exchange client to listen. Most of the hard work is done via the Client.Listen()
 // launches 1 goroutine for periodic checking, if confgured.
-func (ex *ExchangeClient) Listen(wait *sync.WaitGroup) error {
+func (ex *ExchangeClient) Listen(pi* MailPingInformation, wait *sync.WaitGroup) error {
 	// Listen launches 2 goroutines
 	err := ex.client.Listen(wait)
 	if err == nil && ex.pingPeriodicity > 0 {
-		go ex.periodicCheck()
+		go ex.periodicCheck(pi)
 	}
 	return err // could be nil
 }
@@ -131,5 +132,6 @@ func NewExchangeClient(mailInfo *MailPingInformation, debug bool, logger *loggin
 		pingPeriodicity: 5,
 		debug:           debug,
 		stats: NewStatLogger(logger),
+		logger: logger,
 	}
 }

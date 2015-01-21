@@ -4,19 +4,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/rpc"
 	"sync"
+	"net/rpc"
+	"github.com/op/go-logging"
 )
 
-// MailServerType the type of the mail server
-type MailServerType string
+// MailClientType the type of the mail client
+type MailClientType string
 
 const (
-	MailServerExchange MailServerType = "exchange"
+	MailClientExchange MailClientType = "exchange"
 )
 
-type MailServer interface {
-	Listen(wait *sync.WaitGroup) error
+type MailClient interface {
+	Listen(pi* MailPingInformation, wait *sync.WaitGroup) error
 	Action(action int) error
 }
 
@@ -39,6 +40,7 @@ type MailPingInformation struct {
 
 	// private
 	deviceInfo *DeviceInfo
+	mailClient MailClient  // a mail client with the MailClient interface
 }
 
 func (pi *MailPingInformation) String() string {
@@ -71,8 +73,12 @@ func (pi *MailPingInformation) StartPoll(rpcserver string) error {
 	if err != nil {
 		return err
 	}
+	return pi.startPoll(client)
+}
+
+func (pi *MailPingInformation) startPoll(client *rpc.Client) error {
 	var reply PollingResponse
-	err = client.Call("BackendPolling.Start", &StartPollArgs{MailInfo: pi}, &reply)
+	err := client.Call("BackendPolling.Start", &StartPollArgs{MailInfo: pi}, &reply)
 	if err != nil {
 		return err
 	}
@@ -87,11 +93,12 @@ func (pi *MailPingInformation) StopPoll(rpcserver string) error {
 	if err != nil {
 		return err
 	}
-	args := &StopPollArgs{
-		ClientId: pi.deviceInfo.ClientId,
-	}
+	return pi.stopPoll(client)
+}
+
+func (pi *MailPingInformation) stopPoll(client *rpc.Client) error {
 	var reply PollingResponse
-	err = client.Call("BackendPolling.Stop", args, &reply)
+	err := client.Call("BackendPolling.Stop", &StopPollArgs{ClientId: pi.deviceInfo.ClientId}, &reply)
 	if err != nil {
 		return err
 	}
@@ -101,12 +108,39 @@ func (pi *MailPingInformation) StopPoll(rpcserver string) error {
 	return nil
 }
 
-func (pi *MailPingInformation) Start() error {
-	panic("IMPLEMENT ME")
+func (pi *MailPingInformation) RestartPoll(rpcserver string) error {
+	client, err := rpcClient(rpcserver)
+	if err != nil {
+		return err
+	}
+	err = pi.stopPoll(client)
+	if err != nil {
+		return err
+	}
+	err = pi.startPoll(client)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (pi *MailPingInformation) Stop() error {
-	panic("IMPLEMENT ME")
+func (pi *MailPingInformation) Start(debug bool, logger *logging.Logger) error {
+	client := NewExchangeClient(pi, debug, logger)
+	if client == nil {
+		return errors.New("Could not create new Mail Client Pinger")
+	}
+	err := client.Listen(pi, nil)
+	if err != nil {
+		return err
+	}
+	pi.mailClient = client
+	return nil
+}
+
+func (pi *MailPingInformation) Stop(debug bool, logger *logging.Logger) error {
+	if pi.mailClient == nil {
+		panic("pi.mailClient = nil. Perhaps the mailclient has not be started?")
+	}
+	pi.mailClient.Action(Stop)
 	return nil
 }
