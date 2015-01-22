@@ -30,6 +30,7 @@ type ExchangeClient struct {
 	stats         *StatLogger
 	pi            *MailPingInformation
 	urlInfo       *url.URL
+	active bool
 }
 
 // String convert the ExchangeClient structure to something printable
@@ -83,6 +84,7 @@ func (ex *ExchangeClient) logPrefix() string {
 }
 
 func (ex *ExchangeClient) startLongPoll() {
+	defer RecoverCrash(ex.logger)
 	var logPrefix string = ex.logPrefix()
 	ex.logger.Debug("%s: started longpoll", logPrefix)
 
@@ -137,12 +139,22 @@ func (ex *ExchangeClient) startLongPoll() {
 				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", logPrefix)
 
 			default:
+				newMail := false
 				if bytes.Compare(responseBody, ex.pi.HttpExpectedReply) == 0 {
 					// there's new mail!
 					ex.logger.Debug("%s: Reply matched HttpExpectedReply. Send Push", logPrefix)
-					panic("Not yet implemented")
+					newMail = true
 				} else {
-					ex.logger.Debug("%s: Unhandled response %v", logPrefix, response)
+					if ex.pi.HttpNoChangeReply != nil {
+						// apparently the 'no-change' above didn't match, so this must be a change
+						newMail = true
+					} else {
+						ex.sendError(errors.New(fmt.Sprintf("%s: Unhandled response %v", logPrefix, response)))
+						return
+					}
+				}
+				if newMail {
+					panic("Not yet implemented")					
 				}
 			}
 			sleepTime = (time.Duration(ex.pi.ResponseTimeout) * time.Second) - time.Since(requestSent)
@@ -174,15 +186,14 @@ func (ex *ExchangeClient) startLongPoll() {
 }
 
 func (ex *ExchangeClient) sendError(err error) {
-	ex.lastError = err
-	ex.logger.Error("Client threw an error: %s", ex.lastError)
 	_, fn, line, _ := runtime.Caller(1)
-	ex.logger.Error("[error] %s:%d %v", fn, line, ex.lastError)
-	ex.err <- err
+	ex.err <- errors.New(fmt.Sprintf("%s:%d %s", fn, line, err))
 }
+
 func (ex *ExchangeClient) waitForError() {
 	select {
-	case <-ex.err:
+	case err:=<-ex.err:
+		ex.lastError = err
 		ex.command <- Stop
 		return
 	}
@@ -195,7 +206,6 @@ func (ex *ExchangeClient) LastError() error {
 // Listen sets up the exchange client to listen. Most of the hard work is done via the Client.Listen()
 // launches 1 goroutine for periodic checking, if confgured.
 func (ex *ExchangeClient) LongPoll(wait *sync.WaitGroup) error {
-	defer RecoverCrash(ex.logger)
 	go ex.waitForError()
 	go ex.startLongPoll()
 	return nil
@@ -204,6 +214,14 @@ func (ex *ExchangeClient) LongPoll(wait *sync.WaitGroup) error {
 func (ex *ExchangeClient) Action(action int) error {
 	ex.command <- action
 	return nil
+}
+
+func (ex *ExchangeClient) Status() (MailClientStatus, error) {
+	if ex.active {
+		return MailClientStatusPinging, nil
+	} else {
+		return MailClientStatusError, ex.lastError
+	}
 }
 
 // NewExchangeClient set up a new exchange client
@@ -221,5 +239,6 @@ func NewExchangeClient(mailInfo *MailPingInformation, debug bool, logger *loggin
 		debug:    debug,
 		stats:    NewStatLogger(logger),
 		logger:   logger,
+		active:   true,
 	}, nil
 }

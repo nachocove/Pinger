@@ -4,16 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"fmt"
 
 	"github.com/nachocove/Pinger/Pinger"
 )
 
 func init() {
 	httpsRouter.HandleFunc("/register", registerDevice)
+	httpsRouter.HandleFunc("/defer", deferPolling)
 }
 
-// TODO Need to figure out Auth
-// Protocol: POST device=<json-encoded deviceInfo>
+const SessionVarClientId = "ClientId"
+
 func registerDevice(w http.ResponseWriter, r *http.Request) {
 	context := GetContext(r)
 	if r.Method != "POST" {
@@ -54,11 +56,11 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	context.Logger.Debug("created/updated device info %s", postInfo.ClientId)
 
-	session.Values["ClientId"] = postInfo.ClientId
+	session.Values[SessionVarClientId] = postInfo.ClientId
 
-	err = postInfo.StartPoll(context.RpcConnectString)
+	token, err := Pinger.StartPoll(context.RpcConnectString, &postInfo)
 	if err != nil {
-		context.Logger.Warning("Could not start polling for device %s: %s", postInfo.ClientId, err)
+		context.Logger.Warning("Could not re/start polling for device %s: %s", postInfo.ClientId, err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -70,6 +72,76 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+	responseData := make(map[string]string)
+	responseData["Token"] = token
+	responseData["Status"] = "OK"
+	responseData["Message"] = ""
+	
+	responseJson, err := json.Marshal(responseData)
+	if err != nil {
+		context.Logger.Warning("Could not json encode reply: %v", responseData)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Add("Content-Type", "application/json")
+	fmt.Fprintf(w, string(responseJson))
+	return
+}
+
+type deferPost struct {
+	ClientId string
+	StopToken string
+}
+
+func deferPolling(w http.ResponseWriter, r *http.Request) {
+	context := GetContext(r)
+	if r.Method != "POST" {
+		context.Logger.Warning("Received %s method call from %s", r.Method, r.RemoteAddr)
+		http.Error(w, "UNKNOWN METHOD", http.StatusBadRequest)
+		return
+	}
+	session, err := context.SessionStore.Get(r, "pinger-session")
+	if err != nil {
+		context.Logger.Warning("Could not get session")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
+		return
+	}
+	
+	deferData := deferPost{}
+	decoder := json.NewDecoder(r.Body)
+	err = decoder.Decode(&deferData)
+	if err != nil {
+		context.Logger.Error("Could not parse json %s", err)
+		http.Error(w, "Could not parse json", http.StatusBadRequest)
+		return
+	}
+	if session.Values[SessionVarClientId] != deferData.ClientId {
+		context.Logger.Error("Client ID %s does not match session", deferData.ClientId)
+		http.Error(w, "Unknown Client ID", http.StatusForbidden)
+		return		
+	}
+	err = Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.StopToken)
+	if err != nil {
+		context.Logger.Error("Error deferring poll %s", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	responseData := make(map[string]string)
+	responseData["Status"] = "OK"
+	responseData["Message"] = ""
+	
+	responseJson, err := json.Marshal(responseData)
+	if err != nil {
+		context.Logger.Warning("Could not json encode reply: %v", responseData)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Add("Content-Type", "application/json")
+	fmt.Fprintf(w, string(responseJson))
 	return
 }
 
@@ -77,14 +149,6 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 // Helper functions
 ////////////////////////////////////////////////////////////////////////
 
-func getString(myMap map[string]interface{}, key string) string {
-	x, ok := myMap[key]
-	if ok {
-		return x.(string)
-	} else {
-		return ""
-	}
-}
 func newDeviceInfo(pi *Pinger.MailPingInformation) (*Pinger.DeviceInfo, error) {
 	var di *Pinger.DeviceInfo
 	var err error
@@ -155,6 +219,5 @@ func saveDeviceInfo(context *Context, pi *Pinger.MailPingInformation) error {
 			context.Logger.Debug("No change from %s. No DB action take.", pi.ClientId)
 		}
 	}
-	pi.SetDeviceInfo(di)
 	return nil
 }

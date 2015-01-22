@@ -23,6 +23,12 @@ type StartPollArgs struct {
 
 type StopPollArgs struct {
 	ClientId string
+	StopToken string
+}
+
+type DeferPollArgs struct {
+	ClientId string
+	StopToken string
 }
 
 type PollingResponse struct {
@@ -30,11 +36,18 @@ type PollingResponse struct {
 	Message string
 }
 
+type StartPollingResponse struct {
+	Code    int
+	Token string
+	Message string
+}
+
 const RPCPort = 60600
 
 const (
-	PollingReplyOK    = 1
 	PollingReplyError = 0
+	PollingReplyOK    = 1
+	PollingReplyWarn  = 2
 )
 
 var pollMap map[string]*MailPingInformation
@@ -43,30 +56,42 @@ func init() {
 	pollMap = make(map[string]*MailPingInformation)
 }
 
-func (t *BackendPolling) internal_start(args *StartPollArgs, reply *PollingResponse) error {
-	t.logger.Debug("Received request for %s", args.MailInfo.ClientId)
+func (t *BackendPolling) internal_start(args *StartPollArgs, reply *StartPollingResponse) error {
+	t.logger.Debug("%s: Received StartPoll request", args.MailInfo.ClientId)
 	replyCode := PollingReplyOK
 	pi, ok := pollMap[args.MailInfo.ClientId]
 	if ok == true {
 		if pi == nil {
-			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.MailInfo.ClientId))
+			return errors.New(fmt.Sprintf("%s: Could not find poll session in map", args.MailInfo.ClientId))
 		}
-		t.logger.Debug("Already polling for %s", args.MailInfo.ClientId)
-		reply.Message = "Running"
-		// TODO Check to see if we're still running. Maybe get a status and return it. Maybe some stats?
-		// If we detect any issues with the polling routine for this client, kill it and set pi to nil.
+		t.logger.Debug("%s: Found Existing polling session", args.MailInfo.ClientId)
+		status, err := pi.Status()
+		if status != MailClientStatusPinging || err != nil {
+			t.logger.Debug("%s: Not polling. Last error was %s", args.MailInfo.ClientId, err)
+			reply.Message = fmt.Sprintf("Previous Ping failed with error: %s", err.Error())
+			reply.Code = PollingReplyWarn
+		}
+		err = pi.stop(t.debug, t.logger)
+		if err != nil {
+			reply.Message = err.Error()
+			reply.Code = PollingReplyError
+		}
+		pi = nil
 	} else {
 		if pi != nil {
 			panic("Got a pi but ok is false?")
 		}
-		// nothing started yet. So start it.
-		pi = args.MailInfo
-		args.MailInfo.Start(t.debug, t.logger)
-		pollMap[args.MailInfo.ClientId] = args.MailInfo
-		t.logger.Debug("Starting polling for %s", args.MailInfo.ClientId)
-		reply.Message = "Started"
 	}
-
+	// nothing started yet. So start it.
+	pi = args.MailInfo
+	stopToken, err := args.MailInfo.start(t.debug, t.logger)
+	if err != nil {
+		reply.Message = err.Error()
+		reply.Code = PollingReplyError
+	}
+	pollMap[args.MailInfo.ClientId] = args.MailInfo
+	t.logger.Debug("%s: Starting polling", args.MailInfo.ClientId)
+	reply.Token = stopToken
 	reply.Code = replyCode
 	return nil
 }
@@ -82,16 +107,50 @@ func (t *BackendPolling) internal_stop(args *StopPollArgs, reply *PollingRespons
 		if pi == nil {
 			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
 		}
-		err := pi.Stop(t.debug, t.logger)
-		if err != nil {
-			return err
+		if pi.ValidateStopToken(args.StopToken) == false {
+			reply.Message = "Token does not match"
+			reply.Code = PollingReplyError
+		} else {
+			err := pi.stop(t.debug, t.logger)
+			if err != nil {
+				reply.Message = err.Error()
+				reply.Code = PollingReplyError
+			} else {
+				delete(pollMap, args.ClientId)
+				reply.Message = "Stopped"
+			}
 		}
-		reply.Message = "Stopped"
-
 	}
 	reply.Code = replyCode
 	return nil
 }
+
+func (t *BackendPolling) internal_defer(args *DeferPollArgs, reply *PollingResponse) error {
+	t.logger.Debug("Received request for %s", args.ClientId)
+	replyCode := PollingReplyOK
+	pi, ok := pollMap[args.ClientId]
+	if ok == false {
+		// nothing on file.
+		reply.Message = "NotRunning"
+	} else {
+		if pi == nil {
+			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
+		}
+		if pi.ValidateStopToken(args.StopToken) == false {
+			reply.Message = "Token does not match"
+			reply.Code = PollingReplyError
+		} else {
+			err := pi.deferPoll(t.debug, t.logger)
+			if err != nil {
+				reply.Message = err.Error()
+				reply.Code = PollingReplyError
+			}
+		}
+	}
+	reply.Code = replyCode
+	return nil
+}
+
 
 func RecoverCrash(logger *logging.Logger) {
 	if err := recover(); err != nil {
@@ -102,7 +161,7 @@ func RecoverCrash(logger *logging.Logger) {
 	}
 }
 
-func (t *BackendPolling) Start(args *StartPollArgs, reply *PollingResponse) error {
+func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse) error {
 	defer RecoverCrash(t.logger)
 	return t.internal_start(args, reply)
 }
@@ -110,6 +169,11 @@ func (t *BackendPolling) Start(args *StartPollArgs, reply *PollingResponse) erro
 func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error {
 	defer RecoverCrash(t.logger)
 	return t.internal_stop(args, reply)
+}
+
+func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) error {
+	defer RecoverCrash(t.logger)
+	return t.internal_defer(args, reply)
 }
 
 func NewBackendPolling(debug bool, logger *logging.Logger) *BackendPolling {
