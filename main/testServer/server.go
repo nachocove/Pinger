@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -10,13 +12,11 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net"
+	"net/http"
+	"net/http/httputil"
 	"os"
 	"path"
 	"time"
-	"bytes"
-	"net/http"
-	"net/http/httputil"
-	"bufio"
 
 	"github.com/nachocove/Pinger/Pinger"
 	"github.com/op/go-logging"
@@ -32,11 +32,11 @@ func randomInt(x, y int) int {
 	return rand.Intn(y-x) + x
 }
 
-type nopCloser struct { 
-    io.Reader 
-} 
+type nopCloser struct {
+	io.Reader
+}
 
-func (nopCloser) Close() error { return nil } 
+func (nopCloser) Close() error { return nil }
 
 var activeConnections int
 
@@ -108,13 +108,13 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 				response.Proto = request.Proto
 				response.ProtoMajor = request.ProtoMajor
 				response.ProtoMinor = request.ProtoMinor
-				
+
 				data, err = httputil.DumpResponse(&response, true)
 				if err != nil {
 					logger.Error("Error3: %s", err)
 					eCh <- err
 					return
-				}				
+				}
 				logger.Debug("Sucessfully created response: %s", data)
 			}
 			ch <- data
@@ -300,7 +300,7 @@ func main() {
 	}
 
 	dialString := fmt.Sprintf("%s:%d", bindAddress, port)
-	
+
 	var memstats *Pinger.MemStats
 	if printMemPeriodic > 0 {
 		memstats = Pinger.NewMemStats(memStatsExtraInfo, debug, false)
@@ -327,9 +327,9 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Could not listen in %s: %v\n", dialString, err)
 			os.Exit(1)
 		}
-	
+
 		logger.Debug("Min %d, Max %d\n", minWaitTime, maxWaitTime)
-	
+
 		if memstats != nil {
 			memstats.SetBaseMemStats()
 		}
@@ -346,7 +346,7 @@ func main() {
 				disconnectTime = 0
 			}
 			tcpKeepAliveDur := time.Duration(tcpKeepAlive) * time.Second
-	
+
 			// this adds 2 goroutines per connection. One the handleConnection itself, which then launches a read-goroutine
 			go handleConnection(conn, disconnectTime, tcpKeepAliveDur, TLSconfig, false)
 		}
@@ -354,16 +354,16 @@ func main() {
 }
 
 func echoServer(w http.ResponseWriter, r *http.Request) {
-//	body, err := httputil.DumpRequest(r, true)
-//	if err != nil {
-//		http.Error(w, err.Error(), http.StatusInternalServerError)
-//		return
-//	}
-//	logger.Debug("Request: %s", body)
-	body := make([]byte, r.ContentLength)    
+	//	body, err := httputil.DumpRequest(r, true)
+	//	if err != nil {
+	//		http.Error(w, err.Error(), http.StatusInternalServerError)
+	//		return
+	//	}
+	//	logger.Debug("Request: %s", body)
+	body := make([]byte, r.ContentLength)
 	n, err := r.Body.Read(body)
 	logger.Debug("Body has %d bytes and error %v", n, err)
 	logger.Debug("Request body: %s", body)
 	r.Body.Close()
 	fmt.Fprintln(w, body)
-} 
+}

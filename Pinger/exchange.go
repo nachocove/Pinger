@@ -2,31 +2,31 @@ package Pinger
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"runtime"
 	"sync"
 	"time"
-    "crypto/tls"
-    "runtime"
-    "io"
 
 	"github.com/op/go-logging"
 )
 
 type Response struct {
-	body []byte
+	body     []byte
 	response http.Response
 }
 
 // ExchangeClient A client with type exchange.
 type ExchangeClient struct {
-	command chan int
-	err    chan error
-	incoming      chan Response
+	command   chan int
+	err       chan error
+	incoming  chan Response
 	lastError error
 
 	waitBeforeUse int
@@ -80,7 +80,7 @@ func (ex *ExchangeClient) doRequestResponse(client *http.Client, request *http.R
 		ex.sendError(err)
 		return
 	}
-	responseBody := make([]byte, response.ContentLength) 
+	responseBody := make([]byte, response.ContentLength)
 	n, err := response.Body.Read(responseBody)
 	ex.logger.Debug("Read %d bytes and error %v", n, err)
 	if err != nil && err != io.EOF {
@@ -97,9 +97,9 @@ func (ex *ExchangeClient) logPrefix() string {
 func (ex *ExchangeClient) startLongPoll() {
 	var logPrefix string = ex.logPrefix()
 	ex.logger.Debug("%s: started longpoll", logPrefix)
-	
+
 	if ex.pi.WaitBeforeUse > 0 {
-		ex.logger.Debug("%s: WaitBeforeUse %d", logPrefix, ex.pi.WaitBeforeUse)		
+		ex.logger.Debug("%s: WaitBeforeUse %d", logPrefix, ex.pi.WaitBeforeUse)
 		time.Sleep(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
 	}
 
@@ -110,13 +110,13 @@ func (ex *ExchangeClient) startLongPoll() {
 	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: ex.debug},
-		}
+	}
 	client := &http.Client{
 		Timeout:   time.Duration(ex.pi.ResponseTimeout) * time.Second,
 		Jar:       cookies,
 		Transport: tr,
 	}
-	ex.logger.Debug("%s: New HTTP Client with timeout %d", logPrefix, ex.pi.ResponseTimeout)		
+	ex.logger.Debug("%s: New HTTP Client with timeout %d", logPrefix, ex.pi.ResponseTimeout)
 	stopPolling := false
 	var sleepTime time.Duration
 	for {
@@ -137,7 +137,7 @@ func (ex *ExchangeClient) startLongPoll() {
 				ex.logger.Debug("%s: Non-200 response: %v", logPrefix, response.response)
 				ex.sendError(errors.New(fmt.Sprintf("Go %d status response", response.response.StatusCode)))
 				return
-				
+
 			case ex.pi.HttpNoChangeReply != nil && bytes.Compare(response.body, ex.pi.HttpNoChangeReply) == 0:
 				// go back to polling
 				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", logPrefix)
@@ -151,8 +151,8 @@ func (ex *ExchangeClient) startLongPoll() {
 					ex.logger.Debug("%s: Unhandled response %v", logPrefix, response.response)
 				}
 			}
-			sleepTime = (time.Duration(ex.pi.ResponseTimeout)*time.Second)-time.Since(requestSent)
-			
+			sleepTime = (time.Duration(ex.pi.ResponseTimeout) * time.Second) - time.Since(requestSent)
+
 		case cmd := <-ex.command:
 			switch {
 			case cmd == Stop:
@@ -168,7 +168,7 @@ func (ex *ExchangeClient) startLongPoll() {
 				continue
 			}
 		}
-		
+
 		if sleepTime.Seconds() > 0.0 {
 			ex.logger.Debug("%s: sleeping %fs before next attempt", logPrefix, sleepTime.Seconds())
 			time.Sleep(sleepTime)
@@ -180,16 +180,16 @@ func (ex *ExchangeClient) startLongPoll() {
 }
 
 func (ex *ExchangeClient) sendError(err error) {
-	ex.lastError=err
+	ex.lastError = err
 	ex.logger.Error("Client threw an error: %s", ex.lastError)
 	_, fn, line, _ := runtime.Caller(1)
 	ex.logger.Error("[error] %s:%d %v", fn, line, ex.lastError)
-	ex.err<-err
+	ex.err <- err
 }
 func (ex *ExchangeClient) waitForError() {
 	select {
 	case <-ex.err:
-		ex.command<-Stop
+		ex.command <- Stop
 		return
 	}
 }

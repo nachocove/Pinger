@@ -1,14 +1,14 @@
 package Pinger
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/op/go-logging"
 	"net/rpc"
 	"sync"
-	"encoding/hex"
-	"crypto/sha256"
 )
 
 // MailClientType the type of the mail client
