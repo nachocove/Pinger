@@ -7,18 +7,18 @@ import (
 )
 
 type StatLogger struct {
-	ResponseTimeCh chan float64
+	ResponseTimeCh          chan float64
 	FirstTimeResponseTimeCh chan float64
-	OverageSleepTimeCh chan float64
-	tallyLogger *logging.Logger	
+	OverageSleepTimeCh      chan float64
+	tallyLogger             *logging.Logger
 }
 
 func NewStatLogger(logger *logging.Logger) *StatLogger {
 	stat := &StatLogger{
-		ResponseTimeCh: make(chan float64, 1000),
+		ResponseTimeCh:          make(chan float64, 1000),
 		FirstTimeResponseTimeCh: make(chan float64, 1000),
-		OverageSleepTimeCh: make(chan float64, 1000),
-		tallyLogger: logger,
+		OverageSleepTimeCh:      make(chan float64, 1000),
+		tallyLogger:             logger,
 	}
 	go stat.tallyResponseTimes()
 	return stat

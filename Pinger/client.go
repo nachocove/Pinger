@@ -20,12 +20,12 @@ const (
 
 // Client The client structure for tracking a particular endpoint
 type Client struct {
-	Connection    net.Conn
-	Incoming      chan []byte
-	Outgoing      chan []byte
-	Command       chan int
-	Err           chan error
-	
+	Connection net.Conn
+	Incoming   chan []byte
+	Outgoing   chan []byte
+	Command    chan int
+	Err        chan error
+
 	// private
 	buffer        []byte
 	waitGroup     *sync.WaitGroup
@@ -40,12 +40,12 @@ type Client struct {
 // NewClient Set up a new client
 func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, tcpKeepAlive int, debug bool, logger *logging.Logger) *Client {
 	client := &Client{
-		Connection:    nil,
-		Incoming:      make(chan []byte, 2),
-		Outgoing:      make(chan []byte, 2),
-		Command:       make(chan int, 2),
-		Err:           make(chan error),
-		
+		Connection: nil,
+		Incoming:   make(chan []byte, 2),
+		Outgoing:   make(chan []byte, 2),
+		Command:    make(chan int, 2),
+		Err:        make(chan error),
+
 		// private
 		dialString:    dialString,
 		waitGroup:     nil,

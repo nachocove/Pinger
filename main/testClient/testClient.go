@@ -171,7 +171,7 @@ func main() {
 		testClient := NewTestClient(connectionString, pingPeriodic, reopen, debug, tcpKeepAlive, TLSConfig, logger)
 		// this launches either 2 or 3 goroutines per connection. 3 if pingPeriodic > 0, 2 otherwise.
 		if testClient != nil {
-			err := testClient.Listen(nil, &wg)
+			err := testClient.LongPoll(nil, &wg)
 			if err != nil {
 				logger.Error("Could not open connection %d %v\n", i, err.Error())
 				i-- // don't count this one

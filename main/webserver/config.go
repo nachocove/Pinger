@@ -55,7 +55,7 @@ type RPCServerConfiguration struct {
 }
 
 func (rpcConf *RPCServerConfiguration) String() string {
-	return fmt.Sprintf("%s:%d", rpcConf.Hostname, rpcConf.Port) 
+	return fmt.Sprintf("%s:%d", rpcConf.Hostname, rpcConf.Port)
 }
 
 // Configuration - The top level configuration structure.

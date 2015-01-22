@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync"
-	"net/rpc"
 	"github.com/op/go-logging"
+	"net/rpc"
+	"sync"
+	"encoding/hex"
+	"crypto/sha256"
 )
 
 // MailClientType the type of the mail client
@@ -17,7 +19,7 @@ const (
 )
 
 type MailClient interface {
-	Listen(pi* MailPingInformation, wait *sync.WaitGroup) error
+	LongPoll(wait *sync.WaitGroup) error
 	Action(action int) error
 }
 
@@ -39,8 +41,10 @@ type MailPingInformation struct {
 	PushService            string // APNS, AWS, GCM, etc.
 
 	// private
-	deviceInfo *DeviceInfo
-	mailClient MailClient  // a mail client with the MailClient interface
+	deviceInfo      *DeviceInfo
+	mailClient      MailClient // a mail client with the MailClient interface
+	rpcClient       *rpc.Client
+	userCredentials map[string]string
 }
 
 func (pi *MailPingInformation) String() string {
@@ -64,21 +68,25 @@ func (pi *MailPingInformation) Validate() bool {
 		len(pi.HttpExpectedReply) > 0)
 }
 
-func rpcClient(rpcserver string) (*rpc.Client, error) {
-	// TODO Need to figure out if we can cache the client, so we don't have to constantly reopen it
-	return rpc.DialHTTP("tcp", rpcserver)
+func (pi *MailPingInformation) getRpcClient(rpcserver string) error {
+	var err error
+	pi.rpcClient, err = rpc.DialHTTP("tcp", rpcserver)
+	return err
 }
 func (pi *MailPingInformation) StartPoll(rpcserver string) error {
-	client, err := rpcClient(rpcserver)
+	err := pi.getRpcClient(rpcserver)
 	if err != nil {
 		return err
 	}
-	return pi.startPoll(client)
+	return pi.startPoll()
 }
 
-func (pi *MailPingInformation) startPoll(client *rpc.Client) error {
+func (pi *MailPingInformation) startPoll() error {
+	if pi.rpcClient == nil {
+		panic("Can not call startPoll without rpcClient set")
+	}
 	var reply PollingResponse
-	err := client.Call("BackendPolling.Start", &StartPollArgs{MailInfo: pi}, &reply)
+	err := pi.rpcClient.Call("BackendPolling.Start", &StartPollArgs{MailInfo: pi}, &reply)
 	if err != nil {
 		return err
 	}
@@ -89,16 +97,19 @@ func (pi *MailPingInformation) startPoll(client *rpc.Client) error {
 }
 
 func (pi *MailPingInformation) StopPoll(rpcserver string) error {
-	client, err := rpcClient(rpcserver)
+	err := pi.getRpcClient(rpcserver)
 	if err != nil {
 		return err
 	}
-	return pi.stopPoll(client)
+	return pi.stopPoll()
 }
 
-func (pi *MailPingInformation) stopPoll(client *rpc.Client) error {
+func (pi *MailPingInformation) stopPoll() error {
+	if pi.rpcClient == nil {
+		panic("Can not call startPoll without rpcClient set")
+	}
 	var reply PollingResponse
-	err := client.Call("BackendPolling.Stop", &StopPollArgs{ClientId: pi.deviceInfo.ClientId}, &reply)
+	err := pi.rpcClient.Call("BackendPolling.Stop", &StopPollArgs{ClientId: pi.deviceInfo.ClientId}, &reply)
 	if err != nil {
 		return err
 	}
@@ -109,15 +120,15 @@ func (pi *MailPingInformation) stopPoll(client *rpc.Client) error {
 }
 
 func (pi *MailPingInformation) RestartPoll(rpcserver string) error {
-	client, err := rpcClient(rpcserver)
+	err := pi.getRpcClient(rpcserver)
 	if err != nil {
 		return err
 	}
-	err = pi.stopPoll(client)
+	err = pi.stopPoll()
 	if err != nil {
 		return err
 	}
-	err = pi.startPoll(client)
+	err = pi.startPoll()
 	if err != nil {
 		return err
 	}
@@ -125,11 +136,14 @@ func (pi *MailPingInformation) RestartPoll(rpcserver string) error {
 }
 
 func (pi *MailPingInformation) Start(debug bool, logger *logging.Logger) error {
-	client := NewExchangeClient(pi, debug, logger)
+	client, err := NewExchangeClient(pi, debug, logger)
+	if err != nil {
+		return err
+	}
 	if client == nil {
 		return errors.New("Could not create new Mail Client Pinger")
 	}
-	err := client.Listen(pi, nil)
+	err = client.LongPoll(nil) // MUST NOT BLOCK. Is expected to create a goroutine to do the long poll.
 	if err != nil {
 		return err
 	}
@@ -143,4 +157,30 @@ func (pi *MailPingInformation) Stop(debug bool, logger *logging.Logger) error {
 	}
 	pi.mailClient.Action(Stop)
 	return nil
+}
+
+func (pi *MailPingInformation) UserCredentials() (map[string]string, error) {
+	if pi.userCredentials == nil {
+		data := make(map[string]string)
+		err := json.Unmarshal([]byte(pi.MailServerCredentials), &data)
+		if err != nil {
+			return nil, err
+		}
+		pi.userCredentials = data
+	}
+	return pi.userCredentials, nil
+}
+
+func (pi *MailPingInformation) UserSha256(username string) string {
+	userCreds, err := pi.UserCredentials()
+	if err != nil {
+		panic(err.Error())
+	}
+	h := sha256.New()
+	_, err = h.Write([]byte(userCreds["Username"]))
+	if err != nil {
+		panic(err.Error())
+	}
+	md := h.Sum(nil)
+	return hex.EncodeToString(md)
 }

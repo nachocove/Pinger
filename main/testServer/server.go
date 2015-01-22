@@ -13,6 +13,10 @@ import (
 	"os"
 	"path"
 	"time"
+	"bytes"
+	"net/http"
+	"net/http/httputil"
+	"bufio"
 
 	"github.com/nachocove/Pinger/Pinger"
 	"github.com/op/go-logging"
@@ -28,10 +32,16 @@ func randomInt(x, y int) int {
 	return rand.Intn(y-x) + x
 }
 
+type nopCloser struct { 
+    io.Reader 
+} 
+
+func (nopCloser) Close() error { return nil } 
+
 var activeConnections int
 
 // handleConnection Creates channels for incoming data and error, starts a single goroutine, and echoes all data received back.
-func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration, TLSconfig *tls.Config) {
+func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration, TLSconfig *tls.Config, doHttp bool) {
 	defer conn.Close()
 	tc, ok := conn.(*net.TCPConn)
 	if !ok {
@@ -82,6 +92,31 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 				firstTime = false
 			}
 			// send data if we read some.
+			if doHttp {
+				logger.Debug("Got presumed http request: %s", data)
+				requestBody := bufio.NewReader(bytes.NewReader(data))
+				request, err := http.ReadRequest(requestBody)
+				if err != nil {
+					eCh <- err
+					return
+				}
+				request.ParseForm()
+				request.Body.Read(data)
+				response := http.Response{}
+				response.Body = nopCloser{bytes.NewReader(data)}
+				response.StatusCode = http.StatusOK
+				response.Proto = request.Proto
+				response.ProtoMajor = request.ProtoMajor
+				response.ProtoMinor = request.ProtoMinor
+				
+				data, err = httputil.DumpResponse(&response, true)
+				if err != nil {
+					logger.Error("Error3: %s", err)
+					eCh <- err
+					return
+				}				
+				logger.Debug("Sucessfully created response: %s", data)
+			}
 			ch <- data
 		}
 	}(conn, inCh, eCh)
@@ -171,6 +206,7 @@ func main() {
 	var bindAddress string
 	var printMemPeriodic int
 	var tcpKeepAlive int
+	var doHttp bool
 
 	flag.IntVar(&port, "p", 8082, "Listen port")
 	flag.IntVar(&minWaitTime, "min", 0, "min wait time")
@@ -181,6 +217,7 @@ func main() {
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
 	flag.BoolVar(&help, "h", false, "Verbose")
+	flag.BoolVar(&doHttp, "http", false, "Handle http requests and responses, instead of raw TCP")
 	flag.IntVar(&printMemPeriodic, "mem", 0, "print memory periodically mode in seconds")
 	flag.StringVar(&certFile, "cert", "", "TLS server Cert")
 	flag.StringVar(&keyFile, "key", "", "TLS server Keypair")
@@ -263,18 +300,7 @@ func main() {
 	}
 
 	dialString := fmt.Sprintf("%s:%d", bindAddress, port)
-	addr, err := net.ResolveTCPAddr("tcp", dialString)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not resolve address %s: %v\n", dialString, err)
-		os.Exit(1)
-	}
-	addr.Port = port
-	TCPLn, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not listen in %s: %v\n", dialString, err)
-		os.Exit(1)
-	}
-
+	
 	var memstats *Pinger.MemStats
 	if printMemPeriodic > 0 {
 		memstats = Pinger.NewMemStats(memStatsExtraInfo, debug, false)
@@ -282,26 +308,62 @@ func main() {
 	}
 
 	logger.Info("Listening on %s\n", dialString)
-	logger.Debug("Min %d, Max %d\n", minWaitTime, maxWaitTime)
-
-	if memstats != nil {
-		memstats.SetBaseMemStats()
-	}
-	for {
-		conn, err := TCPLn.Accept()
-		if err != nil {
-			logger.Error("Could not accept connection", err.Error())
-			continue
-		}
-		var disconnectTime time.Duration
-		if minWaitTime > 0 || maxWaitTime > 0 {
-			disconnectTime = time.Duration(randomInt(minWaitTime, maxWaitTime)) * time.Second
+	if doHttp {
+		http.HandleFunc("/", echoServer)
+		if certFile != "" || keyFile != "" {
+			http.ListenAndServeTLS(dialString, certFile, keyFile, nil)
 		} else {
-			disconnectTime = 0
+			http.ListenAndServe(dialString, nil)
 		}
-		tcpKeepAliveDur := time.Duration(tcpKeepAlive) * time.Second
-
-		// this adds 2 goroutines per connection. One the handleConnection itself, which then launches a read-goroutine
-		go handleConnection(conn, disconnectTime, tcpKeepAliveDur, TLSconfig)
+	} else {
+		addr, err := net.ResolveTCPAddr("tcp", dialString)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Could not resolve address %s: %v\n", dialString, err)
+			os.Exit(1)
+		}
+		addr.Port = port
+		TCPLn, err := net.ListenTCP("tcp", addr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Could not listen in %s: %v\n", dialString, err)
+			os.Exit(1)
+		}
+	
+		logger.Debug("Min %d, Max %d\n", minWaitTime, maxWaitTime)
+	
+		if memstats != nil {
+			memstats.SetBaseMemStats()
+		}
+		for {
+			conn, err := TCPLn.Accept()
+			if err != nil {
+				logger.Error("Could not accept connection", err.Error())
+				continue
+			}
+			var disconnectTime time.Duration
+			if minWaitTime > 0 || maxWaitTime > 0 {
+				disconnectTime = time.Duration(randomInt(minWaitTime, maxWaitTime)) * time.Second
+			} else {
+				disconnectTime = 0
+			}
+			tcpKeepAliveDur := time.Duration(tcpKeepAlive) * time.Second
+	
+			// this adds 2 goroutines per connection. One the handleConnection itself, which then launches a read-goroutine
+			go handleConnection(conn, disconnectTime, tcpKeepAliveDur, TLSconfig, false)
+		}
 	}
 }
+
+func echoServer(w http.ResponseWriter, r *http.Request) {
+//	body, err := httputil.DumpRequest(r, true)
+//	if err != nil {
+//		http.Error(w, err.Error(), http.StatusInternalServerError)
+//		return
+//	}
+//	logger.Debug("Request: %s", body)
+	body := make([]byte, r.ContentLength)    
+	n, err := r.Body.Read(body)
+	logger.Debug("Body has %d bytes and error %v", n, err)
+	logger.Debug("Request body: %s", body)
+	r.Body.Close()
+	fmt.Fprintln(w, body)
+} 

@@ -14,7 +14,7 @@ import (
 
 type BackendPolling struct {
 	logger *logging.Logger
-	debug bool
+	debug  bool
 }
 
 type StartPollArgs struct {
@@ -93,21 +93,22 @@ func (t *BackendPolling) internal_stop(args *StopPollArgs, reply *PollingRespons
 	return nil
 }
 
-func recoverCrash(logger *logging.Logger) {
+func RecoverCrash(logger *logging.Logger) {
 	if err := recover(); err != nil {
+		logger.Error("Error: %s", err)
 		stack := make([]byte, 8*1024)
 		stack = stack[:runtime.Stack(stack, false)]
-		logger.Error("Error: %s\n%s", err, stack)
+		logger.Debug("Stack: %s", stack)
 	}
 }
 
 func (t *BackendPolling) Start(args *StartPollArgs, reply *PollingResponse) error {
-	defer recoverCrash(t.logger)
+	defer RecoverCrash(t.logger)
 	return t.internal_start(args, reply)
 }
 
 func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error {
-	defer recoverCrash(t.logger)
+	defer RecoverCrash(t.logger)
 	return t.internal_stop(args, reply)
 }
 

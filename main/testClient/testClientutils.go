@@ -8,16 +8,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/op/go-logging"
 	"github.com/nachocove/Pinger/Pinger"
+	"github.com/op/go-logging"
 )
 
 type TestClient struct {
 	client          *Pinger.Client
 	pingPeriodicity int
 	debug           bool
-	logger	*logging.Logger
-	stats *Pinger.StatLogger
+	logger          *logging.Logger
+	stats           *Pinger.StatLogger
 }
 
 // String convert the TestClient structure to something printable
@@ -100,7 +100,7 @@ func (tc *TestClient) periodicCheck() {
 
 // Listen sets up the TestClient to listen. Most of the hard work is done via the Client.Listen()
 // launches 1 goroutine for periodic checking, if confgured.
-func (tc *TestClient) Listen(pi* Pinger.MailPingInformation, wait *sync.WaitGroup) error {
+func (tc *TestClient) LongPoll(pi *Pinger.MailPingInformation, wait *sync.WaitGroup) error {
 	// Listen launches 2 goroutines
 	err := tc.client.Listen(wait)
 	if err == nil && tc.pingPeriodicity > 0 {
@@ -127,8 +127,7 @@ func NewTestClient(dialString string, pingPeriodic int, reopenConnection, debug 
 		client:          client,
 		pingPeriodicity: pingPeriodic,
 		debug:           debug,
-		logger: logger,
-		stats: Pinger.NewStatLogger(logger),
-		
+		logger:          logger,
+		stats:           Pinger.NewStatLogger(logger),
 	}
 }

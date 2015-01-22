@@ -63,8 +63,6 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	context.Logger.Debug("Re/Started Polling for %s", postInfo.ClientId)
-	
-	postInfo.StartPoll(context.Config.Rpc.String())
 
 	err = session.Save(r, w)
 	if err != nil {
