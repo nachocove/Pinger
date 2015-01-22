@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -13,7 +11,6 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"path"
 	"time"
@@ -41,7 +38,7 @@ func (nopCloser) Close() error { return nil }
 var activeConnections int
 
 // handleConnection Creates channels for incoming data and error, starts a single goroutine, and echoes all data received back.
-func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration, TLSconfig *tls.Config, doHttp bool) {
+func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration, TLSconfig *tls.Config) {
 	defer conn.Close()
 	tc, ok := conn.(*net.TCPConn)
 	if !ok {
@@ -92,31 +89,6 @@ func handleConnection(conn net.Conn, disconnectTime, tcpKeepAlive time.Duration,
 				firstTime = false
 			}
 			// send data if we read some.
-			if doHttp {
-				logger.Debug("Got presumed http request: %s", data)
-				requestBody := bufio.NewReader(bytes.NewReader(data))
-				request, err := http.ReadRequest(requestBody)
-				if err != nil {
-					eCh <- err
-					return
-				}
-				request.ParseForm()
-				request.Body.Read(data)
-				response := http.Response{}
-				response.Body = nopCloser{bytes.NewReader(data)}
-				response.StatusCode = http.StatusOK
-				response.Proto = request.Proto
-				response.ProtoMajor = request.ProtoMajor
-				response.ProtoMinor = request.ProtoMinor
-
-				data, err = httputil.DumpResponse(&response, true)
-				if err != nil {
-					logger.Error("Error3: %s", err)
-					eCh <- err
-					return
-				}
-				logger.Debug("Sucessfully created response: %s", data)
-			}
 			ch <- data
 		}
 	}(conn, inCh, eCh)
@@ -348,7 +320,7 @@ func main() {
 			tcpKeepAliveDur := time.Duration(tcpKeepAlive) * time.Second
 
 			// this adds 2 goroutines per connection. One the handleConnection itself, which then launches a read-goroutine
-			go handleConnection(conn, disconnectTime, tcpKeepAliveDur, TLSconfig, false)
+			go handleConnection(conn, disconnectTime, tcpKeepAliveDur, TLSconfig)
 		}
 	}
 }
@@ -362,8 +334,11 @@ func echoServer(w http.ResponseWriter, r *http.Request) {
 	//	logger.Debug("Request: %s", body)
 	body := make([]byte, r.ContentLength)
 	n, err := r.Body.Read(body)
-	logger.Debug("Body has %d bytes and error %v", n, err)
-	logger.Debug("Request body: %s", body)
+	if err != nil && err != io.EOF {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	logger.Debug("Request body(%d): %s", n, body)
 	r.Body.Close()
-	fmt.Fprintln(w, body)
+	fmt.Fprintf(w, "%s", string(body))
 }

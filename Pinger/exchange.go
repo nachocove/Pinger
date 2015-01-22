@@ -17,16 +17,11 @@ import (
 	"github.com/op/go-logging"
 )
 
-type Response struct {
-	body     []byte
-	response http.Response
-}
-
 // ExchangeClient A client with type exchange.
 type ExchangeClient struct {
 	command   chan int
 	err       chan error
-	incoming  chan Response
+	incoming  chan *http.Response
 	lastError error
 
 	waitBeforeUse int
@@ -80,14 +75,7 @@ func (ex *ExchangeClient) doRequestResponse(client *http.Client, request *http.R
 		ex.sendError(err)
 		return
 	}
-	responseBody := make([]byte, response.ContentLength)
-	n, err := response.Body.Read(responseBody)
-	ex.logger.Debug("Read %d bytes and error %v", n, err)
-	if err != nil && err != io.EOF {
-		ex.sendError(err)
-		return
-	}
-	ex.incoming <- Response{body: responseBody, response: *response}
+	ex.incoming <- response
 }
 
 func (ex *ExchangeClient) logPrefix() string {
@@ -131,24 +119,30 @@ func (ex *ExchangeClient) startLongPoll() {
 		ex.logger.Debug("%s: Waiting for response", logPrefix)
 		select {
 		case response := <-ex.incoming:
-			ex.logger.Debug("%s: response body: %s", logPrefix, response.body)
+			responseBody := make([]byte, response.ContentLength)
+			_, err := response.Body.Read(responseBody)
+			if err != nil && err != io.EOF {
+				ex.sendError(err)
+				return
+			}
+			ex.logger.Debug("%s: response body: %s", logPrefix, responseBody)
 			switch {
-			case response.response.StatusCode != 200:
-				ex.logger.Debug("%s: Non-200 response: %v", logPrefix, response.response)
-				ex.sendError(errors.New(fmt.Sprintf("Go %d status response", response.response.StatusCode)))
+			case response.StatusCode != 200:
+				ex.logger.Debug("%s: Non-200 response: %v", logPrefix, response)
+				ex.sendError(errors.New(fmt.Sprintf("Go %d status response", response.StatusCode)))
 				return
 
-			case ex.pi.HttpNoChangeReply != nil && bytes.Compare(response.body, ex.pi.HttpNoChangeReply) == 0:
+			case ex.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.pi.HttpNoChangeReply) == 0:
 				// go back to polling
 				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", logPrefix)
 
 			default:
-				if bytes.Compare(response.body, ex.pi.HttpExpectedReply) == 0 {
+				if bytes.Compare(responseBody, ex.pi.HttpExpectedReply) == 0 {
 					// there's new mail!
 					ex.logger.Debug("%s: Reply matched HttpExpectedReply. Send Push", logPrefix)
 					panic("Not yet implemented")
 				} else {
-					ex.logger.Debug("%s: Unhandled response %v", logPrefix, response.response)
+					ex.logger.Debug("%s: Unhandled response %v", logPrefix, response)
 				}
 			}
 			sleepTime = (time.Duration(ex.pi.ResponseTimeout) * time.Second) - time.Since(requestSent)
@@ -221,7 +215,7 @@ func NewExchangeClient(mailInfo *MailPingInformation, debug bool, logger *loggin
 	return &ExchangeClient{
 		urlInfo:  urlInfo,
 		pi:       mailInfo,
-		incoming: make(chan Response),
+		incoming: make(chan *http.Response),
 		command:  make(chan int, 2),
 		err:      make(chan error),
 		debug:    debug,
