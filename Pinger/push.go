@@ -11,8 +11,10 @@ type PushInformation struct {
 }
 
 func (push *PushInformation) send(message string) error {
-	fmt.Printf("PushInformation.send(): NOT IMPLEMENTED\n")
-	return nil
+	if push.service != "AWS" {
+		return errors.New(fmt.Sprintf("Unsupported push service: %s", push.service))
+	}
+	return sendPushNotification(push.token, message)
 }
 
 func NewPushInformation(service, token, customerData string) (*PushInformation, error) {
