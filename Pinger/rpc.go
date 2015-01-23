@@ -13,6 +13,7 @@ import (
 )
 
 type BackendPolling struct {
+	awsConfig *AWSConfiguration
 	logger *logging.Logger
 	debug  bool
 }
@@ -56,7 +57,7 @@ func init() {
 	pollMap = make(map[string]*MailPingInformation)
 }
 
-func (t *BackendPolling) internal_start(args *StartPollArgs, reply *StartPollingResponse) error {
+func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingResponse) error {
 	t.logger.Debug("%s: Received StartPoll request", args.MailInfo.ClientId)
 	replyCode := PollingReplyOK
 	pi, ok := pollMap[args.MailInfo.ClientId]
@@ -90,13 +91,12 @@ func (t *BackendPolling) internal_start(args *StartPollArgs, reply *StartPolling
 		reply.Code = PollingReplyError
 	}
 	pollMap[args.MailInfo.ClientId] = args.MailInfo
-	t.logger.Debug("%s: Starting polling", args.MailInfo.ClientId)
 	reply.Token = stopToken
 	reply.Code = replyCode
 	return nil
 }
 
-func (t *BackendPolling) internal_stop(args *StopPollArgs, reply *PollingResponse) error {
+func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("Received request for %s", args.ClientId)
 	replyCode := PollingReplyOK
 	pi, ok := pollMap[args.ClientId]
@@ -125,7 +125,7 @@ func (t *BackendPolling) internal_stop(args *StopPollArgs, reply *PollingRespons
 	return nil
 }
 
-func (t *BackendPolling) internal_defer(args *DeferPollArgs, reply *PollingResponse) error {
+func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("Received request for %s", args.ClientId)
 	replyCode := PollingReplyOK
 	pi, ok := pollMap[args.ClientId]
@@ -163,25 +163,29 @@ func RecoverCrash(logger *logging.Logger) {
 
 func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse) error {
 	defer RecoverCrash(t.logger)
-	return t.internal_start(args, reply)
+	return t.startPolling(args, reply)
 }
 
 func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error {
 	defer RecoverCrash(t.logger)
-	return t.internal_stop(args, reply)
+	return t.stopPolling(args, reply)
 }
 
 func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) error {
 	defer RecoverCrash(t.logger)
-	return t.internal_defer(args, reply)
+	return t.deferPolling(args, reply)
 }
 
-func NewBackendPolling(debug bool, logger *logging.Logger) *BackendPolling {
-	return &BackendPolling{logger: logger, debug: debug}
+func NewBackendPolling(awsConfig *AWSConfiguration, debug bool, logger *logging.Logger) *BackendPolling {
+	return &BackendPolling{
+		awsConfig: awsConfig,
+		logger: logger,
+		debug: debug,
+	}
 }
 
-func StartPollingRPCServer(debug bool, logger *logging.Logger) {
-	pollingAPI := NewBackendPolling(debug, logger)
+func StartPollingRPCServer(awsConfig *AWSConfiguration, debug bool, logger *logging.Logger) {
+	pollingAPI := NewBackendPolling(awsConfig, debug, logger)
 	rpc.Register(pollingAPI)
 	rpc.HandleHTTP()
 

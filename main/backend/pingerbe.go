@@ -38,6 +38,7 @@ func main() {
 	var verbose bool
 	var logFileLevel string
 	var logFileName string
+	var configFile string
 
 	flag.StringVar(&logFileName, "log-file", "pinger-backend.log", "log-file to log to")
 	flag.StringVar(&logFileLevel, "log-level", "WARNING", "Logging level for the logfile (DEBUG, INFO, WARN, NOTICE, ERROR, CRITICAL)")
@@ -48,6 +49,7 @@ func main() {
 	flag.BoolVar(&printMem, "m", false, "print memory mode")
 	flag.IntVar(&printMemPeriodic, "mem", 0, "print memory periodically mode in seconds")
 	flag.IntVar(&pingPeriodic, "ping", 0, "ping server in seconds (plus fudge factor)")
+	flag.StringVar(&configFile, "c", "", "The configuration file. Required.")
 
 	flag.Parse()
 	if help {
@@ -55,6 +57,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	if configFile == "" {
+		usage()
+		os.Exit(1)
+	}
+	
 	if logFileName == "" {
 		logFileName = "/dev/null"
 	}
@@ -90,6 +97,13 @@ func main() {
 	}
 
 	logger = Pinger.InitLogging("pinger-be", logFile, fileLevel, screenLogging, screenLevel)
+
+	awsConfig, err := Pinger.ReadAwsConfig(configFile)
+	if err != nil {
+		logger.Error("Reading aws config: %s", err)
+		os.Exit(1)
+	}
+	
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	logger.Info("Running with %d Processors", runtime.NumCPU())
 
@@ -107,5 +121,6 @@ func main() {
 	if memstats != nil {
 		memstats.SetBaseMemStats()
 	}
-	Pinger.StartPollingRPCServer(debug, logger) // will also include the pprof server
+	
+	Pinger.StartPollingRPCServer(awsConfig, debug, logger) // will also include the pprof server
 }

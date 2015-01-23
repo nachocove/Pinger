@@ -5,22 +5,19 @@ import (
 	"github.com/nachocove/goamz/aws"
 	"github.com/nachocove/goamz/sns"
 	"time"
+	"errors"
 )
 
-type AwsCredentials struct {
-	regionName string
-	accessKey string
-	secretKey string
-}
-func getSNSSession(creds *AwsCredentials) (*sns.SNS, error) {
+func getSNSSession(config *AWSConfiguration) (*sns.SNS, error) {
 	// TODO See about caching the sessions
+	
 	expiration := time.Now().Add(time.Duration(300)*time.Second)
 	token := ""
-	region := aws.GetRegion(creds.regionName)
-	auth, err := aws.GetAuth(creds.accessKey, creds.secretKey, token, expiration)
+	auth, err := aws.GetAuth(config.Aws.AccessKey, config.Aws.SecretKey, token, expiration)
 	if err != nil {
 		return nil, err
 	}
+	region := aws.GetRegion(config.Sns.RegionName)
 	snsSession, err := sns.New(auth, region)
 	if err != nil {
 		return nil, err
@@ -28,28 +25,37 @@ func getSNSSession(creds *AwsCredentials) (*sns.SNS, error) {
 	return snsSession, nil
 }
 
-func validateEnpointArn(creds *AwsCredentials, endpointArn string) error {
-	snsSession, err := getSNSSession(creds)
+func validateEnpointArn(endpointArn string) error {
+	snsSession, err := getSNSSession(AwsConfig)
 	if err != nil {
 		return err
 	}
-	attributes, err := snsSession.GetEndpointAttributes(endpointArn)
+	response, err := snsSession.GetEndpointAttributes(endpointArn)
 	if err != nil {
 		return err
 	}
-	fmt.Println(attributes)
+	err = validateResponseMetaData(&response.ResponseMetadata)
+	if err != nil {
+		return err
+	}
+	fmt.Println(response.Attributes)
 	return nil
 }
 
-func registerEndpointArn(creds *AwsCredentials, platformArn, token string) (string, error) {
+func registerEndpointArn(service, token, customerData string) (string, error) {
+	var platformArn string
+	if service == "APNS" {
+		platformArn = AwsConfig.Sns.IOSPlatformArn
+	} else {
+		return "", errors.New(fmt.Sprintf("Unsupported platform service %s", service))
+	}
 	options := sns.PlatformEndpointOptions{
 		Attributes: nil,
 		PlatformApplicationArn: platformArn,
-		CustomUserData: "",
+		CustomUserData: customerData,
 		Token: token,
 	}
-		
-	snsSession, err := getSNSSession(creds)
+	snsSession, err := getSNSSession(AwsConfig)
 	if err != nil {
 		return "", err
 	}
@@ -57,9 +63,38 @@ func registerEndpointArn(creds *AwsCredentials, platformArn, token string) (stri
 	if err != nil {
 		return "", err
 	}
+	err = validateResponseMetaData(&response.ResponseMetadata)
+	if err != nil {
+		return "", err
+	}
 	return response.EndpointArn, nil
 }
 
+func sendPushNotification(endpointArn, message string) error {
+	snsSession, err := getSNSSession(AwsConfig)
+	if err != nil {
+		return err
+	}
+	options := sns.PublishOptions{
+		Message: message,
+		MessageStructure: "", // set to "json" if the message is a json-formatted platform specific message (see AWS SDK docs)
+		Subject: "", // Not used. Email notifications.
+		TopicArn: "", // Not used for mobile push messages. Use only TargetArn
+		TargetArn: endpointArn,
+	}
+	response, err := snsSession.Publish(&options)
+	if err != nil {
+		return err
+	}
+	return validateResponseMetaData(&response.ResponseMetadata)
+}
+
+func validateResponseMetaData(metaData *aws.ResponseMetadata) error {
+	if metaData.RequestId == "" {
+		return errors.New("No request ID in response")
+	}
+	return nil
+}
 
 
 type Cognito int
@@ -68,10 +103,12 @@ func getCognitoSession() (*Cognito, error) {
 	panic("Cognito not yet supported")
 }
 
-func validateCognitoId() (bool, error) {
-	_, err := getCognitoSession()
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+func validateCognitoId(clientId string) error {
+	// TODO Write me!
+	return nil
+//	_, err := getCognitoSession()
+//	if err != nil {
+//		return err
+//	}
+//	return nil
 }

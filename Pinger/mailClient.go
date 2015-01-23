@@ -49,7 +49,7 @@ type MailPingInformation struct {
 	// private
 	//deviceInfo      *DeviceInfo
 	mailClient      MailClient // a mail client with the MailClient interface
-	userCredentials map[string]string
+	_userCredentials map[string]string
 	stopToken string
 }
 
@@ -75,25 +75,21 @@ func (pi *MailPingInformation) Validate() bool {
 		len(pi.HttpExpectedReply) > 0)
 }
 
-func (pi *MailPingInformation) UserCredentials() (map[string]string, error) {
-	if pi.userCredentials == nil {
+func (pi *MailPingInformation) userCredentials() (map[string]string, error) {
+	if pi._userCredentials == nil {
 		data := make(map[string]string)
 		err := json.Unmarshal([]byte(pi.MailServerCredentials), &data)
 		if err != nil {
 			return nil, err
 		}
-		pi.userCredentials = data
+		pi._userCredentials = data
 	}
-	return pi.userCredentials, nil
+	return pi._userCredentials, nil
 }
 
-func (pi *MailPingInformation) UserSha256(username string) string {
-	userCreds, err := pi.UserCredentials()
-	if err != nil {
-		panic(err.Error())
-	}
+func UserSha256(username string) string {
 	h := sha256.New()
-	_, err = h.Write([]byte(userCreds["Username"]))
+	_, err := h.Write([]byte(username))
 	if err != nil {
 		panic(err.Error())
 	}
@@ -103,6 +99,7 @@ func (pi *MailPingInformation) UserSha256(username string) string {
 
 func (pi *MailPingInformation) createToken() {
 	if pi.stopToken == "" {
+		uuid.SwitchFormat(uuid.Clean)
 		pi.stopToken = uuid.NewV4().String()
 	}
 }
@@ -119,6 +116,7 @@ func (pi *MailPingInformation) start(debug bool, logger *logging.Logger) (string
 	if client == nil {
 		return "", errors.New("Could not create new Mail Client Pinger")
 	}
+	logger.Debug("%s: Starting polls", pi.ClientId)
 	err = client.LongPoll(nil) // MUST NOT BLOCK. Is expected to create a goroutine to do the long poll.
 	if err != nil {
 		return "", err
@@ -132,6 +130,7 @@ func (pi *MailPingInformation) stop(debug bool, logger *logging.Logger) error {
 	if pi.mailClient == nil {
 		panic("pi.mailClient = nil. Perhaps the mailclient has not be started?")
 	}
+	logger.Debug("%s: Stopping polls", pi.ClientId)
 	return pi.mailClient.Action(Stop)
 }
 
@@ -139,8 +138,10 @@ func (pi *MailPingInformation) deferPoll(debug bool, logger *logging.Logger) err
 	if pi.mailClient == nil {
 		panic("pi.mailClient = nil. Perhaps the mailclient has not be started?")
 	}
+	logger.Debug("%s: Stopping polls", pi.ClientId)
 	pi.mailClient.Action(Stop)
 	// TODO Should wait for it to be done
+	logger.Debug("%s: Starting polls", pi.ClientId)
 	err := pi.mailClient.LongPoll(nil) // MUST NOT BLOCK. Is expected to create a goroutine to do the long poll.
 	if err != nil {
 		return err

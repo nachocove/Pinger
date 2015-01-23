@@ -54,7 +54,7 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	credentials, err := ex.pi.UserCredentials()
+	credentials, err := ex.pi.userCredentials()
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +88,20 @@ func (ex *ExchangeClient) startLongPoll() {
 	var logPrefix string = ex.logPrefix()
 	ex.logger.Debug("%s: started longpoll", logPrefix)
 
+	ex.logger.Debug("%s: Validating clientID", logPrefix)
+	err := validateCognitoId(ex.pi.ClientId)
+	if err != nil {
+		ex.sendError(err)
+		return
+	}
+	
+	ex.logger.Debug("%s: Registering %s:%s with AWS.", logPrefix, ex.pi.PushService, ex.pi.PushToken)
+	pushInfo, err := NewPushInformation(ex.pi.PushService, ex.pi.PushToken, ex.pi.ClientId)
+	if err != nil {
+		ex.sendError(err)
+		return
+	}
+	
 	if ex.pi.WaitBeforeUse > 0 {
 		ex.logger.Debug("%s: WaitBeforeUse %d", logPrefix, ex.pi.WaitBeforeUse)
 		time.Sleep(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
@@ -154,7 +168,12 @@ func (ex *ExchangeClient) startLongPoll() {
 					}
 				}
 				if newMail {
-					panic("Not yet implemented")					
+					ex.logger.Debug("%s: Sending push message for new mail", logPrefix)
+					err = pushInfo.send("You've got mail!")
+					if err != nil {
+						ex.sendError(err)
+						return
+					}
 				}
 			}
 			sleepTime = (time.Duration(ex.pi.ResponseTimeout) * time.Second) - time.Since(requestSent)
@@ -193,6 +212,7 @@ func (ex *ExchangeClient) sendError(err error) {
 func (ex *ExchangeClient) waitForError() {
 	select {
 	case err:=<-ex.err:
+	ex.logger.Error(err.Error())
 		ex.lastError = err
 		ex.command <- Stop
 		return
