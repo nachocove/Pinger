@@ -13,11 +13,11 @@ func getSNSSession(config *AWSConfiguration) (*sns.SNS, error) {
 	
 	expiration := time.Now().Add(time.Duration(300)*time.Second)
 	token := ""
-	auth, err := aws.GetAuth(config.Aws.AccessKey, config.Aws.SecretKey, token, expiration)
+	auth, err := aws.GetAuth(config.AccessKey, config.SecretKey, token, expiration)
 	if err != nil {
 		return nil, err
 	}
-	region := aws.GetRegion(config.Sns.RegionName)
+	region := aws.GetRegion(config.SnsRegionName)
 	snsSession, err := sns.New(auth, region)
 	if err != nil {
 		return nil, err
@@ -26,7 +26,7 @@ func getSNSSession(config *AWSConfiguration) (*sns.SNS, error) {
 }
 
 func validateEnpointArn(endpointArn string) error {
-	snsSession, err := getSNSSession(AwsConfig)
+	snsSession, err := getSNSSession(&DefaultPollingContext.config.Aws)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func validateEnpointArn(endpointArn string) error {
 func registerEndpointArn(service, token, customerData string) (string, error) {
 	var platformArn string
 	if service == "APNS" {
-		platformArn = AwsConfig.Sns.IOSPlatformArn
+		platformArn = DefaultPollingContext.config.Aws.SnsIOSPlatformArn
 	} else {
 		return "", errors.New(fmt.Sprintf("Unsupported platform service %s", service))
 	}
@@ -55,7 +55,7 @@ func registerEndpointArn(service, token, customerData string) (string, error) {
 		CustomUserData: customerData,
 		Token: token,
 	}
-	snsSession, err := getSNSSession(AwsConfig)
+	snsSession, err := getSNSSession(&DefaultPollingContext.config.Aws)
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +71,7 @@ func registerEndpointArn(service, token, customerData string) (string, error) {
 }
 
 func sendPushNotification(endpointArn, message string) error {
-	snsSession, err := getSNSSession(AwsConfig)
+	snsSession, err := getSNSSession(&DefaultPollingContext.config.Aws)
 	if err != nil {
 		return err
 	}

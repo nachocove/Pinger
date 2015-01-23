@@ -87,21 +87,29 @@ func (ex *ExchangeClient) startLongPoll() {
 	defer RecoverCrash(ex.logger)
 	var logPrefix string = ex.logPrefix()
 	ex.logger.Debug("%s: started longpoll", logPrefix)
-
+	
+	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, ex.pi.ClientId)
+	if err != nil {
+		ex.sendError(err)
+		return		
+	}
+	
+	// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
 	ex.logger.Debug("%s: Validating clientID", logPrefix)
-	err := validateCognitoId(ex.pi.ClientId)
+	err = validateCognitoId(ex.pi.ClientId)
 	if err != nil {
 		ex.sendError(err)
 		return
 	}
 	
-	ex.logger.Debug("%s: Registering %s:%s with AWS.", logPrefix, ex.pi.PushService, ex.pi.PushToken)
-	pushInfo, err := NewPushInformation(ex.pi.PushService, ex.pi.PushToken, ex.pi.ClientId)
-	if err != nil {
-		ex.sendError(err)
-		return
-	}
-	
+	if deviceInfo.AWSEndpointArn == "" {
+		ex.logger.Debug("%s: Registering %s:%s with AWS.", logPrefix, ex.pi.PushService, ex.pi.PushToken)
+		err = deviceInfo.registerAws()
+		if err != nil {
+			ex.sendError(err)
+			return
+		}
+	}		
 	if ex.pi.WaitBeforeUse > 0 {
 		ex.logger.Debug("%s: WaitBeforeUse %d", logPrefix, ex.pi.WaitBeforeUse)
 		time.Sleep(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
@@ -169,7 +177,7 @@ func (ex *ExchangeClient) startLongPoll() {
 				}
 				if newMail {
 					ex.logger.Debug("%s: Sending push message for new mail", logPrefix)
-					err = pushInfo.send("You've got mail!")
+					err = deviceInfo.push("You've got mail!")
 					if err != nil {
 						ex.sendError(err)
 						return

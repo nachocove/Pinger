@@ -10,10 +10,12 @@ import (
 
 	"github.com/op/go-logging"
 	"runtime"
+	"github.com/coopernurse/gorp"
 )
 
 type BackendPolling struct {
-	awsConfig *AWSConfiguration
+	dbm *gorp.DbMap
+	config *Configuration
 	logger *logging.Logger
 	debug  bool
 }
@@ -76,6 +78,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 		if err != nil {
 			reply.Message = err.Error()
 			reply.Code = PollingReplyError
+			return nil
 		}
 		pi = nil
 	} else {
@@ -83,8 +86,20 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 			panic("Got a pi but ok is false?")
 		}
 	}
-	// nothing started yet. So start it.
+	// nothing started. So start it.
 	pi = args.MailInfo
+	
+	err := newDeviceInfoPI(t.dbm, pi)
+	if err != nil {
+		message := fmt.Sprintf("Could not save deviceInfo: %s", err)
+		t.logger.Warning(message)
+		reply.Message = message
+		reply.Code = PollingReplyError
+		return nil
+	}
+	t.logger.Debug("created/updated device info %s", pi.ClientId)
+
+	
 	stopToken, err := args.MailInfo.start(t.debug, t.logger)
 	if err != nil {
 		reply.Message = err.Error()
@@ -151,7 +166,6 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 	return nil
 }
 
-
 func RecoverCrash(logger *logging.Logger) {
 	if err := recover(); err != nil {
 		logger.Error("Error: %s", err)
@@ -176,16 +190,23 @@ func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) erro
 	return t.deferPolling(args, reply)
 }
 
-func NewBackendPolling(awsConfig *AWSConfiguration, debug bool, logger *logging.Logger) *BackendPolling {
-	return &BackendPolling{
-		awsConfig: awsConfig,
+var DefaultPollingContext *BackendPolling
+func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger) *BackendPolling {
+	dbm := initDB(&config.Db, true, debug, logger)
+	if dbm == nil {
+		panic("Could not create DB connection")
+	}
+	DefaultPollingContext = &BackendPolling{
+		dbm: dbm,
+		config: config,
 		logger: logger,
 		debug: debug,
 	}
+	return DefaultPollingContext
 }
 
-func StartPollingRPCServer(awsConfig *AWSConfiguration, debug bool, logger *logging.Logger) {
-	pollingAPI := NewBackendPolling(awsConfig, debug, logger)
+func StartPollingRPCServer(config *Configuration, debug bool, logger *logging.Logger) {
+	pollingAPI := NewBackendPolling(config, debug, logger)
 	rpc.Register(pollingAPI)
 	rpc.HandleHTTP()
 

@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/coopernurse/gorp"
+	"github.com/op/go-logging"
 )
 
 type DBConfiguration struct {
@@ -22,7 +23,15 @@ type DBConfiguration struct {
 	Certificate string // for SSL protected communication with the DB
 }
 
-func InitDB(dbconfig *DBConfiguration, init bool) *gorp.DbMap {
+type DBLogger struct {
+	logger *logging.Logger
+}
+
+func (dbl DBLogger) Printf(format string, v ...interface{}) {
+	dbl.logger.Debug(format, v...)
+}
+
+func initDB(dbconfig *DBConfiguration, init, debug bool, logger *logging.Logger) *gorp.DbMap {
 	var dbmap *gorp.DbMap
 
 	switch {
@@ -38,6 +47,11 @@ func InitDB(dbconfig *DBConfiguration, init bool) *gorp.DbMap {
 
 	if dbmap == nil {
 		log.Fatalf("Could not get dbmap")
+	}
+
+	if debug {
+		l := &DBLogger{logger:logger}
+		dbmap.TraceOn("[gorp]", l)
 	}
 
 	///////////////
@@ -61,6 +75,10 @@ func initDbSqlite(dbconfig *DBConfiguration) *gorp.DbMap {
 	if err != nil {
 		// DO NOT LOG THE PASSWORD!
 		log.Fatalf("Failed to open sqlite3 DB: %s\n%v", dbconfig.Filename, err)
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Could not ping database: %v", err)
 	}
 	return &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}
 }

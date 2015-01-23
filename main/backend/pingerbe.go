@@ -98,12 +98,11 @@ func main() {
 
 	logger = Pinger.InitLogging("pinger-be", logFile, fileLevel, screenLogging, screenLevel)
 
-	awsConfig, err := Pinger.ReadAwsConfig(configFile)
+	config, err := Pinger.ReadConfig(configFile)
 	if err != nil {
 		logger.Error("Reading aws config: %s", err)
 		os.Exit(1)
 	}
-	
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	logger.Info("Running with %d Processors", runtime.NumCPU())
 
@@ -122,5 +121,5 @@ func main() {
 		memstats.SetBaseMemStats()
 	}
 	
-	Pinger.StartPollingRPCServer(awsConfig, debug, logger) // will also include the pprof server
+	Pinger.StartPollingRPCServer(config, debug, logger) // will also include the pprof server
 }

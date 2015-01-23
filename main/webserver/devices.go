@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"fmt"
 
@@ -47,14 +46,6 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "MISSING DATA", http.StatusBadRequest)
 		return
 	}
-
-	err = saveDeviceInfo(context, &postInfo)
-	if err != nil {
-		context.Logger.Warning("Could not save deviceInfo: %s", err)
-		http.Error(w, "MISSING DATA", http.StatusBadRequest)
-		return
-	}
-	context.Logger.Debug("created/updated device info %s", postInfo.ClientId)
 
 	session.Values[SessionVarClientId] = postInfo.ClientId
 
@@ -143,81 +134,4 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	fmt.Fprintf(w, string(responseJson))
 	return
-}
-
-////////////////////////////////////////////////////////////////////////
-// Helper functions
-////////////////////////////////////////////////////////////////////////
-
-func newDeviceInfo(pi *Pinger.MailPingInformation) (*Pinger.DeviceInfo, error) {
-	var di *Pinger.DeviceInfo
-	var err error
-	di, err = Pinger.NewDeviceInfo(
-		pi.ClientId,
-		pi.PushToken,
-		pi.PushService,
-		pi.Platform)
-	if err != nil {
-		return nil, err
-	}
-	if di == nil {
-		return nil, errors.New("Could not create DeviceInfo")
-	}
-	return di, nil
-}
-
-func updateDeviceInfo(di *Pinger.DeviceInfo, pi *Pinger.MailPingInformation) (bool, error) {
-	changed := false
-	if di.ClientId != pi.ClientId {
-		panic("Can not have a different ClientID")
-	}
-	if di.Platform != pi.Platform {
-		di.Platform = pi.Platform
-		changed = true
-	}
-	if di.PushService != pi.PushService {
-		di.PushService = pi.PushService
-		changed = true
-	}
-	if di.PushToken != pi.PushToken {
-		di.PushToken = pi.PushToken
-		changed = true
-	}
-	return changed, nil
-}
-
-func saveDeviceInfo(context *Context, pi *Pinger.MailPingInformation) error {
-	var err error
-	di, err := Pinger.GetDeviceInfo(context.Dbm, pi.ClientId)
-	if err != nil {
-		return err
-	}
-	if di == nil {
-		di, err = newDeviceInfo(pi)
-		if err != nil {
-			return err
-		}
-		err = context.Dbm.Insert(di)
-		if err != nil {
-			return err
-		}
-		context.Logger.Debug("Created new entry for %s", pi.ClientId)
-	} else {
-		changed, err := updateDeviceInfo(di, pi)
-		if err != nil {
-			return err
-		}
-		if changed {
-			n, err := context.Dbm.Update(di)
-			if err != nil {
-				return err
-			}
-			if n > 0 {
-				context.Logger.Debug("Updated %s (%d rows)", pi.ClientId, n)
-			}
-		} else {
-			context.Logger.Debug("No change from %s. No DB action take.", pi.ClientId)
-		}
-	}
-	return nil
 }

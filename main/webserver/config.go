@@ -10,7 +10,6 @@ import (
 
 	"code.google.com/p/gcfg"
 	"github.com/codegangsta/negroni"
-	"github.com/coopernurse/gorp"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/nachocove/Pinger/Pinger"
@@ -62,7 +61,6 @@ func (rpcConf *RPCServerConfiguration) String() string {
 type Configuration struct {
 	Server ServerConfiguration
 	Global GlobalConfiguration
-	DB     Pinger.DBConfiguration
 	Rpc    RPCServerConfiguration
 }
 
@@ -85,16 +83,6 @@ func NewConfiguration() *Configuration {
 			Development: defaultDevelopment,
 			LogDir:      defaultLogDir,
 			LogFileName: defaultLogFileName,
-		},
-		DB: Pinger.DBConfiguration{
-			Type:        "sqlite",
-			Filename:    "pinger.db",
-			Host:        "",
-			Port:        0,
-			Name:        "",
-			Username:    "",
-			Password:    "",
-			Certificate: "",
 		},
 		Rpc: RPCServerConfiguration{
 			Hostname: "localhost",
@@ -121,7 +109,6 @@ func exists(path string) bool {
 
 type Context struct {
 	Config           *Configuration
-	Dbm              *gorp.DbMap
 	Logger           *logging.Logger
 	RpcConnectString string
 	SessionStore     *sessions.CookieStore
@@ -129,13 +116,11 @@ type Context struct {
 
 func NewContext(
 	config *Configuration,
-	dbm *gorp.DbMap,
 	logger *logging.Logger,
 	rpcConnectString string,
 	sessionstore *sessions.CookieStore) *Context {
 	return &Context{
 		Config:           config,
-		Dbm:              dbm,
 		Logger:           logger,
 		RpcConnectString: rpcConnectString,
 		SessionStore:     sessionstore,
@@ -203,16 +188,9 @@ func GetConfigAndRun() {
 		screenLevel = logging.DEBUG
 	}
 	logger := Pinger.InitLogging("pinger-webfe", logFile, logging.DEBUG, screenLogging, screenLevel)
-	dbm := Pinger.InitDB(&config.DB, true)
-	if dbm == nil {
-		logger.Error("Could not open DB Connection")
-		os.Exit(1)
-	}
-	defer dbm.Db.Close()
 
 	context := NewContext(
 		config,
-		dbm,
 		logger,
 		fmt.Sprintf("%s:%d", config.Rpc.Hostname, config.Rpc.Port),
 		sessions.NewCookieStore([]byte(config.Server.SessionSecret)))
