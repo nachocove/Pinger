@@ -50,7 +50,7 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *logging.Logger)
 	}
 
 	if debug {
-		l := &DBLogger{logger:logger}
+		l := &DBLogger{logger: logger}
 		dbmap.TraceOn("[gorp]", l)
 	}
 

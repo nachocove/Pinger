@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/op/go-logging"
-	"sync"
 	"github.com/twinj/uuid"
+	"sync"
 )
 
 // MailClientType the type of the mail client
@@ -18,9 +18,10 @@ const (
 )
 
 type MailClientStatus int
+
 const (
 	MailClientStatusPinging = iota
-	MailClientStatusError = iota
+	MailClientStatusError   = iota
 )
 
 type MailClient interface {
@@ -48,9 +49,9 @@ type MailPingInformation struct {
 
 	// private
 	//deviceInfo      *DeviceInfo
-	mailClient      MailClient // a mail client with the MailClient interface
+	mailClient       MailClient // a mail client with the MailClient interface
 	_userCredentials map[string]string
-	stopToken string
+	stopToken        string
 }
 
 func (pi *MailPingInformation) Status() (MailClientStatus, error) {

@@ -30,7 +30,7 @@ type ExchangeClient struct {
 	stats         *StatLogger
 	pi            *MailPingInformation
 	urlInfo       *url.URL
-	active bool
+	active        bool
 }
 
 // String convert the ExchangeClient structure to something printable
@@ -87,13 +87,13 @@ func (ex *ExchangeClient) startLongPoll() {
 	defer RecoverCrash(ex.logger)
 	var logPrefix string = ex.logPrefix()
 	ex.logger.Debug("%s: started longpoll", logPrefix)
-	
+
 	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, ex.pi.ClientId)
 	if err != nil {
 		ex.sendError(err)
-		return		
+		return
 	}
-	
+
 	// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
 	ex.logger.Debug("%s: Validating clientID", logPrefix)
 	err = validateCognitoId(ex.pi.ClientId)
@@ -101,7 +101,7 @@ func (ex *ExchangeClient) startLongPoll() {
 		ex.sendError(err)
 		return
 	}
-	
+
 	if deviceInfo.AWSEndpointArn == "" {
 		ex.logger.Debug("%s: Registering %s:%s with AWS.", logPrefix, ex.pi.PushService, ex.pi.PushToken)
 		err = deviceInfo.registerAws()
@@ -109,7 +109,7 @@ func (ex *ExchangeClient) startLongPoll() {
 			ex.sendError(err)
 			return
 		}
-	}		
+	}
 	if ex.pi.WaitBeforeUse > 0 {
 		ex.logger.Debug("%s: WaitBeforeUse %d", logPrefix, ex.pi.WaitBeforeUse)
 		time.Sleep(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
@@ -219,8 +219,8 @@ func (ex *ExchangeClient) sendError(err error) {
 
 func (ex *ExchangeClient) waitForError() {
 	select {
-	case err:=<-ex.err:
-	ex.logger.Error(err.Error())
+	case err := <-ex.err:
+		ex.logger.Error(err.Error())
 		ex.lastError = err
 		ex.command <- Stop
 		return

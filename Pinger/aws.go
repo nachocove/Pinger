@@ -1,17 +1,17 @@
 package Pinger
 
 import (
+	"errors"
 	"fmt"
 	"github.com/nachocove/goamz/aws"
 	"github.com/nachocove/goamz/sns"
 	"time"
-	"errors"
 )
 
 func getSNSSession(config *AWSConfiguration) (*sns.SNS, error) {
 	// TODO See about caching the sessions
-	
-	expiration := time.Now().Add(time.Duration(300)*time.Second)
+
+	expiration := time.Now().Add(time.Duration(300) * time.Second)
 	token := ""
 	auth, err := aws.GetAuth(config.AccessKey, config.SecretKey, token, expiration)
 	if err != nil {
@@ -50,10 +50,10 @@ func registerEndpointArn(service, token, customerData string) (string, error) {
 		return "", errors.New(fmt.Sprintf("Unsupported platform service %s", service))
 	}
 	options := sns.PlatformEndpointOptions{
-		Attributes: nil,
+		Attributes:             nil,
 		PlatformApplicationArn: platformArn,
-		CustomUserData: customerData,
-		Token: token,
+		CustomUserData:         customerData,
+		Token:                  token,
 	}
 	snsSession, err := getSNSSession(&DefaultPollingContext.config.Aws)
 	if err != nil {
@@ -76,11 +76,11 @@ func sendPushNotification(endpointArn, message string) error {
 		return err
 	}
 	options := sns.PublishOptions{
-		Message: message,
+		Message:          message,
 		MessageStructure: "", // set to "json" if the message is a json-formatted platform specific message (see AWS SDK docs)
-		Subject: "", // Not used. Email notifications.
-		TopicArn: "", // Not used for mobile push messages. Use only TargetArn
-		TargetArn: endpointArn,
+		Subject:          "", // Not used. Email notifications.
+		TopicArn:         "", // Not used for mobile push messages. Use only TargetArn
+		TargetArn:        endpointArn,
 	}
 	response, err := snsSession.Publish(&options)
 	if err != nil {
@@ -96,7 +96,6 @@ func validateResponseMetaData(metaData *aws.ResponseMetadata) error {
 	return nil
 }
 
-
 type Cognito int
 
 func getCognitoSession() (*Cognito, error) {
@@ -106,9 +105,9 @@ func getCognitoSession() (*Cognito, error) {
 func validateCognitoId(clientId string) error {
 	// TODO Write me!
 	return nil
-//	_, err := getCognitoSession()
-//	if err != nil {
-//		return err
-//	}
-//	return nil
+	//	_, err := getCognitoSession()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return nil
 }

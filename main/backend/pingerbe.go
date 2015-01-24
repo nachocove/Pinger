@@ -61,7 +61,7 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
-	
+
 	if logFileName == "" {
 		logFileName = "/dev/null"
 	}
@@ -120,6 +120,6 @@ func main() {
 	if memstats != nil {
 		memstats.SetBaseMemStats()
 	}
-	
+
 	Pinger.StartPollingRPCServer(config, debug, logger) // will also include the pprof server
 }

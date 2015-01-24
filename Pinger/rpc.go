@@ -8,13 +8,13 @@ import (
 	_ "net/http/pprof"
 	"net/rpc"
 
+	"github.com/coopernurse/gorp"
 	"github.com/op/go-logging"
 	"runtime"
-	"github.com/coopernurse/gorp"
 )
 
 type BackendPolling struct {
-	dbm *gorp.DbMap
+	dbm    *gorp.DbMap
 	config *Configuration
 	logger *logging.Logger
 	debug  bool
@@ -25,12 +25,12 @@ type StartPollArgs struct {
 }
 
 type StopPollArgs struct {
-	ClientId string
+	ClientId  string
 	StopToken string
 }
 
 type DeferPollArgs struct {
-	ClientId string
+	ClientId  string
 	StopToken string
 }
 
@@ -41,7 +41,7 @@ type PollingResponse struct {
 
 type StartPollingResponse struct {
 	Code    int
-	Token string
+	Token   string
 	Message string
 }
 
@@ -88,7 +88,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 	}
 	// nothing started. So start it.
 	pi = args.MailInfo
-	
+
 	err := newDeviceInfoPI(t.dbm, pi)
 	if err != nil {
 		message := fmt.Sprintf("Could not save deviceInfo: %s", err)
@@ -99,7 +99,6 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 	}
 	t.logger.Debug("created/updated device info %s", pi.ClientId)
 
-	
 	stopToken, err := args.MailInfo.start(t.debug, t.logger)
 	if err != nil {
 		reply.Message = err.Error()
@@ -191,16 +190,17 @@ func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) erro
 }
 
 var DefaultPollingContext *BackendPolling
+
 func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger) *BackendPolling {
 	dbm := initDB(&config.Db, true, debug, logger)
 	if dbm == nil {
 		panic("Could not create DB connection")
 	}
 	DefaultPollingContext = &BackendPolling{
-		dbm: dbm,
+		dbm:    dbm,
 		config: config,
 		logger: logger,
-		debug: debug,
+		debug:  debug,
 	}
 	return DefaultPollingContext
 }

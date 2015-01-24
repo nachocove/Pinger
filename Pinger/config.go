@@ -1,19 +1,19 @@
 package Pinger
 
 import (
-	"errors"
 	"code.google.com/p/gcfg"
+	"errors"
 )
 
 type AWSConfiguration struct {
 	RegionName string
-	AccessKey string
-	SecretKey string
-	
-	SnsRegionName string
+	AccessKey  string
+	SecretKey  string
+
+	SnsRegionName     string
 	SnsIOSPlatformArn string
 
-	CognitoRegionName string
+	CognitoRegionName     string
 	CognitoIdentityPoolId string
 }
 
@@ -32,7 +32,7 @@ func (awsConfig *AWSConfiguration) Validate() error {
 
 type Configuration struct {
 	Aws AWSConfiguration
-	Db DBConfiguration 
+	Db  DBConfiguration
 }
 
 func ReadConfig(filename string) (*Configuration, error) {
@@ -47,4 +47,3 @@ func ReadConfig(filename string) (*Configuration, error) {
 	}
 	return &config, nil
 }
-

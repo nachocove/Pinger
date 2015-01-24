@@ -13,15 +13,15 @@ import (
 )
 
 type DeviceInfo struct {
-	Id          int64  `db:"id"`
-	Created     int64  `db:"created"`
-	Updated     int64  `db:"updated"`
-	ClientId    string `db:"client_id"`       // us-east-1a-XXXXXXXX
-	Platform    string `db:"device_platform"` // "ios", "android", etc..
-	PushToken   string `db:"push_token"`
-	PushService string `db:"push_service"` // APNS, GCM, ...
+	Id             int64  `db:"id"`
+	Created        int64  `db:"created"`
+	Updated        int64  `db:"updated"`
+	ClientId       string `db:"client_id"`       // us-east-1a-XXXXXXXX
+	Platform       string `db:"device_platform"` // "ios", "android", etc..
+	PushToken      string `db:"push_token"`
+	PushService    string `db:"push_service"` // APNS, GCM, ...
 	AWSEndpointArn string `db:"aws_endpoint_arn"`
-	
+
 	dbm *gorp.DbMap `db:"-"`
 }
 
@@ -36,7 +36,7 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 	}
 	cMap := tMap.ColMap("Created")
 	cMap.SetNotNull(true)
-	
+
 	cMap = tMap.ColMap("Updated")
 	cMap.SetNotNull(true)
 
@@ -153,7 +153,7 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation) error {
 		if di == nil {
 			return errors.New("Could not create DeviceInfo")
 		}
-		di.dbm  = dbm
+		di.dbm = dbm
 		err = di.insert()
 		if err != nil {
 			return err
@@ -196,7 +196,6 @@ func (di *DeviceInfo) updateDeviceInfo(pi *MailPingInformation) (bool, error) {
 	return changed, nil
 }
 
-
 func (di *DeviceInfo) update() (int64, error) {
 	if di.dbm == nil {
 		panic("Can not update device info without having fetched it")
@@ -214,27 +213,27 @@ func (di *DeviceInfo) insert() error {
 func (di *DeviceInfo) push(message string) error {
 	var err error
 	switch {
-		case di.AWSEndpointArn != "":
-			err = sendPushNotification(di.AWSEndpointArn, message)
-			if err != nil {
-				awsErr := err.(*aws.Error)
-				switch {
-					case awsErr.Code == "EndpointDisabled":
-					   // TODO Need to mark the endpoint as 'off' or whatever
-					   break
-					
-					default:
-						break
-				}
+	case di.AWSEndpointArn != "":
+		err = sendPushNotification(di.AWSEndpointArn, message)
+		if err != nil {
+			awsErr := err.(*aws.Error)
+			switch {
+			case awsErr.Code == "EndpointDisabled":
+				// TODO Need to mark the endpoint as 'off' or whatever
+				break
+
+			default:
+				break
 			}
-			
-		default:
-			return errors.New(fmt.Sprintf("Unsupported push service: %s", di.PushService))
+		}
+
+	default:
+		return errors.New(fmt.Sprintf("Unsupported push service: %s", di.PushService))
 	}
 	return err
 }
 
-func(di *DeviceInfo) registerAws() error {
+func (di *DeviceInfo) registerAws() error {
 	if di.AWSEndpointArn == "" {
 		if di.PushService != "APNS" {
 			return errors.New(fmt.Sprintf("Unsupported push service %s", di.PushService))

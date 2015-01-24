@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"net/http"
 	"fmt"
+	"net/http"
 
 	"github.com/nachocove/Pinger/Pinger"
 )
@@ -67,7 +67,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	responseData["Token"] = token
 	responseData["Status"] = "OK"
 	responseData["Message"] = ""
-	
+
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
 		context.Logger.Warning("Could not json encode reply: %v", responseData)
@@ -80,7 +80,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 }
 
 type deferPost struct {
-	ClientId string
+	ClientId  string
 	StopToken string
 }
 
@@ -101,7 +101,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
 		return
 	}
-	
+
 	deferData := deferPost{}
 	decoder := json.NewDecoder(r.Body)
 	err = decoder.Decode(&deferData)
@@ -113,7 +113,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	if session.Values[SessionVarClientId] != deferData.ClientId {
 		context.Logger.Error("Client ID %s does not match session", deferData.ClientId)
 		http.Error(w, "Unknown Client ID", http.StatusForbidden)
-		return		
+		return
 	}
 	err = Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.StopToken)
 	if err != nil {
@@ -124,7 +124,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	responseData := make(map[string]string)
 	responseData["Status"] = "OK"
 	responseData["Message"] = ""
-	
+
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
 		context.Logger.Warning("Could not json encode reply: %v", responseData)
