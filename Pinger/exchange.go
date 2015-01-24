@@ -33,11 +33,6 @@ type ExchangeClient struct {
 	active        bool
 }
 
-// String convert the ExchangeClient structure to something printable
-func (ex *ExchangeClient) String() string {
-	return fmt.Sprintf("Exchange %s", ex)
-}
-
 var rng *rand.Rand
 
 func init() {
