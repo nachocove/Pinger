@@ -21,17 +21,17 @@ cd $GOPATH/src/github.com/nachocove/Pinger
 
 * webserver:
 ```
-webserver -d config/webserver-example-coig.cfg
+webserver -d config/webserver-example-config.cfg
 ```
 
 * testServer (fake mail server)
 ```
-testServer -cert config/cert.pem -key coig/key.pem -d -log-level DEBUG -v -http
+testServer -cert config/cert.pem -key config/key.pem -d -log-level DEBUG -v -http
 ```
 
 * backend
 ```
-backend -log-level DEBUG -c config/backe-example-config.cfg -v -d
+backend -log-level DEBUG -c config/backend-example-config.cfg -v -d
 ```
 
 * "client"
