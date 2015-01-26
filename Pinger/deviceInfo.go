@@ -214,7 +214,7 @@ func (di *DeviceInfo) push(message string) error {
 	var err error
 	switch {
 	case di.AWSEndpointArn != "":
-		err = sendPushNotification(di.AWSEndpointArn, message)
+		err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, message)
 		if err != nil {
 			awsErr := err.(*aws.Error)
 			switch {
@@ -238,9 +238,8 @@ func (di *DeviceInfo) registerAws() error {
 		if di.PushService != "APNS" {
 			return errors.New(fmt.Sprintf("Unsupported push service %s", di.PushService))
 		}
-		arn, err := registerEndpointArn(di.PushService, di.PushToken, di.ClientId)
+		arn, err := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, di.PushToken, di.ClientId)
 		if err != nil {
-			// TODO process AWS error codes here
 			return err
 		}
 		di.AWSEndpointArn = arn

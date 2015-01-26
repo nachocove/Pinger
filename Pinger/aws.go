@@ -8,7 +8,32 @@ import (
 	"time"
 )
 
-func getSNSSession(config *AWSConfiguration) (*sns.SNS, error) {
+type AWSConfiguration struct {
+	RegionName string
+	AccessKey  string
+	SecretKey  string
+
+	SnsRegionName     string
+	SnsIOSPlatformArn string
+
+	CognitoRegionName     string
+	CognitoIdentityPoolId string
+}
+
+func (config *AWSConfiguration) Validate() error {
+	if config.AccessKey == "" || config.SecretKey == "" || config.RegionName == "" {
+		return errors.New("aws section must be filled in")
+	}
+	if config.SnsRegionName == "" {
+		config.SnsRegionName = config.RegionName
+	}
+	if config.CognitoRegionName == "" {
+		config.CognitoRegionName = config.RegionName
+	}
+	return nil
+}
+
+func (config *AWSConfiguration) getSNSSession() (*sns.SNS, error) {
 	// TODO See about caching the sessions
 
 	expiration := time.Now().Add(time.Duration(300) * time.Second)
@@ -25,8 +50,8 @@ func getSNSSession(config *AWSConfiguration) (*sns.SNS, error) {
 	return snsSession, nil
 }
 
-func validateEnpointArn(endpointArn string) error {
-	snsSession, err := getSNSSession(&DefaultPollingContext.config.Aws)
+func (config *AWSConfiguration) validateEnpointArn(endpointArn string) error {
+	snsSession, err := config.getSNSSession()
 	if err != nil {
 		return err
 	}
@@ -42,10 +67,10 @@ func validateEnpointArn(endpointArn string) error {
 	return nil
 }
 
-func registerEndpointArn(service, token, customerData string) (string, error) {
+func (config *AWSConfiguration) registerEndpointArn(service, token, customerData string) (string, error) {
 	var platformArn string
 	if service == "APNS" {
-		platformArn = DefaultPollingContext.config.Aws.SnsIOSPlatformArn
+		platformArn = config.SnsIOSPlatformArn
 	} else {
 		return "", errors.New(fmt.Sprintf("Unsupported platform service %s", service))
 	}
@@ -55,7 +80,7 @@ func registerEndpointArn(service, token, customerData string) (string, error) {
 		CustomUserData:         customerData,
 		Token:                  token,
 	}
-	snsSession, err := getSNSSession(&DefaultPollingContext.config.Aws)
+	snsSession, err := config.getSNSSession()
 	if err != nil {
 		return "", err
 	}
@@ -70,8 +95,8 @@ func registerEndpointArn(service, token, customerData string) (string, error) {
 	return response.EndpointArn, nil
 }
 
-func sendPushNotification(endpointArn, message string) error {
-	snsSession, err := getSNSSession(&DefaultPollingContext.config.Aws)
+func (config *AWSConfiguration) sendPushNotification(endpointArn, message string) error {
+	snsSession, err := config.getSNSSession()
 	if err != nil {
 		return err
 	}

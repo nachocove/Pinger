@@ -68,7 +68,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 			return errors.New(fmt.Sprintf("%s: Could not find poll session in map", args.MailInfo.ClientId))
 		}
 		t.logger.Debug("%s: Found Existing polling session", args.MailInfo.ClientId)
-		status, err := pi.Status()
+		status, err := pi.status()
 		if status != MailClientStatusPinging || err != nil {
 			t.logger.Debug("%s: Not polling. Last error was %s", args.MailInfo.ClientId, err)
 			reply.Message = fmt.Sprintf("Previous Ping failed with error: %s", err.Error())
@@ -121,7 +121,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 		if pi == nil {
 			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
 		}
-		if pi.ValidateStopToken(args.StopToken) == false {
+		if pi.validateStopToken(args.StopToken) == false {
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
 		} else {
@@ -150,7 +150,7 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 		if pi == nil {
 			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
 		}
-		if pi.ValidateStopToken(args.StopToken) == false {
+		if pi.validateStopToken(args.StopToken) == false {
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
 		} else {
