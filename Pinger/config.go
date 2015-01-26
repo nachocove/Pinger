@@ -5,10 +5,14 @@ import (
 )
 
 type Configuration struct {
+	Global GlobalConfiguration
 	Aws AWSConfiguration
 	Db  DBConfiguration
 }
 
+type GlobalConfiguration struct {
+	DumpRequests bool	
+}
 func ReadConfig(filename string) (*Configuration, error) {
 	config := Configuration{}
 	err := gcfg.ReadFileInto(&config, filename)
