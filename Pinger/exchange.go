@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/cookiejar"
+	"net/http/httputil"
 	"net/url"
 	"runtime"
 	"sync"
@@ -49,6 +50,13 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Add("User-Agent", "Nacho Cove, Inc. Pinger")
+	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	//req.Header.Add("MS-ASProtocolVersion", "14.1")
+	req.Proto = "HTTP/1.1"
+	req.ProtoMajor = 1
+	req.ProtoMinor = 1
+	
 	credentials, err := ex.pi.userCredentials()
 	if err != nil {
 		return nil, err
@@ -66,6 +74,14 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 }
 
 func (ex *ExchangeClient) doRequestResponse(client *http.Client, request *http.Request) {
+	if DefaultPollingContext.config.Global.DumpRequests {
+		requestBytes, err := httputil.DumpRequest(request, false)
+		if err != nil {
+			ex.logger.Error("DumpRequest error; %v", err)
+		} else {
+			ex.logger.Debug("%s: sending request: %s", ex.logPrefix(), requestBytes)
+		}
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		ex.sendError(err)
@@ -119,11 +135,15 @@ func (ex *ExchangeClient) startLongPoll() {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: ex.debug},
 	}
 	client := &http.Client{
-		Timeout:   time.Duration(ex.pi.ResponseTimeout) * time.Second,
 		Jar:       cookies,
 		Transport: tr,
+		
 	}
-	ex.logger.Debug("%s: New HTTP Client with timeout %d", logPrefix, ex.pi.ResponseTimeout)
+	if ex.pi.ResponseTimeout > 0 {
+		client.Timeout = time.Duration(ex.pi.ResponseTimeout) * time.Second
+	}
+
+	ex.logger.Debug("%s: New HTTP Client with timeout %d %s", logPrefix, ex.pi.ResponseTimeout, ex.pi.MailServerUrl)
 	stopPolling := false
 	var sleepTime time.Duration
 	for {
@@ -144,11 +164,13 @@ func (ex *ExchangeClient) startLongPoll() {
 				ex.sendError(err)
 				return
 			}
-			ex.logger.Debug("%s: response body: %s", logPrefix, responseBody)
+			if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
+				ex.logger.Debug("%s: response and body: %v %s", logPrefix, *response, responseBody)
+			}
 			switch {
 			case response.StatusCode != 200:
-				ex.logger.Debug("%s: Non-200 response: %v", logPrefix, response)
-				ex.sendError(errors.New(fmt.Sprintf("Go %d status response", response.StatusCode)))
+				ex.logger.Debug("%s: Non-200 response: %d", logPrefix, response.StatusCode)
+				ex.sendError(errors.New(fmt.Sprintf("Http %d status response", response.StatusCode)))
 				return
 
 			case ex.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.pi.HttpNoChangeReply) == 0:
