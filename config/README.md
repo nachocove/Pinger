@@ -1,5 +1,5 @@
-Config examples etc
-===================
+Example Configs
+===============
 
 cert.pem/key.pem/chain.pem
 --------------------------
