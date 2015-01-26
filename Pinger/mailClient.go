@@ -48,13 +48,12 @@ type MailPingInformation struct {
 	PushService            string // APNS, AWS, GCM, etc.
 
 	// private
-	//deviceInfo      *DeviceInfo
 	mailClient       MailClient // a mail client with the MailClient interface
 	_userCredentials map[string]string
 	stopToken        string
 }
 
-func (pi *MailPingInformation) Status() (MailClientStatus, error) {
+func (pi *MailPingInformation) status() (MailClientStatus, error) {
 	return pi.mailClient.Status()
 }
 
@@ -68,6 +67,7 @@ func (pi *MailPingInformation) String() string {
 	return string(jsonstring)
 }
 
+// Validate validate the structure/information to make sure required information exists.
 func (pi *MailPingInformation) Validate() bool {
 	return (pi.ClientId != "" &&
 		pi.MailServerUrl != "" &&
@@ -105,10 +105,10 @@ func (pi *MailPingInformation) createToken() {
 	}
 }
 
-func (pi *MailPingInformation) ValidateStopToken(token string) bool {
+func (pi *MailPingInformation) validateStopToken(token string) bool {
 	return pi.stopToken == token
 }
-
+	
 func (pi *MailPingInformation) start(debug bool, logger *logging.Logger) (string, error) {
 	client, err := NewExchangeClient(pi, debug, logger)
 	if err != nil {
@@ -129,10 +129,10 @@ func (pi *MailPingInformation) start(debug bool, logger *logging.Logger) (string
 
 func (pi *MailPingInformation) stop(debug bool, logger *logging.Logger) error {
 	if pi.mailClient == nil {
-		panic("pi.mailClient = nil. Perhaps the mailclient has not be started?")
+		logger.Debug("%s: Stopping polls", pi.ClientId)
+		return pi.mailClient.Action(Stop)
 	}
-	logger.Debug("%s: Stopping polls", pi.ClientId)
-	return pi.mailClient.Action(Stop)
+	return nil
 }
 
 func (pi *MailPingInformation) deferPoll(debug bool, logger *logging.Logger) error {
