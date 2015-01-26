@@ -165,7 +165,7 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 	return nil
 }
 
-func RecoverCrash(logger *logging.Logger) {
+func recoverCrash(logger *logging.Logger) {
 	if err := recover(); err != nil {
 		logger.Error("Error: %s", err)
 		stack := make([]byte, 8*1024)
@@ -175,17 +175,17 @@ func RecoverCrash(logger *logging.Logger) {
 }
 
 func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse) error {
-	defer RecoverCrash(t.logger)
+	defer recoverCrash(t.logger)
 	return t.startPolling(args, reply)
 }
 
 func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error {
-	defer RecoverCrash(t.logger)
+	defer recoverCrash(t.logger)
 	return t.stopPolling(args, reply)
 }
 
 func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) error {
-	defer RecoverCrash(t.logger)
+	defer recoverCrash(t.logger)
 	return t.deferPolling(args, reply)
 }
 

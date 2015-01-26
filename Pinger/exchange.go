@@ -79,7 +79,7 @@ func (ex *ExchangeClient) logPrefix() string {
 }
 
 func (ex *ExchangeClient) startLongPoll() {
-	defer RecoverCrash(ex.logger)
+	defer recoverCrash(ex.logger)
 	var logPrefix string = ex.logPrefix()
 	ex.logger.Debug("%s: started longpoll", logPrefix)
 
