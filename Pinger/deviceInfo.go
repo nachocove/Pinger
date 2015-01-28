@@ -234,17 +234,35 @@ func (di *DeviceInfo) push(message string) error {
 }
 
 func (di *DeviceInfo) registerAws() error {
-	if di.AWSEndpointArn == "" {
-		if di.PushService != "APNS" {
-			return errors.New(fmt.Sprintf("Unsupported push service %s", di.PushService))
-		}
-		arn, err := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, di.PushToken, di.ClientId)
-		if err != nil {
-			return err
-		}
-		di.AWSEndpointArn = arn
-	} else {
-		// TODO get the values here, and update
+	if di.AWSEndpointArn != "" {
+		panic("No need to call register again. Call validate")
+	}
+	if di.PushService != "APNS" {
+		return errors.New(fmt.Sprintf("Unsupported push service %s", di.PushService))
+	}
+	arn, err := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, di.PushToken, di.ClientId)
+	if err != nil {
+		return err
+	}
+	di.AWSEndpointArn = arn
+	_, err = di.update()
+	if err != nil {
+		return err
 	}
 	return nil
+}
+
+func (di *DeviceInfo) validateAws() error {
+	if di.AWSEndpointArn == "" {
+		panic("Can't call validate before register")
+	}
+	attributes, err := DefaultPollingContext.config.Aws.validateEndpointArn(di.AWSEndpointArn)
+	if err != nil {
+		return err
+	}
+	enabled, ok := attributes["Enabled"]
+	if !ok || enabled != "true" {
+		return errors.New("Endpoint is not enabled")
+	}
+	return nil	
 }

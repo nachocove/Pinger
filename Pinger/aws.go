@@ -95,6 +95,22 @@ func (config *AWSConfiguration) registerEndpointArn(service, token, customerData
 	return response.EndpointArn, nil
 }
 
+func (config *AWSConfiguration) validateEndpointArn(endpointArn string) (map[string]string, error) {
+	snsSession, err := config.getSNSSession()
+	if err != nil {
+		return nil, err
+	}
+	response, err := snsSession.GetEndpointAttributes(endpointArn)
+	if err != nil {
+		return nil, err
+	}
+	attrmap := make(map[string]string)
+	for _,attr := range response.Attributes {
+		attrmap[attr.Key] = attr.Value
+	}
+	return attrmap, nil
+}
+
 func (config *AWSConfiguration) sendPushNotification(endpointArn, message string) error {
 	snsSession, err := config.getSNSSession()
 	if err != nil {
