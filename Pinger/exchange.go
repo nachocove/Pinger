@@ -50,7 +50,7 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	for k,v := range ex.pi.HttpHeaders {
+	for k, v := range ex.pi.HttpHeaders {
 		req.Header.Add(k, v)
 	}
 	if header := req.Header.Get("User-Agent"); header == "" {
@@ -62,7 +62,7 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 	req.Proto = "HTTP/1.1"
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
-	
+
 	credentials, err := ex.pi.userCredentials()
 	if err != nil {
 		return nil, err
@@ -153,7 +153,6 @@ func (ex *ExchangeClient) startLongPoll() {
 	client := &http.Client{
 		Jar:       cookies,
 		Transport: tr,
-		
 	}
 	if ex.pi.ResponseTimeout > 0 {
 		client.Timeout = time.Duration(ex.pi.ResponseTimeout) * time.Second
@@ -184,7 +183,7 @@ func (ex *ExchangeClient) startLongPoll() {
 			if err != nil {
 				ex.sendError(err)
 				return
-			}			
+			}
 			if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
 				ex.logger.Debug("%s: response and body: %v %s", logPrefix, *response, responseBody)
 			}

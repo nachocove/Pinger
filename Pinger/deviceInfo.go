@@ -80,7 +80,7 @@ func newDeviceInfo(clientID, pushToken, pushService, platform string) (*DeviceIn
 		PushToken:   pushToken,
 		PushService: pushService,
 		Platform:    platform,
-		Enabled: true,
+		Enabled:     true,
 	}
 	err := di.validate()
 	if err != nil {
@@ -219,7 +219,7 @@ func (di *DeviceInfo) push(message string) error {
 
 	case di.Enabled == false:
 		return errors.New("Endpoint is disabled")
-		
+
 	default:
 		return errors.New(fmt.Sprintf("Unsupported push service: %s", di.PushService))
 	}
@@ -267,5 +267,5 @@ func (di *DeviceInfo) validateAws() error {
 		di.Enabled = true
 		di.update()
 	}
-	return nil	
+	return nil
 }

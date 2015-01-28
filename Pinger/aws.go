@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stripe/aws-go/aws"
-	"github.com/stripe/aws-go/gen/sns"
 	cognitoidentity "github.com/stripe/aws-go/gen/cognito/identity"
+	"github.com/stripe/aws-go/gen/sns"
 )
 
 type AWSConfiguration struct {
@@ -16,8 +16,8 @@ type AWSConfiguration struct {
 	SnsRegionName     string
 	SnsIOSPlatformArn string
 
-	CognitoIdentityRegionName     string
-	CognitoIdentityPoolId string
+	CognitoIdentityRegionName string
+	CognitoIdentityPoolId     string
 }
 
 func (config *AWSConfiguration) Validate() error {
@@ -84,8 +84,8 @@ func (config *AWSConfiguration) sendPushNotification(endpointArn, message string
 		return err
 	}
 	input := sns.PublishInput{
-		Message:          aws.StringValue(&message),
-		TargetARN:        aws.StringValue(&endpointArn),
+		Message:   aws.StringValue(&message),
+		TargetARN: aws.StringValue(&endpointArn),
 	}
 	response, err := snsSession.Publish(&input)
 	if err != nil {
@@ -105,7 +105,7 @@ func (config *AWSConfiguration) getCognitoIdentitySession() (*cognitoidentity.Co
 	return cognitoSession, nil
 }
 
-func (config *AWSConfiguration)  validateCognitoId(clientId string) error {
+func (config *AWSConfiguration) validateCognitoId(clientId string) error {
 	cognitoSession, err := config.getCognitoIdentitySession()
 	if err != nil {
 		return err

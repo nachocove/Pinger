@@ -34,8 +34,8 @@ type MailPingInformation struct {
 	ClientId               string
 	Platform               string
 	MailServerUrl          string
-	MailServerCredentials  string // json encoded, presumably {"username": <foo>, "password": <bar>}
-	Protocol               string // usually http (is this needed?)
+	MailServerCredentials  string            // json encoded, presumably {"username": <foo>, "password": <bar>}
+	Protocol               string            // usually http (is this needed?)
 	HttpHeaders            map[string]string // optional
 	HttpRequestData        []byte
 	HttpExpectedReply      []byte
@@ -108,7 +108,7 @@ func (pi *MailPingInformation) createToken() {
 func (pi *MailPingInformation) validateStopToken(token string) bool {
 	return pi.stopToken == token
 }
-	
+
 func (pi *MailPingInformation) start(debug bool, logger *logging.Logger) (string, error) {
 	client, err := NewExchangeClient(pi, debug, logger)
 	if err != nil {
@@ -156,4 +156,3 @@ func (pi *MailPingInformation) validateClientId() error {
 	}
 	return DefaultPollingContext.config.Aws.validateCognitoId(pi.ClientId)
 }
-
