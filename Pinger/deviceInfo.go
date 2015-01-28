@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/coopernurse/gorp"
-	"github.com/nachocove/goamz/aws"
 )
 
 type DeviceInfo struct {
@@ -21,6 +20,7 @@ type DeviceInfo struct {
 	PushToken      string `db:"push_token"`
 	PushService    string `db:"push_service"` // APNS, GCM, ...
 	AWSEndpointArn string `db:"aws_endpoint_arn"`
+	Enabled        bool   `db:"enabled"`
 
 	dbm *gorp.DbMap `db:"-"`
 }
@@ -80,6 +80,7 @@ func newDeviceInfo(clientID, pushToken, pushService, platform string) (*DeviceIn
 		PushToken:   pushToken,
 		PushService: pushService,
 		Platform:    platform,
+		Enabled: true,
 	}
 	err := di.validate()
 	if err != nil {
@@ -215,18 +216,10 @@ func (di *DeviceInfo) push(message string) error {
 	switch {
 	case di.AWSEndpointArn != "":
 		err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, message)
-		if err != nil {
-			awsErr := err.(*aws.Error)
-			switch {
-			case awsErr.Code == "EndpointDisabled":
-				// TODO Need to mark the endpoint as 'off' or whatever
-				break
 
-			default:
-				break
-			}
-		}
-
+	case di.Enabled == false:
+		return errors.New("Endpoint is disabled")
+		
 	default:
 		return errors.New(fmt.Sprintf("Unsupported push service: %s", di.PushService))
 	}
@@ -262,7 +255,17 @@ func (di *DeviceInfo) validateAws() error {
 	}
 	enabled, ok := attributes["Enabled"]
 	if !ok || enabled != "true" {
+		if enabled != "true" {
+			// Only disable this if we get an actual indication thereof
+			di.Enabled = false
+			di.update()
+		}
 		return errors.New("Endpoint is not enabled")
+	}
+	if di.Enabled == false {
+		// re-enable the endpoint
+		di.Enabled = true
+		di.update()
 	}
 	return nil	
 }

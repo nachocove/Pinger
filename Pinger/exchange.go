@@ -113,7 +113,7 @@ func (ex *ExchangeClient) startLongPoll() {
 
 	// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
 	ex.logger.Debug("%s: Validating clientID", logPrefix)
-	err = validateCognitoId(ex.pi.ClientId)
+	err = ex.pi.validateClientId()
 	if err != nil {
 		ex.sendError(err)
 		return
@@ -126,12 +126,16 @@ func (ex *ExchangeClient) startLongPoll() {
 			ex.sendError(err)
 			return
 		}
+		ex.logger.Debug("%s: endpoint created %s", logPrefix, deviceInfo.AWSEndpointArn)
+		// TODO We should send a test-ping here, so we don't find out the endpoint is unreachable later.
+		// It's optional (we'll find out eventually), but this would speed it up.
 	} else {
 		err = deviceInfo.validateAws()
 		if err != nil {
 			ex.sendError(err)
 			return
 		}
+		ex.logger.Debug("%s: endpoint validated %s", logPrefix, deviceInfo.AWSEndpointArn)
 	}
 	if ex.pi.WaitBeforeUse > 0 {
 		ex.logger.Debug("%s: WaitBeforeUse %d", logPrefix, ex.pi.WaitBeforeUse)
@@ -176,6 +180,11 @@ func (ex *ExchangeClient) startLongPoll() {
 				ex.sendError(err)
 				return
 			}
+			err = response.Body.Close()
+			if err != nil {
+				ex.sendError(err)
+				return
+			}			
 			if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
 				ex.logger.Debug("%s: response and body: %v %s", logPrefix, *response, responseBody)
 			}

@@ -149,3 +149,11 @@ func (pi *MailPingInformation) deferPoll(debug bool, logger *logging.Logger) err
 	}
 	return nil
 }
+
+func (pi *MailPingInformation) validateClientId() error {
+	if pi.ClientId == "" {
+		return errors.New("Empty client ID is not valid")
+	}
+	return DefaultPollingContext.config.Aws.validateCognitoId(pi.ClientId)
+}
+
