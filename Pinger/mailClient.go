@@ -36,7 +36,7 @@ type MailPingInformation struct {
 	MailServerUrl          string
 	MailServerCredentials  string // json encoded, presumably {"username": <foo>, "password": <bar>}
 	Protocol               string // usually http (is this needed?)
-	HttpHeaders            string // optional
+	HttpHeaders            map[string]string // optional
 	HttpRequestData        []byte
 	HttpExpectedReply      []byte
 	HttpNoChangeReply      []byte

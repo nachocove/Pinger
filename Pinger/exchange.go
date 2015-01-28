@@ -50,9 +50,15 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("User-Agent", "Nacho Cove, Inc. Pinger")
-	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-	//req.Header.Add("MS-ASProtocolVersion", "14.1")
+	for k,v := range ex.pi.HttpHeaders {
+		req.Header.Add(k, v)
+	}
+	if header := req.Header.Get("User-Agent"); header == "" {
+		req.Header.Add("User-Agent", "NachoCovePingerv0.9")
+	}
+	if header := req.Header.Get("Accept"); header == "" {
+		req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	}
 	req.Proto = "HTTP/1.1"
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
@@ -116,6 +122,12 @@ func (ex *ExchangeClient) startLongPoll() {
 	if deviceInfo.AWSEndpointArn == "" {
 		ex.logger.Debug("%s: Registering %s:%s with AWS.", logPrefix, ex.pi.PushService, ex.pi.PushToken)
 		err = deviceInfo.registerAws()
+		if err != nil {
+			ex.sendError(err)
+			return
+		}
+	} else {
+		err = deviceInfo.validateAws()
 		if err != nil {
 			ex.sendError(err)
 			return
