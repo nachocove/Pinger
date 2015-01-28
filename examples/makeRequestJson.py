@@ -7,6 +7,12 @@ def main(args):
     credentials = {"Username": args.username,
                    "Password": args.password,
                    }
+
+    headers = {}
+    for header in args.header:
+        k,v = header.split('=')
+        headers[k] = v
+
     jsonPayload = {"WaitBeforeUse": args.wait_before_use,
                    "ResponseTimeout": args.timeout,
                    "MailServerUrl": args.url,
@@ -15,6 +21,7 @@ def main(args):
                    "PushService": args.push_service,
                    "ClientId": args.client_id,
                    "Platform": args.platform,
+                   "HttpHeaders": headers,
                    "HttpRequestData": base64.b64encode(args.request_data.read()) if args.request_data else "",
                    "HttpExpectedReply": base64.b64encode(args.reply_data.read()) if args.reply_data else "",
                    "HttpNoChangeReply": base64.b64encode(args.no_change_reply.read()) if args.no_change_reply else "",
@@ -37,6 +44,7 @@ if __name__ == "__main__":
     parser.add_argument('--no-change-reply', type=file, help='The no-change reply (file)')
     parser.add_argument('--platform', choices=('ios',), help='The platform')
     parser.add_argument('--client-id', help='A client ID (cognito ID)')
+    parser.add_argument('--header', action='append', default=[], help="Headers (format: Key=Value). Can be given multiple times.")
 
     args = parser.parse_args()
     print main(args)
