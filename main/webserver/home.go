@@ -14,7 +14,6 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	context := GetContext(r)
 	config := context.Config
 	mainTemplate := path.Join(config.Server.TemplateDir, "main.tmpl")
-	fmt.Println(mainTemplate)
 	t, err := template.ParseFiles(mainTemplate)
 	if err != nil {
 		panic("could not open template file")

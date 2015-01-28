@@ -95,7 +95,6 @@ func initDbMySql(dbConfig *DBConfiguration) *gorp.DbMap {
 		dbConfig.Port,
 		dbConfig.Name,
 	)
-	fmt.Println(connectString)
 	db, err := sql.Open("mysql", connectString)
 	if err != nil {
 		// DO NOT LOG THE PASSWORD!
