@@ -5,21 +5,19 @@ A place where devices register their email credentials, which
 then pings the mail server at various intervals, and sends devices
 push notifications.
 
-Download/install:
+Download/install
+----------------
 
 ```
-go get github.com/nachocove/Pinger/...
+go get [-u] github.com/nachocove/Pinger/...
 ```
+Add the -u to update an existing install
 
 *NOTE: Yes, that's 3 dots. 3 dots ('...') is idiomatic go for 'everything under here'.*
 
-To update:
 
-```
-go get -u github.com/nachocove/Pinger/...
-```
-
-or to get the git repo:
+Git repo
+--------
 
 ```
 mkdir -p $GOPATH/src/github.com/nachocove/
@@ -53,19 +51,21 @@ Dependencies
 Web server Dependencies (will get pulled in with 'go get ...' during the initial pull of Pinger):
 
 ```
+code.google.com/p/gcfg
 github.com/Go-SQL-Driver/MySQL
 github.com/codegangsta/negroni
 github.com/coopernurse/gorp
+github.com/juju/errors
 github.com/mattn/go-sqlite3
 github.com/op/go-logging
-code.google.com/p/gcfg
-code.google.com/p/gcfg/scanner
-code.google.com/p/gcfg/token
-code.google.com/p/gcfg/types
+github.com/stripe/aws-go
+github.com/twinj/uuid
+github.com/vaughan0/go-ini
 github.com/gorilla/context
 github.com/gorilla/mux
 github.com/gorilla/securecookie
 github.com/gorilla/sessions
+```
 
 To get the list of dependencies, use:
 ```
