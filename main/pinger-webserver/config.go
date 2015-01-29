@@ -92,7 +92,7 @@ func NewConfiguration() *Configuration {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "USAGE: %s [args] <config file>\n Args:\n", path.Base(os.Args[0]))
+	fmt.Fprintf(os.Stderr, "USAGE: %s [args]\n Args:\n", path.Base(os.Args[0]))
 	flag.PrintDefaults()
 }
 
@@ -138,15 +138,15 @@ func GetConfigAndRun() {
 
 	flag.IntVar(&port, "p", defaultPort, "The port to bind to")
 	flag.StringVar(&bindAddress, "host", defaultBindAddress, "The IP address to bind to")
+	flag.StringVar(&configFile, "c", "", "Configuration file")
 	flag.BoolVar(&debug, "d", defaultDebug, "Debug")
 	flag.BoolVar(&development, "devel", defaultDebug, "In Development")
 	flag.Usage = usage
 	flag.Parse()
-	if len(flag.Args()) != 1 {
+	if configFile == "" {
 		usage()
 		os.Exit(1)
 	}
-	configFile = flag.Arg(0)
 	config := NewConfiguration()
 	if configFile != "" {
 		err = config.Read(configFile)
