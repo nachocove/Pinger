@@ -130,6 +130,8 @@ func (ex *ExchangeClient) startLongPoll() {
 		// TODO We should send a test-ping here, so we don't find out the endpoint is unreachable later.
 		// It's optional (we'll find out eventually), but this would speed it up.
 	} else {
+		// Validate this even if the device is marked as deviceInfo.Enabled=false, because this might
+		// mark it as enabled again. Possibly...
 		err = deviceInfo.validateAws()
 		if err != nil {
 			ex.sendError(err)
