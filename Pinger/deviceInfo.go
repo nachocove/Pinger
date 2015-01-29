@@ -80,7 +80,7 @@ func newDeviceInfo(clientID, pushToken, pushService, platform string) (*DeviceIn
 		PushToken:   pushToken,
 		PushService: pushService,
 		Platform:    platform,
-		Enabled:     true,
+		Enabled:     false,
 	}
 	err := di.validate()
 	if err != nil {
@@ -238,6 +238,7 @@ func (di *DeviceInfo) registerAws() error {
 		return err
 	}
 	di.AWSEndpointArn = arn
+	di.Enabled = true
 	_, err = di.update()
 	if err != nil {
 		return err
