@@ -1,7 +1,12 @@
 package Pinger
 
 import (
+	"os"
+	"fmt"
+	"github.com/op/go-logging"
 	"code.google.com/p/gcfg"
+	"errors"
+	"path"
 )
 
 type Configuration struct {
@@ -12,11 +17,85 @@ type Configuration struct {
 
 type GlobalConfiguration struct {
 	DumpRequests bool
+	LogDir string
+	LogFileName string
+	LogFileLevel string
+	Debug bool
+	
+	// private
+	logFileLevel logging.Level
+}
+
+const (
+	defaultDumpRequests = false
+	defaultDebug = false
+	defaultLogDir = "./log"
+	defaultLogFileName = "pinger-backend.log"
+	defailtLogFileLevel = "WARNING"
+)
+func NewConfiguration() *Configuration {
+	return &Configuration{
+		Global: GlobalConfiguration{
+			Debug:       defaultDebug,
+			LogDir:      defaultLogDir,
+			LogFileName: defaultLogFileName,
+			LogFileLevel: defailtLogFileLevel,
+		},
+	}
+}
+
+func LevelNameToLevel(levelName string) (logging.Level, error) {
+	var level logging.Level
+	switch {
+	case levelName == "WARNING":
+		level = logging.WARNING
+	case levelName == "ERROR":
+		level = logging.ERROR
+	case levelName == "DEBUG":
+		level = logging.DEBUG
+	case levelName == "INFO":
+		level = logging.INFO
+	case levelName == "CRITICAL":
+		level = logging.CRITICAL
+	case levelName == "NOTICE":
+		level = logging.NOTICE
+	default:
+		return 0, errors.New(fmt.Sprintf("Unknown logging level %s", level))
+	}
+	return level, nil
+}
+
+func (gconfig *GlobalConfiguration) Validate() error {
+	if gconfig.LogFileName == "" {
+		gconfig.LogFileName = fmt.Sprintf("%s.log", os.Args[0])
+	}
+	level, err := LevelNameToLevel(gconfig.LogFileLevel)
+	if err != nil {
+		return err
+	} 
+	gconfig.logFileLevel = level
+	return nil
+}
+
+func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel logging.Level) (*logging.Logger, error) {
+	err := gconfig.Validate()
+	if err != nil {
+		return nil, err
+	}
+	if !exists(gconfig.LogDir) {
+		return nil, errors.New(fmt.Sprintf("Logging directory %s does not exist.\n", gconfig.LogDir))
+	}
+	loggerName := os.Args[0]
+	return InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel)
 }
 
 func ReadConfig(filename string) (*Configuration, error) {
-	config := Configuration{}
-	err := gcfg.ReadFileInto(&config, filename)
+	config := NewConfiguration()
+	err := gcfg.ReadFileInto(config, filename)
+	if err != nil {
+		return nil, err
+	}
+	err = config.Global.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -24,5 +103,5 @@ func ReadConfig(filename string) (*Configuration, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &config, nil
+	return config, nil
 }

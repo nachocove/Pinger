@@ -103,11 +103,6 @@ func main() {
 	if logFileName == "" {
 		logFileName = "/dev/null"
 	}
-	logFile, err := os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
 	var screenLogging = false
 	var screenLevel = logging.ERROR
 	if debug || verbose {
@@ -118,23 +113,16 @@ func main() {
 			screenLevel = logging.INFO
 		}
 	}
-	var fileLevel logging.Level
-	switch {
-	case logFileLevel == "WARNING":
-		fileLevel = logging.WARNING
-	case logFileLevel == "ERROR":
-		fileLevel = logging.ERROR
-	case logFileLevel == "DEBUG":
-		fileLevel = logging.DEBUG
-	case logFileLevel == "INFO":
-		fileLevel = logging.INFO
-	case logFileLevel == "CRITICAL":
-		fileLevel = logging.CRITICAL
-	case logFileLevel == "NOTICE":
-		fileLevel = logging.NOTICE
+	fileLevel, err := Pinger.LevelNameToLevel(logFileLevel)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "LevelNameToLevel: %v\n", err)
+		os.Exit(1)
 	}
-
-	logger = Pinger.InitLogging("testClient", logFile, fileLevel, screenLogging, screenLevel)
+	logger, err = Pinger.InitLogging("testClient", logFileName, fileLevel, screenLogging, screenLevel)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "InitLogging: %v\n", err)
+		os.Exit(1)
+	}
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	logger.Info("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
 

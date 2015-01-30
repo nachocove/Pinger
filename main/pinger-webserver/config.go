@@ -26,8 +26,8 @@ const (
 	defaultDebug          = false
 	defaultNonTLSPort     = 80
 	defaultDevelopment    = false
-	defaultLogDir         = "/var/log/"
-	defaultLogFileName    = "webserver.log"
+	defaultLogDir         = "./"
+	defaultLogFileName    = ""
 )
 
 // ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
@@ -43,7 +43,6 @@ type ServerConfiguration struct {
 
 type GlobalConfiguration struct {
 	Debug       bool
-	Development bool
 	LogDir      string
 	LogFileName string
 }
@@ -60,27 +59,34 @@ func (rpcConf *RPCServerConfiguration) String() string {
 // Configuration - The top level configuration structure.
 type Configuration struct {
 	Server ServerConfiguration
-	Global GlobalConfiguration
+	Global Pinger.GlobalConfiguration
 	Rpc    RPCServerConfiguration
 }
 
 func (config *Configuration) Read(filename string) error {
-	return gcfg.ReadFileInto(config, filename)
+	err := gcfg.ReadFileInto(config, filename)
+	if err != nil {
+		return err
+	}
+	if config.Global.LogFileName == "" {
+		config.Global.LogFileName = fmt.Sprintf("%s.log", os.Args[0])
+	}
+	return nil
 }
 
 func NewConfiguration() *Configuration {
-	return &Configuration{Server: ServerConfiguration{
-		Port:           defaultPort,
-		BindAddress:    defaultBindAddress,
-		TemplateDir:    defaultTemplateDir,
-		ServerCertFile: defaultserverCertFile,
-		ServerKeyFile:  defaultserverKeyFile,
-		NonTlsPort:     defaultNonTLSPort,
-		SessionSecret:  "",
-	},
-		Global: GlobalConfiguration{
+	return &Configuration{
+		Server: ServerConfiguration{
+			Port:           defaultPort,
+			BindAddress:    defaultBindAddress,
+			TemplateDir:    defaultTemplateDir,
+			ServerCertFile: defaultserverCertFile,
+			ServerKeyFile:  defaultserverKeyFile,
+			NonTlsPort:     defaultNonTLSPort,
+			SessionSecret:  "",
+		},
+		Global: Pinger.GlobalConfiguration{
 			Debug:       defaultDebug,
-			Development: defaultDevelopment,
 			LogDir:      defaultLogDir,
 			LogFileName: defaultLogFileName,
 		},
@@ -131,7 +137,6 @@ func NewContext(
 func GetConfigAndRun() {
 	var configFile string
 	var debug bool
-	var development bool
 	var port int
 	var bindAddress string
 	var err error
@@ -140,26 +145,27 @@ func GetConfigAndRun() {
 	flag.StringVar(&bindAddress, "host", defaultBindAddress, "The IP address to bind to")
 	flag.StringVar(&configFile, "c", "", "Configuration file")
 	flag.BoolVar(&debug, "d", defaultDebug, "Debug")
-	flag.BoolVar(&development, "devel", defaultDebug, "In Development")
 	flag.Usage = usage
 	flag.Parse()
+
 	if configFile == "" {
 		usage()
 		os.Exit(1)
 	}
 	config := NewConfiguration()
-	if configFile != "" {
-		err = config.Read(configFile)
-		if err != nil {
-			log.Fatalf("Error reading config file:\n%v\n", err)
-			os.Exit(1)
-		}
+	err = config.Read(configFile)
+	if err != nil {
+		log.Fatalf("Error reading config file:\n%v\n", err)
+		os.Exit(1)
 	}
+	err = config.Global.Validate()
+	if err != nil {
+		log.Fatalf("Error validate global config:\n%v\n", err)
+		os.Exit(1)		
+	}
+	
 	if port != defaultPort {
 		config.Server.Port = port
-	}
-	if development != defaultDevelopment {
-		config.Global.Development = development
 	}
 	if bindAddress != defaultBindAddress {
 		config.Server.BindAddress = bindAddress
@@ -171,24 +177,17 @@ func GetConfigAndRun() {
 		log.Fatalf("No template directory specified!")
 		os.Exit(1)
 	}
-	if !exists(config.Global.LogDir) {
-		log.Fatalf("Logging directory %s does not exist.\n", config.Global.LogDir)
-		os.Exit(1)
-	}
-
-	logFile, err := os.OpenFile(path.Join(config.Global.LogDir, config.Global.LogFileName), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-	if err != nil {
-		log.Fatalf("%v\n", err)
-		os.Exit(1)
-	}
 	var screenLogging = false
 	var screenLevel = logging.ERROR
 	if debug {
 		screenLogging = true
 		screenLevel = logging.DEBUG
 	}
-	logger := Pinger.InitLogging("pinger-webfe", logFile, logging.DEBUG, screenLogging, screenLevel)
-
+	logger, err := config.Global.InitLogging(screenLogging, screenLevel)
+	if err != nil {
+		log.Fatalf("Error InitLogging: %v\n", err)
+		os.Exit(1)
+	}
 	context := NewContext(
 		config,
 		logger,

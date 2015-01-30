@@ -206,10 +206,6 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
-	logFile, err := os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error opening file %s: %v", logFileName, err)
-	}
 	var screenLogging = false
 	var screenLevel = logging.ERROR
 	if debug || verbose {
@@ -222,23 +218,16 @@ func main() {
 			screenLevel = logging.INFO
 		}
 	}
-	var fileLevel logging.Level
-	switch {
-	case logFileLevel == "WARNING":
-		fileLevel = logging.WARNING
-	case logFileLevel == "ERROR":
-		fileLevel = logging.ERROR
-	case logFileLevel == "DEBUG":
-		fileLevel = logging.DEBUG
-	case logFileLevel == "INFO":
-		fileLevel = logging.INFO
-	case logFileLevel == "CRITICAL":
-		fileLevel = logging.CRITICAL
-	case logFileLevel == "NOTICE":
-		fileLevel = logging.NOTICE
+	fileLevel, err := Pinger.LevelNameToLevel(logFileLevel)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "LevelNameToLevel: %v\n", err)
+		os.Exit(1)
 	}
-
-	logger = Pinger.InitLogging("TestServer", logFile, fileLevel, screenLogging, screenLevel)
+	logger, err = Pinger.InitLogging("TestServer", logFileName, fileLevel, screenLogging, screenLevel)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "InitLogging: %v\n", err)
+		os.Exit(1)
+	}
 
 	var TLSconfig *tls.Config
 

@@ -31,24 +31,16 @@ var logger *logging.Logger
 
 func main() {
 	var printMemPeriodic int
-	var pingPeriodic int
 	var printMem bool
 	var help bool
-	var noReopenConnections bool
 	var verbose bool
-	var logFileLevel string
-	var logFileName string
 	var configFile string
 
-	flag.StringVar(&logFileName, "log-file", "pinger-backend.log", "log-file to log to")
-	flag.StringVar(&logFileLevel, "log-level", "WARNING", "Logging level for the logfile (DEBUG, INFO, WARN, NOTICE, ERROR, CRITICAL)")
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
 	flag.BoolVar(&help, "h", false, "Help")
-	flag.BoolVar(&noReopenConnections, "no-reopen", false, "Verbose")
 	flag.BoolVar(&printMem, "m", false, "print memory mode")
 	flag.IntVar(&printMemPeriodic, "mem", 0, "print memory periodically mode in seconds")
-	flag.IntVar(&pingPeriodic, "ping", 0, "ping server in seconds (plus fudge factor)")
 	flag.StringVar(&configFile, "c", "", "The configuration file. Required.")
 
 	flag.Parse()
@@ -62,12 +54,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	if logFileName == "" {
-		logFileName = "/dev/null"
-	}
-	logFile, err := os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+	config, err := Pinger.ReadConfig(configFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		fmt.Fprintf(os.Stderr, "Reading aws config: %s", err)
 		os.Exit(1)
 	}
 	var screenLogging = false
@@ -80,29 +69,12 @@ func main() {
 			screenLevel = logging.INFO
 		}
 	}
-	var fileLevel logging.Level
-	switch {
-	case logFileLevel == "WARNING":
-		fileLevel = logging.WARNING
-	case logFileLevel == "ERROR":
-		fileLevel = logging.ERROR
-	case logFileLevel == "DEBUG":
-		fileLevel = logging.DEBUG
-	case logFileLevel == "INFO":
-		fileLevel = logging.INFO
-	case logFileLevel == "CRITICAL":
-		fileLevel = logging.CRITICAL
-	case logFileLevel == "NOTICE":
-		fileLevel = logging.NOTICE
-	}
-
-	logger = Pinger.InitLogging("pinger-be", logFile, fileLevel, screenLogging, screenLevel)
-
-	config, err := Pinger.ReadConfig(configFile)
+	logger, err = config.Global.InitLogging(screenLogging, screenLevel)
 	if err != nil {
-		logger.Error("Reading aws config: %s", err)
+		fmt.Fprintf(os.Stderr, "Init Logging: %s", err)
 		os.Exit(1)
 	}
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	logger.Info("Running with %d Processors", runtime.NumCPU())
 
