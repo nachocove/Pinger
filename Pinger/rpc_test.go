@@ -3,48 +3,32 @@ package Pinger
 import (
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
-	"sync"
 	"testing"
+	"fmt"
+	"os"
 )
 
-type DummyMailServer struct {
-}
-
-func NewDummyMailServer() *DummyMailServer {
-	return &DummyMailServer{}
-}
-func (d *DummyMailServer) Listen(wait *sync.WaitGroup) error {
-	return nil
-}
-func (d *DummyMailServer) Action(action int) error {
-	return nil
-}
-
-func (di *DeviceInfo) NewMailServer(hostname string, port, pingPeriodicity int, ssl, debug bool, logger *logging.Logger) MailServer {
-	fmt.Printf("Called NewMailServer\n")
-	return NewDummyMailServer()
-}
+const testingDbFilename = "testingDB.db"
 
 func TestRpcSstart(t *testing.T) {
+	assert := assert.New(t)
 	logger, err := logging.GetLogger("Unittests")
-	assert.Nil(t, err)
-	InitRpc(logger)
-	di, err := NewDeviceInfo(
-		"1234567",
-		"MyDeviceID",
-		"SomePushToken",
-		"AWS",
-		"ios",
-		"exchange")
-	assert.Nil(t, err)
-	assert.NotNil(t, di)
-
+	assert.Nil(err, "err should be nil")
+	
+	config := NewConfiguration()
+	config.Db.Type = "sqlite"
+	config.Db.Filename = testingDbFilename
+	
+	poll, err := NewBackendPolling(config, true, logger)
+	assert.Nil(err, "err should be nil")
+	defer os.Remove(testingDbFilename)
+	
+	mailInfo := &MailPingInformation{}	
 	args := StartPollArgs{
-		Device:       di,
-		MailEndpoint: "",
+		MailInfo:       mailInfo,
 	}
-	reply := PollingResponse{}
+	reply := StartPollingResponse{}
 
-	poll := new(BackendPolling)
-	poll.start(&args, &reply)
+	poll.Start(&args, &reply)
+	assert.Equal(reply.Code, PollingReplyError, fmt.Sprintf("Did not get error from poll.Start. DeviceInfo save should have failed"))
 }

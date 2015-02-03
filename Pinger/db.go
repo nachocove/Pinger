@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"errors"
 
 	_ "github.com/Go-SQL-Driver/MySQL"
 	_ "github.com/mattn/go-sqlite3"
@@ -23,6 +24,25 @@ type DBConfiguration struct {
 	Certificate string // for SSL protected communication with the DB
 }
 
+func (dbconfig *DBConfiguration) Validate() error {
+	switch {
+	case dbconfig.Type == "mysql":
+		if dbconfig.Username == "" || dbconfig.Password == "" || dbconfig.Host == "" ||
+			dbconfig.Port == 0 || dbconfig.Name == "" {
+				return errors.New("Missing parameters for mysql. All are required: Username, Password, Host, Port, Name")
+			}
+	case dbconfig.Type == "sqlite" || dbconfig.Type == "sqlite3":
+		if dbconfig.Filename == "" {
+			return errors.New("Empty filename with sqlite")
+		}
+		break
+
+	default:
+		return errors.New(fmt.Sprintf("Unknown/Unsupported db type %s", dbconfig.Type))
+	}
+	return nil
+}
+
 type DBLogger struct {
 	logger *logging.Logger
 }
@@ -31,9 +51,13 @@ func (dbl DBLogger) Printf(format string, v ...interface{}) {
 	dbl.logger.Debug(format, v...)
 }
 
-func initDB(dbconfig *DBConfiguration, init, debug bool, logger *logging.Logger) *gorp.DbMap {
+func initDB(dbconfig *DBConfiguration, init, debug bool, logger *logging.Logger) (*gorp.DbMap, error) {
 	var dbmap *gorp.DbMap
-
+	err := dbconfig.Validate()
+	if err != nil {
+		return nil, err
+	}
+	
 	switch {
 	case dbconfig.Type == "mysql":
 		dbmap = initDbMySql(dbconfig)
@@ -42,11 +66,11 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *logging.Logger)
 		dbmap = initDbSqlite(dbconfig)
 
 	default:
-		log.Fatalf("Unknown db type %s", dbconfig.Type)
+		return nil, errors.New(fmt.Sprintf("Unknown db type %s", dbconfig.Type))
 	}
 
 	if dbmap == nil {
-		log.Fatalf("Could not get dbmap")
+		return nil, errors.New("Could not get dbmap")
 	}
 
 	if debug {
@@ -64,10 +88,10 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *logging.Logger)
 		// use a migration tool, or create the tables via scripts
 		err := dbmap.CreateTablesIfNotExists()
 		if err != nil {
-			log.Fatalf("Create tables failed: %s", err)
+			return nil, errors.New(fmt.Sprintf("Create tables failed: %s", err))
 		}
 	}
-	return dbmap
+	return dbmap, nil
 }
 
 func initDbSqlite(dbconfig *DBConfiguration) *gorp.DbMap {

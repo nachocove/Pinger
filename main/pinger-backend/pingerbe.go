@@ -93,5 +93,8 @@ func main() {
 		memstats.SetBaseMemStats()
 	}
 
-	Pinger.StartPollingRPCServer(config, debug, logger) // will also include the pprof server
+	err = Pinger.StartPollingRPCServer(config, debug, logger) // will also include the pprof server
+	if err != nil {
+		panic(err.Error())
+	}
 }

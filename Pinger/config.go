@@ -106,5 +106,9 @@ func ReadConfig(filename string) (*Configuration, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = config.Db.Validate()
+	if err != nil {
+		return nil, err
+	}
 	return config, nil
 }

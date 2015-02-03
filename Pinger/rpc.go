@@ -191,10 +191,10 @@ func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) erro
 
 var DefaultPollingContext *BackendPolling
 
-func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger) *BackendPolling {
-	dbm := initDB(&config.Db, true, debug, logger)
-	if dbm == nil {
-		panic("Could not create DB connection")
+func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger) (*BackendPolling, error) {
+	dbm, err := initDB(&config.Db, true, debug, logger)
+	if err != nil {
+		return nil, err
 	}
 	DefaultPollingContext = &BackendPolling{
 		dbm:    dbm,
@@ -202,18 +202,22 @@ func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger
 		logger: logger,
 		debug:  debug,
 	}
-	return DefaultPollingContext
+	return DefaultPollingContext, nil
 }
 
-func StartPollingRPCServer(config *Configuration, debug bool, logger *logging.Logger) {
-	pollingAPI := NewBackendPolling(config, debug, logger)
+func StartPollingRPCServer(config *Configuration, debug bool, logger *logging.Logger) error {
+	pollingAPI, err := NewBackendPolling(config, debug, logger)
+	if err != nil {
+		return err
+	}
 	rpc.Register(pollingAPI)
 	rpc.HandleHTTP()
 
 	rpcConnectString := fmt.Sprintf("%s:%d", "localhost", RPCPort)
 	logger.Info("Starting RPC server on %s", rpcConnectString)
-	err := http.ListenAndServe(rpcConnectString, nil)
+	err = http.ListenAndServe(rpcConnectString, nil)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
