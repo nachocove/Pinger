@@ -23,11 +23,9 @@ const (
 	defaultDebugging      = false
 	defaultserverCertFile = ""
 	defaultserverKeyFile  = ""
-	defaultDebug          = false
 	defaultNonTLSPort     = 80
 	defaultDevelopment    = false
-	defaultLogDir         = "./"
-	defaultLogFileName    = ""
+	defaultDebug = false
 )
 
 // ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
@@ -75,7 +73,7 @@ func (config *Configuration) Read(filename string) error {
 }
 
 func NewConfiguration() *Configuration {
-	return &Configuration{
+	config := &Configuration{
 		Server: ServerConfiguration{
 			Port:           defaultPort,
 			BindAddress:    defaultBindAddress,
@@ -85,16 +83,13 @@ func NewConfiguration() *Configuration {
 			NonTlsPort:     defaultNonTLSPort,
 			SessionSecret:  "",
 		},
-		Global: Pinger.GlobalConfiguration{
-			Debug:       defaultDebug,
-			LogDir:      defaultLogDir,
-			LogFileName: defaultLogFileName,
-		},
 		Rpc: RPCServerConfiguration{
 			Hostname: "localhost",
 			Port:     Pinger.RPCPort,
 		},
 	}
+	config.Global = *Pinger.NewGlobalConfiguration()
+	return config
 }
 
 func usage() {

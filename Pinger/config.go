@@ -26,22 +26,25 @@ type GlobalConfiguration struct {
 	logFileLevel logging.Level
 }
 
+func NewGlobalConfiguration() *GlobalConfiguration {
+	return &GlobalConfiguration{
+			Debug:       defaultDebug,
+			LogDir:      defaultLogDir,
+			LogFileName: defaultLogFileName,
+			LogFileLevel: defaultLogFileLevel,
+		}
+}
 const (
 	defaultDumpRequests = false
 	defaultDebug = false
 	defaultLogDir = "./log"
 	defaultLogFileName = "pinger-backend.log"
-	defailtLogFileLevel = "WARNING"
+	defaultLogFileLevel = "WARNING"
 )
 func NewConfiguration() *Configuration {
-	return &Configuration{
-		Global: GlobalConfiguration{
-			Debug:       defaultDebug,
-			LogDir:      defaultLogDir,
-			LogFileName: defaultLogFileName,
-			LogFileLevel: defailtLogFileLevel,
-		},
-	}
+	config := &Configuration{}
+	config.Global = *NewGlobalConfiguration()
+	return config
 }
 
 func LevelNameToLevel(levelName string) (logging.Level, error) {
