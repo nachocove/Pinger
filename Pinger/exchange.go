@@ -266,23 +266,23 @@ func (ex *ExchangeClient) waitForError() {
 	}
 }
 
-func (ex *ExchangeClient) LastError() error {
-	return ex.lastError
-}
-
-// Listen sets up the exchange client to listen. Most of the hard work is done via the Client.Listen()
+// LongPoll sets up the exchange client to listen. Most of the hard work is done via the Client.Listen()
 // launches 1 goroutine for periodic checking, if confgured.
 func (ex *ExchangeClient) LongPoll(wait *sync.WaitGroup) error {
+	go ex.stats.tallyResponseTimes()
 	go ex.waitForError()
 	go ex.startLongPoll()
 	return nil
 }
 
+// Action sends a command to the go routine.
 func (ex *ExchangeClient) Action(action int) error {
+	ex.stats.Command <- action
 	ex.command <- action
 	return nil
 }
 
+// Status gets the status of the go routine
 func (ex *ExchangeClient) Status() (MailClientStatus, error) {
 	if ex.active {
 		return MailClientStatusPinging, nil
@@ -304,7 +304,7 @@ func NewExchangeClient(mailInfo *MailPingInformation, debug bool, logger *loggin
 		command:  make(chan int, 2),
 		err:      make(chan error),
 		debug:    debug,
-		stats:    NewStatLogger(logger, true),
+		stats:    NewStatLogger(logger, false),
 		logger:   logger,
 		active:   true,
 	}, nil
