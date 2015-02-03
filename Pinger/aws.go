@@ -3,9 +3,9 @@ package Pinger
 import (
 	"errors"
 	"fmt"
-	"github.com/stripe/aws-go/aws"
-	cognitoidentity "github.com/stripe/aws-go/gen/cognito/identity"
-	"github.com/stripe/aws-go/gen/sns"
+	"github.com/awslabs/aws-sdk-go/aws"
+	cognitoidentity "github.com/awslabs/aws-sdk-go/gen/cognito/identity"
+	"github.com/awslabs/aws-sdk-go/gen/sns"
 )
 
 type AWSConfiguration struct {
