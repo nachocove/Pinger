@@ -11,6 +11,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httputil"
 	"net/url"
+	"path"
 	"runtime"
 	"sync"
 	"time"
@@ -253,7 +254,7 @@ func (ex *ExchangeClient) startLongPoll() {
 
 func (ex *ExchangeClient) sendError(err error) {
 	_, fn, line, _ := runtime.Caller(1)
-	ex.err <- errors.New(fmt.Sprintf("%s:%d %s", fn, line, err))
+	ex.err <- errors.New(fmt.Sprintf("%s/%s:%d %s", path.Base(path.Dir(fn)), path.Base(fn), line, err))
 }
 
 func (ex *ExchangeClient) waitForError() {
@@ -261,7 +262,8 @@ func (ex *ExchangeClient) waitForError() {
 	case err := <-ex.err:
 		ex.logger.Error(err.Error())
 		ex.lastError = err
-		ex.command <- Stop
+		ex.logger.Debug("Stopping goroutines")
+		ex.Action(Stop)
 		return
 	}
 }
@@ -269,7 +271,9 @@ func (ex *ExchangeClient) waitForError() {
 // LongPoll sets up the exchange client to listen. Most of the hard work is done via the Client.Listen()
 // launches 1 goroutine for periodic checking, if confgured.
 func (ex *ExchangeClient) LongPoll(wait *sync.WaitGroup) error {
-	go ex.stats.tallyResponseTimes()
+	if ex.stats != nil {
+		go ex.stats.tallyResponseTimes()
+	}
 	go ex.waitForError()
 	go ex.startLongPoll()
 	return nil
@@ -277,7 +281,9 @@ func (ex *ExchangeClient) LongPoll(wait *sync.WaitGroup) error {
 
 // Action sends a command to the go routine.
 func (ex *ExchangeClient) Action(action int) error {
-	ex.stats.Command <- action
+	if ex.stats != nil {
+		ex.stats.Command <- action
+	}
 	ex.command <- action
 	return nil
 }
@@ -292,20 +298,24 @@ func (ex *ExchangeClient) Status() (MailClientStatus, error) {
 }
 
 // NewExchangeClient set up a new exchange client
-func NewExchangeClient(mailInfo *MailPingInformation, debug bool, logger *logging.Logger) (*ExchangeClient, error) {
+func NewExchangeClient(mailInfo *MailPingInformation, debug, doStats bool, logger *logging.Logger) (*ExchangeClient, error) {
 	urlInfo, err := url.Parse(mailInfo.MailServerUrl)
 	if err != nil {
 		return nil, err
 	}
-	return &ExchangeClient{
+	ex := &ExchangeClient{
 		urlInfo:  urlInfo,
 		pi:       mailInfo,
 		incoming: make(chan *http.Response),
 		command:  make(chan int, 2),
 		err:      make(chan error),
 		debug:    debug,
-		stats:    NewStatLogger(logger, false),
+		stats:    nil,
 		logger:   logger,
 		active:   true,
-	}, nil
+	}
+	if doStats {
+		ex.stats = NewStatLogger(logger, false)
+	}
+	return ex, nil
 }

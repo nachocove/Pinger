@@ -99,7 +99,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 	}
 	t.logger.Debug("created/updated device info %s", pi.ClientId)
 
-	stopToken, err := args.MailInfo.start(t.debug, t.logger)
+	stopToken, err := args.MailInfo.start(t.debug, false, t.logger)
 	if err != nil {
 		reply.Message = err.Error()
 		reply.Code = PollingReplyError

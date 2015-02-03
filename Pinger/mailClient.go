@@ -109,8 +109,8 @@ func (pi *MailPingInformation) validateStopToken(token string) bool {
 	return pi.stopToken == token
 }
 
-func (pi *MailPingInformation) start(debug bool, logger *logging.Logger) (string, error) {
-	client, err := NewExchangeClient(pi, debug, logger)
+func (pi *MailPingInformation) start(debug, doStats bool, logger *logging.Logger) (string, error) {
+	client, err := NewExchangeClient(pi, debug, doStats, logger)
 	if err != nil {
 		return "", err
 	}
