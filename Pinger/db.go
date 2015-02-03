@@ -2,9 +2,9 @@ package Pinger
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
-	"errors"
 
 	_ "github.com/Go-SQL-Driver/MySQL"
 	_ "github.com/mattn/go-sqlite3"
@@ -29,8 +29,8 @@ func (dbconfig *DBConfiguration) Validate() error {
 	case dbconfig.Type == "mysql":
 		if dbconfig.Username == "" || dbconfig.Password == "" || dbconfig.Host == "" ||
 			dbconfig.Port == 0 || dbconfig.Name == "" {
-				return errors.New("Missing parameters for mysql. All are required: Username, Password, Host, Port, Name")
-			}
+			return errors.New("Missing parameters for mysql. All are required: Username, Password, Host, Port, Name")
+		}
 	case dbconfig.Type == "sqlite" || dbconfig.Type == "sqlite3":
 		if dbconfig.Filename == "" {
 			return errors.New("Empty filename with sqlite")
@@ -57,7 +57,7 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *logging.Logger)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	switch {
 	case dbconfig.Type == "mysql":
 		dbmap = initDbMySql(dbconfig)

@@ -25,7 +25,7 @@ const (
 	defaultserverKeyFile  = ""
 	defaultNonTLSPort     = 80
 	defaultDevelopment    = false
-	defaultDebug = false
+	defaultDebug          = false
 )
 
 // ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
@@ -156,9 +156,9 @@ func GetConfigAndRun() {
 	err = config.Global.Validate()
 	if err != nil {
 		log.Fatalf("Error validate global config:\n%v\n", err)
-		os.Exit(1)		
+		os.Exit(1)
 	}
-	
+
 	if port != defaultPort {
 		config.Server.Port = port
 	}

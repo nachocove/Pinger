@@ -1,11 +1,11 @@
 package Pinger
 
 import (
-	"os"
-	"fmt"
-	"github.com/op/go-logging"
 	"code.google.com/p/gcfg"
 	"errors"
+	"fmt"
+	"github.com/op/go-logging"
+	"os"
 	"path"
 )
 
@@ -17,30 +17,32 @@ type Configuration struct {
 
 type GlobalConfiguration struct {
 	DumpRequests bool
-	LogDir string
-	LogFileName string
+	LogDir       string
+	LogFileName  string
 	LogFileLevel string
-	Debug bool
-	
+	Debug        bool
+
 	// private
 	logFileLevel logging.Level
 }
 
 func NewGlobalConfiguration() *GlobalConfiguration {
 	return &GlobalConfiguration{
-			Debug:       defaultDebug,
-			LogDir:      defaultLogDir,
-			LogFileName: defaultLogFileName,
-			LogFileLevel: defaultLogFileLevel,
-		}
+		Debug:        defaultDebug,
+		LogDir:       defaultLogDir,
+		LogFileName:  defaultLogFileName,
+		LogFileLevel: defaultLogFileLevel,
+	}
 }
+
 const (
 	defaultDumpRequests = false
-	defaultDebug = false
-	defaultLogDir = "./log"
-	defaultLogFileName = "pinger-backend.log"
+	defaultDebug        = false
+	defaultLogDir       = "./log"
+	defaultLogFileName  = "pinger-backend.log"
 	defaultLogFileLevel = "WARNING"
 )
+
 func NewConfiguration() *Configuration {
 	config := &Configuration{}
 	config.Global = *NewGlobalConfiguration()
@@ -75,7 +77,7 @@ func (gconfig *GlobalConfiguration) Validate() error {
 	level, err := LevelNameToLevel(gconfig.LogFileLevel)
 	if err != nil {
 		return err
-	} 
+	}
 	gconfig.logFileLevel = level
 	return nil
 }

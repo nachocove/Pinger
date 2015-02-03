@@ -114,8 +114,6 @@ func (tc *TestClient) Action(action int) error {
 	return nil
 }
 
-// TODO This really ought to just be a method/interface thing
-
 // NewTestClient set up a new TestClient
 func NewTestClient(dialString string, pingPeriodic int, reopenConnection, debug bool, tcpKeepAlive int, tlsConfig *tls.Config, logger *logging.Logger) *TestClient {
 	client := Pinger.NewClient(dialString, reopenConnection, tlsConfig, tcpKeepAlive, debug, logger)
@@ -128,6 +126,6 @@ func NewTestClient(dialString string, pingPeriodic int, reopenConnection, debug 
 		pingPeriodicity: pingPeriodic,
 		debug:           debug,
 		logger:          logger,
-		stats:           Pinger.NewStatLogger(logger),
+		stats:           Pinger.NewStatLogger(logger, true),
 	}
 }

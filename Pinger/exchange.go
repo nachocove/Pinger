@@ -304,7 +304,7 @@ func NewExchangeClient(mailInfo *MailPingInformation, debug bool, logger *loggin
 		command:  make(chan int, 2),
 		err:      make(chan error),
 		debug:    debug,
-		stats:    NewStatLogger(logger),
+		stats:    NewStatLogger(logger, true),
 		logger:   logger,
 		active:   true,
 	}, nil

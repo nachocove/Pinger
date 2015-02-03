@@ -1,9 +1,9 @@
 package Pinger
 
 import (
-	"testing"
+	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
-	"github.com/op/go-logging"	
+	"testing"
 )
 
 func TestLevelNameToLevel(t *testing.T) {
