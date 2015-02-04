@@ -1,9 +1,8 @@
 FROM golang
 MAINTAINER Jan Vilhuber <janv@nachocove.com>
-RUN apt-get update -qq -y && apt-get install -qq -y apt-utils supervisor git-core openssh-client vim less sudo
+RUN apt-get update -qq -y && apt-get install -qq -y apt-utils supervisor git-core openssh-client vim less
 RUN addgroup nachocove
 RUN adduser --ingroup nachocove --gecos "Nacho Cove User" --disabled-password nachocove
-RUN adduser nachocove sudo
 RUN update-rc.d supervisor defaults
 RUN mkdir -p /srv/pinger
 RUN mkdir /home/nachocove/.ssh
