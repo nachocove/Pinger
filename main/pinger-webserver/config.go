@@ -108,6 +108,7 @@ func exists(path string) bool {
 type Context struct {
 	Config           *Configuration
 	Logger           *logging.Logger
+	loggerLevel      logging.Level
 	RpcConnectString string
 	SessionStore     *sessions.CookieStore
 }
@@ -120,10 +121,16 @@ func NewContext(
 	return &Context{
 		Config:           config,
 		Logger:           logger,
+		loggerLevel:      -1,
 		RpcConnectString: rpcConnectString,
 		SessionStore:     sessionstore,
 	}
 }
+
+func (context *Context) ToggleDebug() {
+	context.loggerLevel = Pinger.ToggleLogging(context.Logger, context.loggerLevel)
+}
+
 
 // GetConfigAndRun process command line arguments and run the server
 func GetConfigAndRun() {
@@ -223,6 +230,9 @@ func (context *Context) run() error {
 			context.Logger.Fatalf("Could not start server on port %d\n", config.Server.NonTlsPort)
 		}
 	}()
+	
+	Pinger.AddDebugToggleSignal(context)
+	
 	// start the https server
 	err := http.ListenAndServeTLS(addr, config.Server.ServerCertFile, config.Server.ServerKeyFile, httpsMiddlewares)
 	return err

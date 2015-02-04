@@ -218,7 +218,7 @@ func main() {
 			screenLevel = logging.INFO
 		}
 	}
-	fileLevel, err := Pinger.LevelNameToLevel(logFileLevel)
+	fileLevel, err := logging.LogLevel(logFileLevel)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "LevelNameToLevel: %v\n", err)
 		os.Exit(1)

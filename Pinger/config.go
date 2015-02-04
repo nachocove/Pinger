@@ -49,32 +49,11 @@ func NewConfiguration() *Configuration {
 	return config
 }
 
-func LevelNameToLevel(levelName string) (logging.Level, error) {
-	var level logging.Level
-	switch {
-	case levelName == "WARNING":
-		level = logging.WARNING
-	case levelName == "ERROR":
-		level = logging.ERROR
-	case levelName == "DEBUG":
-		level = logging.DEBUG
-	case levelName == "INFO":
-		level = logging.INFO
-	case levelName == "CRITICAL":
-		level = logging.CRITICAL
-	case levelName == "NOTICE":
-		level = logging.NOTICE
-	default:
-		return 0, errors.New(fmt.Sprintf("Unknown logging level %s", level))
-	}
-	return level, nil
-}
-
 func (gconfig *GlobalConfiguration) Validate() error {
 	if gconfig.LogFileName == "" {
 		gconfig.LogFileName = fmt.Sprintf("%s.log", path.Base(os.Args[0]))
 	}
-	level, err := LevelNameToLevel(gconfig.LogFileLevel)
+	level, err := logging.LogLevel(gconfig.LogFileLevel)
 	if err != nil {
 		return err
 	}

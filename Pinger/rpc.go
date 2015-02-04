@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-
+	"log"
+	"io/ioutil"
+	
 	_ "net/http/pprof"
 	"net/rpc"
 
@@ -13,11 +15,15 @@ import (
 	"runtime"
 )
 
+type pollMapType map[string]*MailPingInformation
+
 type BackendPolling struct {
 	dbm    *gorp.DbMap
 	config *Configuration
 	logger *logging.Logger
+	loggerLevel logging.Level
 	debug  bool
+	pollMap pollMapType
 }
 
 type StartPollArgs struct {
@@ -53,16 +59,15 @@ const (
 	PollingReplyWarn  = 2
 )
 
-var pollMap map[string]*MailPingInformation
-
-func init() {
-	pollMap = make(map[string]*MailPingInformation)
+func (t *BackendPolling) ToggleDebug() {
+	t.debug = !t.debug
+	t.loggerLevel = ToggleLogging(t.logger, t.loggerLevel)
 }
 
 func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingResponse) error {
 	t.logger.Debug("%s: Received StartPoll request", args.MailInfo.ClientId)
 	replyCode := PollingReplyOK
-	pi, ok := pollMap[args.MailInfo.ClientId]
+	pi, ok := t.pollMap[args.MailInfo.ClientId]
 	if ok == true {
 		if pi == nil {
 			return errors.New(fmt.Sprintf("%s: Could not find poll session in map", args.MailInfo.ClientId))
@@ -104,7 +109,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 		reply.Message = err.Error()
 		reply.Code = PollingReplyError
 	}
-	pollMap[args.MailInfo.ClientId] = args.MailInfo
+	t.pollMap[args.MailInfo.ClientId] = args.MailInfo
 	reply.Token = stopToken
 	reply.Code = replyCode
 	return nil
@@ -113,7 +118,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("Received request for %s", args.ClientId)
 	replyCode := PollingReplyOK
-	pi, ok := pollMap[args.ClientId]
+	pi, ok := t.pollMap[args.ClientId]
 	if ok == false {
 		// nothing on file.
 		reply.Message = "NotRunning"
@@ -130,7 +135,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
 			} else {
-				delete(pollMap, args.ClientId)
+				delete(t.pollMap, args.ClientId)
 				reply.Message = "Stopped"
 			}
 		}
@@ -142,7 +147,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("Received request for %s", args.ClientId)
 	replyCode := PollingReplyOK
-	pi, ok := pollMap[args.ClientId]
+	pi, ok := t.pollMap[args.ClientId]
 	if ok == false {
 		// nothing on file.
 		reply.Message = "NotRunning"
@@ -200,8 +205,12 @@ func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger
 		dbm:    dbm,
 		config: config,
 		logger: logger,
+		loggerLevel: -1,
 		debug:  debug,
+		pollMap: make(pollMapType),
 	}
+	
+	AddDebugToggleSignal(DefaultPollingContext)
 	return DefaultPollingContext, nil
 }
 
@@ -210,6 +219,8 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *logging.Lo
 	if err != nil {
 		return err
 	}
+	log.SetOutput(ioutil.Discard) // rpc.Register logs a warning for ToggleDebug, which we don't want.
+
 	rpc.Register(pollingAPI)
 	rpc.HandleHTTP()
 
