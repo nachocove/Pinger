@@ -139,14 +139,20 @@ func GetConfigAndRun() {
 	var port int
 	var bindAddress string
 	var err error
+	var printErrors bool
 
 	flag.IntVar(&port, "p", defaultPort, "The port to bind to")
 	flag.StringVar(&bindAddress, "host", defaultBindAddress, "The IP address to bind to")
 	flag.StringVar(&configFile, "c", "", "Configuration file")
 	flag.BoolVar(&debug, "d", defaultDebug, "Debug")
+	flag.BoolVar(&printErrors, "print-errors", false, "Print Error messages")
 	flag.Usage = usage
 	flag.Parse()
 
+	if printErrors {
+		printErrorsForDoc()
+		os.Exit(0)
+	}
 	if configFile == "" {
 		usage()
 		os.Exit(1)

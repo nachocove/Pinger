@@ -28,7 +28,9 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	if r.Header.Get("Content-Type") != "application/json" {
+	encodingStr := r.Header.Get("Content-Type")
+	if encodingStr != "application/json" && encodingStr != "text/json" {
+		context.Logger.Debug("Bad encoding %s", encodingStr)
 		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
 		return
 	}
@@ -43,16 +45,16 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	if postInfo.Validate() == false {
 		context.Logger.Warning("Missing non-optional data")
-		http.Error(w, "MISSING DATA", http.StatusBadRequest)
+		responseError(w, MISSING_REQUIRED_DATA)
 		return
 	}
 
 	session.Values[SessionVarClientId] = postInfo.ClientId
 
-	token, err := Pinger.StartPoll(context.RpcConnectString, &postInfo)
+	_, err = Pinger.StartPoll(context.RpcConnectString, &postInfo)
 	if err != nil {
 		context.Logger.Warning("Could not re/start polling for device %s: %s", postInfo.ClientId, err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		responseError(w, RPC_SERVER_ERROR)
 		return
 	}
 	context.Logger.Debug("Re/Started Polling for %s", postInfo.ClientId)
@@ -60,18 +62,18 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	err = session.Save(r, w)
 	if err != nil {
 		context.Logger.Warning("Could not save session")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		responseError(w, SAVE_SESSION_ERROR)
 		return
 	}
 	responseData := make(map[string]string)
-	responseData["Token"] = token
+	//responseData["Token"] = token
 	responseData["Status"] = "OK"
 	responseData["Message"] = ""
 
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
 		context.Logger.Warning("Could not json encode reply: %v", responseData)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		responseError(w, JSON_ENCODE_ERROR)
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")

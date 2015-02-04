@@ -126,7 +126,10 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 		if pi == nil {
 			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
 		}
-		if pi.validateStopToken(args.StopToken) == false {
+		//validToken := pi.validateStopToken(args.StopToken)
+		t.logger.Warning("ignoring token")
+		validToken := true
+		if validToken == false {
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
 		} else {
@@ -155,7 +158,10 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 		if pi == nil {
 			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
 		}
-		if pi.validateStopToken(args.StopToken) == false {
+		//validToken := pi.validateStopToken(args.StopToken)
+		t.logger.Warning("ignoring token")
+		validToken := true
+		if validToken == false {
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
 		} else {
