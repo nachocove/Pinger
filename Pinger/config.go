@@ -39,7 +39,7 @@ const (
 	defaultDumpRequests = false
 	defaultDebug        = false
 	defaultLogDir       = "./log"
-	defaultLogFileName  = "pinger-backend.log"
+	defaultLogFileName  = ""
 	defaultLogFileLevel = "WARNING"
 )
 
@@ -91,6 +91,7 @@ func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel logging
 		return nil, errors.New(fmt.Sprintf("Logging directory %s does not exist.\n", gconfig.LogDir))
 	}
 	loggerName := os.Args[0]
+	fmt.Printf("loggerName: %s, logfile %s\n", loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName))
 	return InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel)
 }
 

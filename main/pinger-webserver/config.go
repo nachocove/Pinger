@@ -190,7 +190,7 @@ func GetConfigAndRun() {
 		sessions.NewCookieStore([]byte(config.Server.SessionSecret)))
 	err = context.run()
 	if err != nil {
-		logger.Error("Could not run server!")
+		logger.Error("Could not run server! %v", err)
 		os.Exit(1)
 	}
 	logger.Info("Exiting Server.\n")
