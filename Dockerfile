@@ -11,6 +11,6 @@ USER nachocove
 WORKDIR /srv/pinger
 RUN go get -u -f github.com/nachocove/Pinger/...
 RUN mkdir -p ./log
-ENTRYPOINT supervisord -c ./config/supervisord.conf
+ENTRYPOINT supervisord --nodaemon -c ./config/supervisord.conf
 #USER root
 EXPOSE 8443 8080
