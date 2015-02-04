@@ -72,7 +72,7 @@ func LevelNameToLevel(levelName string) (logging.Level, error) {
 
 func (gconfig *GlobalConfiguration) Validate() error {
 	if gconfig.LogFileName == "" {
-		gconfig.LogFileName = fmt.Sprintf("%s.log", os.Args[0])
+		gconfig.LogFileName = fmt.Sprintf("%s.log", path.Base(os.Args[0]))
 	}
 	level, err := LevelNameToLevel(gconfig.LogFileLevel)
 	if err != nil {
@@ -90,8 +90,7 @@ func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel logging
 	if !exists(gconfig.LogDir) {
 		return nil, errors.New(fmt.Sprintf("Logging directory %s does not exist.\n", gconfig.LogDir))
 	}
-	loggerName := os.Args[0]
-	fmt.Printf("loggerName: %s, logfile %s\n", loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName))
+	loggerName := path.Base(os.Args[0])
 	return InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel)
 }
 

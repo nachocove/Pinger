@@ -66,9 +66,6 @@ func (config *Configuration) Read(filename string) error {
 	if err != nil {
 		return err
 	}
-	if config.Global.LogFileName == "" {
-		config.Global.LogFileName = fmt.Sprintf("%s.log", os.Args[0])
-	}
 	return nil
 }
 
