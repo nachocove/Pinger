@@ -40,7 +40,7 @@ const (
 	defaultDebug        = false
 	defaultLogDir       = "./log"
 	defaultLogFileName  = ""
-	defaultLogFileLevel = "WARNING"
+	defaultLogFileLevel = "INFO"
 )
 
 func NewConfiguration() *Configuration {
@@ -91,7 +91,12 @@ func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel logging
 		return nil, errors.New(fmt.Sprintf("Logging directory %s does not exist.\n", gconfig.LogDir))
 	}
 	loggerName := path.Base(os.Args[0])
-	return InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel)
+	logger, err := InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel)
+	if err != nil {
+		return nil, err
+	}
+	logger.Info("Started logging %s %v", gconfig.LogFileLevel, os.Args)
+	return logger, nil
 }
 
 func ReadConfig(filename string) (*Configuration, error) {
