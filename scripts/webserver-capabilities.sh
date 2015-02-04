@@ -5,4 +5,4 @@ if [ -z $GOPATH ] ; then
     exit 1
 fi
 
-sudo setcap 'cap_net_bind_service=+ep' $GOPATH/bin/webserver
+sudo setcap 'cap_net_bind_service=+ep' $GOPATH/bin/pinger-webserver
