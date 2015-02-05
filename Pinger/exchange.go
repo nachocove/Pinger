@@ -241,13 +241,13 @@ func (ex *ExchangeClient) startLongPoll() {
 				continue
 			}
 		}
+		if stopPolling == true {
+			break
+		}
 
 		if sleepTime.Seconds() > 0.0 {
 			ex.logger.Debug("%s: sleeping %fs before next attempt", logPrefix, sleepTime.Seconds())
 			time.Sleep(sleepTime)
-		}
-		if stopPolling == true {
-			break
 		}
 	}
 }
