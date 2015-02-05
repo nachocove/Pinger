@@ -87,9 +87,8 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	requestData, err := httputil.DumpRequest(r, true)
-	if err == nil {
-		// TODO Remove this after interop testing! This is an error so we never forget.
-		context.Logger.Error("Received request\n%s", string(requestData))
+	if context.Config.Global.DumpRequests && err == nil {
+		context.Logger.Debug("Received request\n%s", string(requestData))
 	}
 
 	encodingStr := r.Header.Get("Content-Type")

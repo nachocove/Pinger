@@ -39,12 +39,6 @@ type ServerConfiguration struct {
 	SessionSecret  string `gcfg:"session-secret"`
 }
 
-type GlobalConfiguration struct {
-	Debug       bool
-	LogDir      string
-	LogFileName string
-}
-
 type RPCServerConfiguration struct {
 	Hostname string
 	Port     int
