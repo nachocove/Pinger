@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httputil"
 
 	"github.com/nachocove/Pinger/Pinger"
 )
@@ -85,6 +86,12 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+	requestData, err := httputil.DumpRequest(r, true)
+	if err == nil {
+		// TODO Remove this after interop testing! This is an error so we never forget.
+		context.Logger.Error("Received request\n%s", string(requestData))
+	}
+
 	encodingStr := r.Header.Get("Content-Type")
 	postInfo := registerPostData{}
 	switch {
@@ -102,6 +109,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
 		return
 	}
+	
 	if postInfo.Validate() == false {
 		context.Logger.Warning("Missing non-optional data")
 		responseError(w, MISSING_REQUIRED_DATA)
