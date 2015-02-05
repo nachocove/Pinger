@@ -11,6 +11,10 @@ import (
 	"github.com/coopernurse/gorp"
 )
 
+const (
+	PushServiceAPNS = "APNS"
+)
+
 type DeviceInfo struct {
 	Id             int64  `db:"id"`
 	Created        int64  `db:"created"`

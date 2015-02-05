@@ -131,7 +131,6 @@ func (context *Context) ToggleDebug() {
 	context.loggerLevel = Pinger.ToggleLogging(context.Logger, context.loggerLevel)
 }
 
-
 // GetConfigAndRun process command line arguments and run the server
 func GetConfigAndRun() {
 	var configFile string
@@ -236,9 +235,9 @@ func (context *Context) run() error {
 			context.Logger.Fatalf("Could not start server on port %d\n", config.Server.NonTlsPort)
 		}
 	}()
-	
+
 	Pinger.AddDebugToggleSignal(context)
-	
+
 	// start the https server
 	err := http.ListenAndServeTLS(addr, config.Server.ServerCertFile, config.Server.ServerKeyFile, httpsMiddlewares)
 	return err

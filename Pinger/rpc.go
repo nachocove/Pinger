@@ -3,10 +3,10 @@ package Pinger
 import (
 	"errors"
 	"fmt"
-	"net/http"
-	"log"
 	"io/ioutil"
-	
+	"log"
+	"net/http"
+
 	_ "net/http/pprof"
 	"net/rpc"
 
@@ -18,12 +18,12 @@ import (
 type pollMapType map[string]*MailPingInformation
 
 type BackendPolling struct {
-	dbm    *gorp.DbMap
-	config *Configuration
-	logger *logging.Logger
+	dbm         *gorp.DbMap
+	config      *Configuration
+	logger      *logging.Logger
 	loggerLevel logging.Level
-	debug  bool
-	pollMap pollMapType
+	debug       bool
+	pollMap     pollMapType
 }
 
 type StartPollArgs struct {
@@ -208,14 +208,14 @@ func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger
 		return nil, err
 	}
 	DefaultPollingContext = &BackendPolling{
-		dbm:    dbm,
-		config: config,
-		logger: logger,
+		dbm:         dbm,
+		config:      config,
+		logger:      logger,
 		loggerLevel: -1,
-		debug:  debug,
-		pollMap: make(pollMapType),
+		debug:       debug,
+		pollMap:     make(pollMapType),
 	}
-	
+
 	AddDebugToggleSignal(DefaultPollingContext)
 	return DefaultPollingContext, nil
 }

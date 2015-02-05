@@ -58,7 +58,7 @@ func ToggleLogging(logger *logging.Logger, previousLevel logging.Level) logging.
 		} else {
 			return -1
 		}
-		
+
 	case previousLevel != currentLevel:
 		logging.SetLevel(previousLevel, logger.Module)
 		logger.Warning("Logger-%s: Resetting logging to %d\n", logger.Module, previousLevel)

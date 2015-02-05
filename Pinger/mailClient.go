@@ -5,16 +5,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/op/go-logging"
 	"github.com/twinj/uuid"
+	"strings"
 	"sync"
 )
 
-// MailClientType the type of the mail client
-type MailClientType string
-
 const (
-	MailClientExchange MailClientType = "exchange"
+	MailClientActivesync = "ActiveSync"
 )
 
 type MailClientStatus int
@@ -30,21 +29,22 @@ type MailClient interface {
 	Status() (MailClientStatus, error)
 }
 
+// MailPingInformation the bag of information we get from the client. None of this is saved in the DB.
 type MailPingInformation struct {
 	ClientId               string
 	Platform               string
 	MailServerUrl          string
-	MailServerCredentials  string            // json encoded, presumably {"username": <foo>, "password": <bar>}
-	Protocol               string            // usually http (is this needed?)
+	MailServerCredentials  string // json encoded, presumably {"username": <foo>, "password": <bar>}
+	Protocol               string
 	HttpHeaders            map[string]string // optional
 	HttpRequestData        []byte
 	HttpExpectedReply      []byte
 	HttpNoChangeReply      []byte
-	CommandTerminator      []byte
-	CommandAcknowledgement []byte
-	ResponseTimeout        int64
-	WaitBeforeUse          int64
-	PushToken              string
+	CommandTerminator      []byte // used by imap
+	CommandAcknowledgement []byte // used by imap
+	ResponseTimeout        int64  // in seconds
+	WaitBeforeUse          int64  // in seconds
+	PushToken              string // platform dependent push token
 	PushService            string // APNS, AWS, GCM, etc.
 
 	// private
@@ -110,10 +110,21 @@ func (pi *MailPingInformation) validateStopToken(token string) bool {
 }
 
 func (pi *MailPingInformation) start(debug, doStats bool, logger *logging.Logger) (string, error) {
-	client, err := NewExchangeClient(pi, debug, doStats, logger)
-	if err != nil {
-		return "", err
+	var client MailClient
+	var err error
+
+	switch {
+	case strings.EqualFold(pi.Protocol, MailClientActivesync):
+		client, err = NewExchangeClient(pi, debug, doStats, logger)
+		if err != nil {
+			return "", err
+		}
+	default:
+		msg := fmt.Sprintf("Unsupported Mail Protocol %s", pi.Protocol)
+		logger.Error(msg)
+		return "", errors.New(msg)
 	}
+
 	if client == nil {
 		return "", errors.New("Could not create new Mail Client Pinger")
 	}

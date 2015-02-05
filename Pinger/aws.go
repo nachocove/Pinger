@@ -6,6 +6,7 @@ import (
 	"github.com/awslabs/aws-sdk-go/aws"
 	cognitoidentity "github.com/awslabs/aws-sdk-go/gen/cognito/identity"
 	"github.com/awslabs/aws-sdk-go/gen/sns"
+	"strings"
 )
 
 type AWSConfiguration struct {
@@ -43,7 +44,7 @@ func (config *AWSConfiguration) getSNSSession() (*sns.SNS, error) {
 
 func (config *AWSConfiguration) registerEndpointArn(service, token, customerData string) (string, error) {
 	var platformArn string
-	if service == "APNS" {
+	if strings.EqualFold(service, PushServiceAPNS) {
 		platformArn = config.SnsIOSPlatformArn
 	} else {
 		return "", errors.New(fmt.Sprintf("Unsupported platform service %s", service))

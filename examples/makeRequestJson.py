@@ -17,6 +17,7 @@ def main(args):
                    "ResponseTimeout": args.timeout,
                    "MailServerUrl": args.url,
                    "MailServerCredentials": json.dumps(credentials),
+                   "Protocol": args.protocol,
                    "PushToken": args.push_token,
                    "PushService": args.push_service,
                    "ClientId": args.client_id,
@@ -35,6 +36,7 @@ if __name__ == "__main__":
     parser.add_argument('--username', help="The username")
     parser.add_argument('--password', help="the password")
     parser.add_argument('--url', help="The host URL")
+    parser.add_argument('--protocol', help="The email protocols")
     parser.add_argument('--wait-before-use', type=int, default=30, help='Time (in seconds) to wait before starting to poll')
     parser.add_argument('--timeout', type=int, default=600, help='Time (in seconds) to wait for a response')
     parser.add_argument('--push-token', help='The Push Token (platform dependent)')

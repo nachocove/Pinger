@@ -1,11 +1,11 @@
 package Pinger
 
 import (
-	"syscall"
-	"os"
-	"sync"
 	"fmt"
+	"os"
 	"os/signal"
+	"sync"
+	"syscall"
 )
 
 type SignalDebugToggle interface {
@@ -30,8 +30,7 @@ func initUsr1Catcher() {
 		go usr1Catcher()
 		usr1MutexInitialized = true
 	}
-} 
-
+}
 
 func AddDebugToggleSignal(f SignalDebugToggle) {
 	initUsr1Catcher()
@@ -43,7 +42,7 @@ func usr1Catcher() {
 		signal := <-usr1Channel
 		switch {
 		case signal == syscall.SIGUSR1:
-			for _,f := range usr1Signalhandlers {
+			for _, f := range usr1Signalhandlers {
 				f.ToggleDebug()
 			}
 		default:
