@@ -15,6 +15,63 @@ func init() {
 
 const SessionVarClientId = "ClientId"
 
+// registerPostCredentials and registerPostData are (currently) mirror images
+// of Pinger.MailPingInformation and Pinger.MailServerCredentials
+// This is so that we can change the json interface without needing to touch
+// the underlying Pinger code.
+// That being said, there has to be a better way of doing this...
+type registerPostCredentials struct {
+	Username string
+	Password string
+}
+type registerPostData struct {
+	ClientId               string
+	Platform               string
+	MailServerUrl          string
+	MailServerCredentials  registerPostCredentials
+	Protocol               string
+	HttpHeaders            map[string]string // optional
+	HttpRequestData        []byte
+	HttpExpectedReply      []byte
+	HttpNoChangeReply      []byte
+	CommandTerminator      []byte // used by imap
+	CommandAcknowledgement []byte // used by imap
+	ResponseTimeout        int64  // in seconds
+	WaitBeforeUse          int64  // in seconds
+	PushToken              string // platform dependent push token
+	PushService            string // APNS, AWS, GCM, etc.
+}
+
+// Validate validate the structure/information to make sure required information exists.
+func (pd *registerPostData) Validate() bool {
+	return (pd.ClientId != "" &&
+		pd.MailServerUrl != "" &&
+		len(pd.HttpRequestData) > 0 &&
+		len(pd.HttpExpectedReply) > 0)
+}
+
+func (pd *registerPostData) AsMailInfo() *Pinger.MailPingInformation {
+	// there's got to be a better way to do this...
+	pi := Pinger.MailPingInformation{}
+	pi.ClientId = pd.ClientId
+	pi.Platform = pd.Platform
+	pi.MailServerUrl = pd.MailServerUrl
+	pi.MailServerCredentials.Username = pd.MailServerCredentials.Username
+	pi.MailServerCredentials.Password = pd.MailServerCredentials.Password
+	pi.Protocol = pd.Protocol
+	pi.HttpHeaders = pd.HttpHeaders
+	pi.HttpRequestData = pd.HttpRequestData
+	pi.HttpExpectedReply = pd.HttpExpectedReply
+	pi.HttpNoChangeReply = pd.HttpNoChangeReply
+	pi.CommandTerminator = pd.CommandTerminator
+	pi.CommandAcknowledgement = pd.CommandAcknowledgement
+	pi.ResponseTimeout = pd.ResponseTimeout
+	pi.WaitBeforeUse = pd.WaitBeforeUse
+	pi.PushToken = pd.PushToken
+	pi.PushService = pd.PushService
+	return &pi
+}
+
 func registerDevice(w http.ResponseWriter, r *http.Request) {
 	context := GetContext(r)
 	if r.Method != "POST" {
@@ -29,18 +86,20 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	encodingStr := r.Header.Get("Content-Type")
-	if encodingStr != "application/json" && encodingStr != "text/json" {
+	postInfo := registerPostData{}
+	switch {
+	case encodingStr == "application/json" || encodingStr == "text/json":
+		decoder := json.NewDecoder(r.Body)
+		err = decoder.Decode(&postInfo)
+		if err != nil {
+			context.Logger.Error("Could not parse json %s", err)
+			http.Error(w, "Could not parse json", http.StatusBadRequest)
+			return
+		}
+		
+	default:
 		context.Logger.Debug("Bad encoding %s", encodingStr)
 		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
-		return
-	}
-
-	postInfo := Pinger.MailPingInformation{}
-	decoder := json.NewDecoder(r.Body)
-	err = decoder.Decode(&postInfo)
-	if err != nil {
-		context.Logger.Error("Could not parse json %s", err)
-		http.Error(w, "Could not parse json", http.StatusBadRequest)
 		return
 	}
 	if postInfo.Validate() == false {
@@ -51,7 +110,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 	session.Values[SessionVarClientId] = postInfo.ClientId
 
-	_, err = Pinger.StartPoll(context.RpcConnectString, &postInfo)
+	_, err = Pinger.StartPoll(context.RpcConnectString, postInfo.AsMailInfo())
 	if err != nil {
 		context.Logger.Warning("Could not re/start polling for device %s: %s", postInfo.ClientId, err)
 		responseError(w, RPC_SERVER_ERROR)

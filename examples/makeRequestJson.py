@@ -17,7 +17,7 @@ def register_payload(args):
     jsonPayload = {"WaitBeforeUse": args.wait_before_use,
                    "ResponseTimeout": args.timeout,
                    "MailServerUrl": args.url,
-                   "MailServerCredentials": json.dumps(credentials),
+                   "MailServerCredentials": credentials,
                    "Protocol": args.protocol,
                    "PushToken": args.push_token,
                    "PushService": args.push_service,

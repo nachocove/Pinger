@@ -29,12 +29,17 @@ type MailClient interface {
 	Status() (MailClientStatus, error)
 }
 
+type MailServerCredentials struct {
+	Username string
+	Password string
+}
+
 // MailPingInformation the bag of information we get from the client. None of this is saved in the DB.
 type MailPingInformation struct {
 	ClientId               string
 	Platform               string
 	MailServerUrl          string
-	MailServerCredentials  string // json encoded, presumably {"username": <foo>, "password": <bar>}
+	MailServerCredentials  MailServerCredentials
 	Protocol               string
 	HttpHeaders            map[string]string // optional
 	HttpRequestData        []byte
@@ -59,7 +64,7 @@ func (pi *MailPingInformation) status() (MailClientStatus, error) {
 
 func (pi *MailPingInformation) String() string {
 	mailcopy := *pi
-	mailcopy.MailServerCredentials = "REDACTED"
+	mailcopy.MailServerCredentials.Password = "REDACTED"
 	jsonstring, err := json.Marshal(mailcopy)
 	if err != nil {
 		panic("Could not encode struct")
@@ -71,21 +76,10 @@ func (pi *MailPingInformation) String() string {
 func (pi *MailPingInformation) Validate() bool {
 	return (pi.ClientId != "" &&
 		pi.MailServerUrl != "" &&
-		pi.MailServerCredentials != "" &&
+		pi.MailServerCredentials.Username != "" &&
+		pi.MailServerCredentials.Password != "" &&
 		len(pi.HttpRequestData) > 0 &&
 		len(pi.HttpExpectedReply) > 0)
-}
-
-func (pi *MailPingInformation) userCredentials() (map[string]string, error) {
-	if pi._userCredentials == nil {
-		data := make(map[string]string)
-		err := json.Unmarshal([]byte(pi.MailServerCredentials), &data)
-		if err != nil {
-			return nil, err
-		}
-		pi._userCredentials = data
-	}
-	return pi._userCredentials, nil
 }
 
 func UserSha256(username string) string {

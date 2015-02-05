@@ -64,19 +64,7 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
 
-	credentials, err := ex.pi.userCredentials()
-	if err != nil {
-		return nil, err
-	}
-	username, ok := credentials["Username"]
-	if ok == false {
-		return nil, errors.New("No Username in credentials")
-	}
-	password, ok := credentials["Password"]
-	if ok == false {
-		return nil, errors.New("No Password in credentials")
-	}
-	req.SetBasicAuth(username, password)
+	req.SetBasicAuth(ex.pi.MailServerCredentials.Username, ex.pi.MailServerCredentials.Password)
 	return req, nil
 }
 
