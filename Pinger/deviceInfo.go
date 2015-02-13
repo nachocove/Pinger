@@ -117,12 +117,10 @@ func init() {
 		if inter.HardwareAddr.String() == "" {
 			continue
 		}
-		fmt.Printf("Using %s for hostid inteface\n", inter.Name)
 		hash := sha256.New()
 		hash.Write(inter.HardwareAddr)
 		md := hash.Sum(nil)
 		pingerHostId = hex.EncodeToString(md)
-		fmt.Printf("Host ID is %s\n", pingerHostId)
 		break
 	}
 }
