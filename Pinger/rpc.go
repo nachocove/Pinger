@@ -72,6 +72,12 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 		if pi == nil {
 			return errors.New(fmt.Sprintf("%s: Could not find poll session in map", args.MailInfo.ClientId))
 		}
+		err := updateLastContact(t.dbm, args.MailInfo.ClientId)
+		if err != nil {
+			reply.Message = err.Error()
+			reply.Code = PollingReplyError
+			return nil
+		}
 		t.logger.Debug("%s: Found Existing polling session", args.MailInfo.ClientId)
 		status, err := pi.status()
 		if status != MailClientStatusPinging || err != nil {
@@ -126,6 +132,12 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 		if pi == nil {
 			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
 		}
+		err := updateLastContact(t.dbm, args.ClientId)
+		if err != nil {
+			reply.Message = err.Error()
+			reply.Code = PollingReplyError
+			return nil
+		}
 		//validToken := pi.validateStopToken(args.StopToken)
 		t.logger.Warning("ignoring token")
 		validToken := true
@@ -157,6 +169,12 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 	} else {
 		if pi == nil {
 			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
+		}
+		err := updateLastContact(t.dbm, args.ClientId)
+		if err != nil {
+			reply.Message = err.Error()
+			reply.Code = PollingReplyError
+			return nil
 		}
 		//validToken := pi.validateStopToken(args.StopToken)
 		t.logger.Warning("ignoring token")

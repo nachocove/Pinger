@@ -22,6 +22,8 @@ type DeviceInfo struct {
 	Id             int64  `db:"id"`
 	Created        int64  `db:"created"`
 	Updated        int64  `db:"updated"`
+	LastContact    int64  `db:"last_contact"`
+	
 	ClientId       string `db:"client_id"`       // us-east-1a-XXXXXXXX
 	Platform       string `db:"device_platform"` // "ios", "android", etc..
 	PushToken      string `db:"push_token"`
@@ -48,6 +50,9 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 	cMap = tMap.ColMap("Updated")
 	cMap.SetNotNull(true)
 
+	cMap = tMap.ColMap("LastContact")
+	cMap.SetNotNull(true)
+
 	cMap = tMap.ColMap("ClientId")
 	cMap.SetUnique(true)
 	cMap.SetNotNull(true)
@@ -60,6 +65,9 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 	cMap.SetNotNull(true)
 
 	cMap = tMap.ColMap("PushService")
+	cMap.SetNotNull(true)
+
+	cMap = tMap.ColMap("Pinger")
 	cMap.SetNotNull(true)
 
 	return nil
@@ -175,12 +183,17 @@ func getAllMyDeviceInfo(dbm *gorp.DbMap) ([]DeviceInfo, error) {
 
 func (di *DeviceInfo) PreUpdate(s gorp.SqlExecutor) error {
 	di.Updated = time.Now().UnixNano()
+	if di.Pinger == "" {
+		di.Pinger = pingerHostId
+	}
 	return di.validate()
 }
 
 func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
 	di.Created = time.Now().UnixNano()
 	di.Updated = di.Created
+	di.LastContact = di.Created
+	
 	if di.Pinger == "" {
 		di.Pinger = pingerHostId
 	}
@@ -191,6 +204,19 @@ func (di *DeviceInfo) setDbm(dbm *gorp.DbMap) {
 	di.dbm = dbm
 }
 
+func updateLastContact(dbm *gorp.DbMap, clientId string) error {
+	di, err := getDeviceInfo(dbm, clientId)
+	if err != nil {
+		return err
+	}
+	di.LastContact = time.Now().UnixNano()
+	_, err = di.update()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+	
 func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation) error {
 	var err error
 	di, err := getDeviceInfo(dbm, pi.ClientId)
