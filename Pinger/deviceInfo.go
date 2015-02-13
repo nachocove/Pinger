@@ -23,6 +23,7 @@ type DeviceInfo struct {
 	Created        int64  `db:"created"`
 	Updated        int64  `db:"updated"`
 	LastContact    int64  `db:"last_contact"`
+	LastContactRequest    int64  `db:"last_contact_request"`
 	
 	ClientId       string `db:"client_id"`       // us-east-1a-XXXXXXXX
 	Platform       string `db:"device_platform"` // "ios", "android", etc..
@@ -299,10 +300,14 @@ func (di *DeviceInfo) push(message string) error {
 		err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, message)
 
 	case di.Enabled == false:
-		return errors.New("Endpoint is disabled")
+		err = errors.New("Endpoint is disabled")
 
 	default:
-		return errors.New(fmt.Sprintf("Unsupported push service: %s", di.PushService))
+		err = errors.New(fmt.Sprintf("Unsupported push service: %s", di.PushService))
+	}
+	if err == nil {
+		di.LastContactRequest = time.Now().UnixNano()
+		_, err = di.update()	
 	}
 	return err
 }
