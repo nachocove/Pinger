@@ -1,9 +1,12 @@
 package Pinger
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"reflect"
 	"regexp"
 	"time"
@@ -25,6 +28,7 @@ type DeviceInfo struct {
 	PushService    string `db:"push_service"` // APNS, GCM, ...
 	AWSEndpointArn string `db:"aws_endpoint_arn"`
 	Enabled        bool   `db:"enabled"`
+	Pinger         string `db:"pinger"`
 
 	dbm *gorp.DbMap `db:"-"`
 }
@@ -93,18 +97,44 @@ func newDeviceInfo(clientID, pushToken, pushService, platform string) (*DeviceIn
 	return di, nil
 }
 
+var pingerHostId string
+
+func init() {
+	interfaces, _ := net.Interfaces()
+	for _, inter := range interfaces {
+		if inter.Name[0:2] == "lo" {
+			continue
+		}
+		if inter.HardwareAddr.String() == "" {
+			continue
+		}
+		fmt.Printf("Using %s for hostid inteface\n", inter.Name)
+		hash := sha256.New()
+		hash.Write(inter.HardwareAddr)
+		md := hash.Sum(nil)
+		pingerHostId = hex.EncodeToString(md)
+		fmt.Printf("Host ID is %s\n", pingerHostId)
+		break
+	}
+}
+
 func getDeviceInfo(dbm *gorp.DbMap, clientId string) (*DeviceInfo, error) {
 	s := reflect.TypeOf(DeviceInfo{})
-	field, ok := s.FieldByName("ClientId")
+	clientIdField, ok := s.FieldByName("ClientId")
 	if ok == false {
 		return nil, errors.New("Could not get ClientId Field information")
+	}
+	pingerField, ok := s.FieldByName("Pinger")
+	if ok == false {
+		return nil, errors.New("Could not get Pinger Field information")
 	}
 	var devices []DeviceInfo
 	var err error
 	_, err = dbm.Select(
 		&devices,
-		fmt.Sprintf("select * from %s where %s=?", s.Name(), field.Tag.Get("db")),
-		clientId)
+		fmt.Sprintf("select * from %s where %s=? and %s=?", s.Name(),
+			clientIdField.Tag.Get("db"), pingerField.Tag.Get("db")),
+		clientId, pingerHostId)
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +155,24 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId string) (*DeviceInfo, error) {
 	}
 }
 
+func getAllMyDeviceInfo(dbm *gorp.DbMap) ([]DeviceInfo, error) {
+	s := reflect.TypeOf(DeviceInfo{})
+	pingerField, ok := s.FieldByName("Pinger")
+	if ok == false {
+		return nil, errors.New("Could not get Pinger Field information")
+	}
+	var devices []DeviceInfo
+	var err error
+	_, err = dbm.Select(
+		&devices,
+		fmt.Sprintf("select * from %s where %s=?", s.Name(), pingerField.Tag.Get("db")),
+		pingerHostId)
+	if err != nil {
+		return nil, err
+	}
+	return devices, nil
+}
+
 func (di *DeviceInfo) PreUpdate(s gorp.SqlExecutor) error {
 	di.Updated = time.Now().UnixNano()
 	return di.validate()
@@ -133,6 +181,9 @@ func (di *DeviceInfo) PreUpdate(s gorp.SqlExecutor) error {
 func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
 	di.Created = time.Now().UnixNano()
 	di.Updated = di.Created
+	if di.Pinger == "" {
+		di.Pinger = pingerHostId
+	}
 	return di.validate()
 }
 
