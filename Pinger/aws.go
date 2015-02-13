@@ -112,15 +112,12 @@ func (config *AWSConfiguration) validateCognitoId(clientId string) error {
 		return err
 	}
 	input := cognitoidentity.DescribeIdentityInput{IdentityID: aws.StringValue(&clientId)}
-	_, err = cognitoSession.DescribeIdentity(&input)
+	response, err := cognitoSession.DescribeIdentity(&input)
 	if err != nil {
-		// TODO There appears to be a bug either in amazon or the go toolkit. it's returning
-		// {"CreationDate":1.421516513393E9,"IdentityId":"us-east-1:0005d365-c8ea-470f-8a61-a7f44f145efb","LastModifiedDate":1.421516513393E9}
-		// And chokes on those odd-looking datetime fields.
-		// For now I've hacked the toolkit to pass back the numbers instead of interpreting them
-		//return err
-		fmt.Printf("ERROR(ignored): %v\n", err)
-		return nil
+		return err
+	}
+	if string(*response.IdentityID) == "" {
+		return errors.New("No IdentityId returned.")
 	}
 	return nil
 }
