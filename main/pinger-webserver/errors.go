@@ -69,7 +69,7 @@ func printErrorsForDoc() {
 	}
 	jsonStr, err := json.Marshal(errArray)
 	if err != nil {
-		fmt.Println("Could not marshall json: %v", err)
+		fmt.Printf("Could not marshall json: %v\n", err)
 		return
 	}
 	fmt.Println(string(jsonStr))

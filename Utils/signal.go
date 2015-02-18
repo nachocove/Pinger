@@ -46,7 +46,7 @@ func usr1Catcher() {
 				f.ToggleDebug()
 			}
 		default:
-			fmt.Fprintf(os.Stderr, "Received unexpected signal %d\n", signal)
+			fmt.Fprintf(os.Stderr, "Received unexpected signal %s\n", signal.String())
 		}
 	}
 }
