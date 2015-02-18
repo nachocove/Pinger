@@ -11,9 +11,9 @@ import (
 	"net/rpc"
 
 	"github.com/coopernurse/gorp"
+	"github.com/nachocove/Pinger/Utils"
 	"github.com/op/go-logging"
 	"runtime"
-	"github.com/nachocove/Pinger/Utils"
 )
 
 type pollMapType map[string]*MailPingInformation
