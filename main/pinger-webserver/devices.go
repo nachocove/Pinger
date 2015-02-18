@@ -146,7 +146,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 	case reply.Code == Pinger.PollingReplyWarn:
 		//responseData["Token"] = token
-		responseData["Status"] = "OK"
+		responseData["Status"] = "WARN"
 		responseData["Message"] = reply.Message
 		
 	default:
@@ -203,7 +203,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 		return
 	}
-	reply, err := Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.StopToken)
+	reply, err := Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.Timeout, deferData.StopToken)
 	if err != nil {
 		context.Logger.Error("Error deferring poll %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -220,7 +220,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		responseData["Message"] = ""
 	
 	case reply.Code == Pinger.PollingReplyWarn:
-		responseData["Status"] = "OK"
+		responseData["Status"] = "WARN"
 		responseData["Message"] = reply.Message
 		
 	default:

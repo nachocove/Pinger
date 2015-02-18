@@ -53,20 +53,20 @@ func stopPoll(rpcClient *rpc.Client, clientId string) (*PollingResponse, error) 
 	return &reply, nil
 }
 
-func DeferPoll(rpcserver, clientId, token string) (*PollingResponse, error) {
+func DeferPoll(rpcserver, clientId string, timeout int64, token string) (*PollingResponse, error) {
 	client, err := getRpcClient(rpcserver)
 	if err != nil {
 		return nil, err
 	}
-	return deferPoll(client, clientId, token)
+	return deferPoll(client, clientId, timeout, token)
 }
 
-func deferPoll(rpcClient *rpc.Client, clientId, token string) (*PollingResponse, error) {
+func deferPoll(rpcClient *rpc.Client, clientId string, timeout int64, token string) (*PollingResponse, error) {
 	if rpcClient == nil {
 		panic("Can not call startPoll without rpcClient set")
 	}
 	var reply PollingResponse
-	err := rpcClient.Call("BackendPolling.Defer", &DeferPollArgs{ClientId: clientId, StopToken: token}, &reply)
+	err := rpcClient.Call("BackendPolling.Defer", &DeferPollArgs{ClientId: clientId, Timeout: timeout, StopToken: token}, &reply)
 	if err != nil {
 		return nil, err
 	}
