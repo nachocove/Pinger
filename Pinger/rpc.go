@@ -81,7 +81,6 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 		}
 		t.logger.Debug("%s: Found Existing polling session", args.MailInfo.ClientId)
 		status, err := pi.status()
-		t.logger.Debug("Found status %d", status)
 		if status != MailClientStatusPinging || err != nil {
 			t.logger.Debug("%s: Not polling. Last error was %s", args.MailInfo.ClientId, err)
 			reply.Message = fmt.Sprintf("Previous Ping failed with error: %s", err.Error())
