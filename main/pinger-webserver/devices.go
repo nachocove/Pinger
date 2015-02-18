@@ -104,13 +104,13 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Could not parse json", http.StatusBadRequest)
 			return
 		}
-		
+
 	default:
 		context.Logger.Debug("Bad encoding %s", encodingStr)
 		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
 		return
 	}
-	
+
 	if postInfo.Validate() == false {
 		context.Logger.Warning("Missing non-optional data")
 		responseError(w, MISSING_REQUIRED_DATA)
@@ -134,7 +134,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	responseData := make(map[string]string)
-	
+
 	switch {
 	case reply.Code == Pinger.PollingReplyOK:
 		//responseData["Token"] = token
@@ -149,13 +149,13 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		//responseData["Token"] = token
 		responseData["Status"] = "WARN"
 		responseData["Message"] = reply.Message
-		
+
 	default:
 		context.Logger.Error("Unknown PollingReply Code %d", reply.Code)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
 		context.Logger.Warning("Could not json encode reply: %v", responseData)
@@ -219,17 +219,17 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	case reply.Code == Pinger.PollingReplyOK:
 		responseData["Status"] = "OK"
 		responseData["Message"] = ""
-	
+
 	case reply.Code == Pinger.PollingReplyWarn:
 		responseData["Status"] = "WARN"
 		responseData["Message"] = reply.Message
-		
+
 	default:
 		context.Logger.Error("Unknown PollingReply Code %d", reply.Code)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
 		context.Logger.Warning("Could not json encode reply: %v", responseData)
