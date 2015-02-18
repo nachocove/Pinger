@@ -19,12 +19,12 @@ const (
 )
 
 type DeviceInfo struct {
-	Id             int64  `db:"id"`
-	Created        int64  `db:"created"`
-	Updated        int64  `db:"updated"`
-	LastContact    int64  `db:"last_contact"`
-	LastContactRequest    int64  `db:"last_contact_request"`
-	
+	Id                 int64 `db:"id"`
+	Created            int64 `db:"created"`
+	Updated            int64 `db:"updated"`
+	LastContact        int64 `db:"last_contact"`
+	LastContactRequest int64 `db:"last_contact_request"`
+
 	ClientId       string `db:"client_id"`       // us-east-1a-XXXXXXXX
 	Platform       string `db:"device_platform"` // "ios", "android", etc..
 	PushToken      string `db:"push_token"`
@@ -192,7 +192,7 @@ func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
 	di.Created = time.Now().UnixNano()
 	di.Updated = di.Created
 	di.LastContact = di.Created
-	
+
 	if di.Pinger == "" {
 		di.Pinger = pingerHostId
 	}
@@ -215,7 +215,7 @@ func updateLastContact(dbm *gorp.DbMap, clientId string) error {
 	}
 	return nil
 }
-	
+
 func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation) error {
 	var err error
 	di, err := getDeviceInfo(dbm, pi.ClientId)
@@ -305,7 +305,7 @@ func (di *DeviceInfo) push(message string) error {
 	}
 	if err == nil {
 		di.LastContactRequest = time.Now().UnixNano()
-		_, err = di.update()	
+		_, err = di.update()
 	}
 	return err
 }
