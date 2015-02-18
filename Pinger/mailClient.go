@@ -37,6 +37,7 @@ type MailServerCredentials struct {
 // MailPingInformation the bag of information we get from the client. None of this is saved in the DB.
 type MailPingInformation struct {
 	ClientId               string
+	ClientContext          string
 	Platform               string
 	MailServerUrl          string
 	MailServerCredentials  MailServerCredentials

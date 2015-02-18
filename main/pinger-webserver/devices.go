@@ -27,7 +27,7 @@ type registerPostCredentials struct {
 }
 type registerPostData struct {
 	ClientId               string
-	ClientContext          []byte
+	ClientContext          string
 	Platform               string
 	MailServerUrl          string
 	MailServerCredentials  registerPostCredentials
@@ -56,6 +56,7 @@ func (pd *registerPostData) AsMailInfo() *Pinger.MailPingInformation {
 	// there's got to be a better way to do this...
 	pi := Pinger.MailPingInformation{}
 	pi.ClientId = pd.ClientId
+	pi.ClientContext = pd.ClientContext
 	pi.Platform = pd.Platform
 	pi.MailServerUrl = pd.MailServerUrl
 	pi.MailServerCredentials.Username = pd.MailServerCredentials.Username

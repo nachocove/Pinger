@@ -270,7 +270,7 @@ func (ex *ExchangeClient) run() {
 				}
 				if newMail {
 					ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
-					err = ex.deviceInfo.push("You've got mail!")
+					err = ex.deviceInfo.push(ex.pi.ClientContext)
 					if err != nil {
 						ex.sendError(err)
 						return
