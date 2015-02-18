@@ -116,6 +116,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 	if err != nil {
 		reply.Message = err.Error()
 		reply.Code = PollingReplyError
+		return nil
 	}
 	t.pollMap[args.MailInfo.ClientId] = args.MailInfo
 	reply.Token = stopToken
