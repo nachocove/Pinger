@@ -27,9 +27,6 @@ func startPoll(rpcClient *rpc.Client, pi *MailPingInformation) (*StartPollingRes
 	if err != nil {
 		return nil, err
 	}
-	if reply.Code != PollingReplyOK {
-		return nil, errors.New(fmt.Sprintf("RPC server responded with %d:%s", reply.Code, reply.Message))
-	}
 	return &reply, nil
 }
 
