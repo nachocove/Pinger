@@ -16,18 +16,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/op/go-logging"
 	"github.com/nachocove/Pinger/Utils"
+	"github.com/op/go-logging"
 )
 
 // ExchangeClient A client with type exchange.
 type ExchangeClient struct {
-	command   chan int
-	err       chan error
-	incoming  chan *http.Response
-	stopCh    chan int64
-	
-	lastError error
+	command  chan PingerCommand
+	err      chan error
+	incoming chan *http.Response
+	stopCh   chan PingerCommand
+
+	lastError     error
 	waitBeforeUse int
 	debug         bool
 	logger        *logging.Logger
@@ -109,7 +109,7 @@ func (ex *ExchangeClient) validateClient(deviceInfo *DeviceInfo) error {
 		ex.logger.Debug("%s: Registering %s:%s with AWS.", ex.getLogPrefix(), ex.pi.PushService, ex.pi.PushToken)
 		err = deviceInfo.registerAws()
 		if err != nil {
-		return err
+			return err
 		}
 		ex.logger.Debug("%s: endpoint created %s", ex.getLogPrefix(), deviceInfo.AWSEndpointArn)
 		// TODO We should send a test-ping here, so we don't find out the endpoint is unreachable later.
@@ -119,24 +119,24 @@ func (ex *ExchangeClient) validateClient(deviceInfo *DeviceInfo) error {
 		// mark it as enabled again. Possibly...
 		err = deviceInfo.validateAws()
 		if err != nil {
-		return err
+			return err
 		}
 		ex.logger.Debug("%s: endpoint validated %s", ex.getLogPrefix(), deviceInfo.AWSEndpointArn)
 	}
 	ex.deviceInfo = deviceInfo
-	return nil	
+	return nil
 }
 
 // This function needs refactoring to better support a clean 'defer'
 func (ex *ExchangeClient) startLongPoll() {
 	defer recoverCrash(ex.logger)
-	ex.command = make(chan int, 10)
+	ex.command = make(chan PingerCommand, 10)
 	defer func() {
 		ex.command = nil
 		ex.active = false
 	}()
 	ex.mutex.Unlock()
-	
+
 	ex.logger.Debug("%s: started longpoll", ex.getLogPrefix())
 
 	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, ex.pi.ClientId)
@@ -144,41 +144,41 @@ func (ex *ExchangeClient) startLongPoll() {
 		ex.sendError(err)
 		return
 	}
-	
+
 	err = ex.validateClient(deviceInfo)
 	if err != nil {
 		ex.sendError(err)
 		return
 	}
-	
+
 	ex.logger.Debug("%s: Starting deferTimer for %d seconds", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
 	deferTimer := time.NewTimer(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
-	
-	forLoop:	
+
+forLoop:
 	for {
 		select {
 		case <-deferTimer.C:
 			ex.logger.Debug("DeferTimer expired. Starting Polling.")
 			ex.mutex.Lock()
-			go ex.run()  // will unlock mutex, when the stop channel is initialized. Prevents race-condition where we get a Stop/Defer just as the go routine is starting
-	
+			go ex.run() // will unlock mutex, when the stop channel is initialized. Prevents race-condition where we get a Stop/Defer just as the go routine is starting
+
 		case cmd := <-ex.command:
 			switch {
-			case cmd == Stop:
+			case cmd == PingerStop:
 				ex.logger.Debug("%s: got 'stop' command", ex.getLogPrefix())
 				deferTimer.Stop()
 				ex.stop()
 				break forLoop
-				
-			case cmd == Defer:
+
+			case cmd == PingerDefer:
 				ex.logger.Debug("%s: reStarting deferTimer for %d seconds", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
 				ex.stop()
 				deferTimer.Reset(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
-				
+
 			default:
 				ex.logger.Error("%s: Unknown command %d", ex.getLogPrefix(), cmd)
 				continue
-			
+
 			}
 		}
 	}
@@ -188,17 +188,17 @@ func (ex *ExchangeClient) stop() {
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
 	if ex.stopCh != nil {
-		ex.stopCh<-Stop
+		ex.stopCh <- PingerStop
 	}
 }
 
 func (ex *ExchangeClient) run() {
-	ex.stopCh = make(chan int64, 2)
+	ex.stopCh = make(chan PingerCommand, 2)
 	defer func() {
 		ex.stopCh = nil
 	}()
 	ex.mutex.Unlock()
-	
+
 	cookies, err := cookiejar.New(nil)
 	if err != nil {
 		ex.sendError(err)
@@ -280,16 +280,16 @@ func (ex *ExchangeClient) run() {
 			}
 			sleepTime = (time.Duration(ex.pi.ResponseTimeout) * time.Second) - time.Since(requestSent)
 
-		case cmd := <- ex.stopCh:
+		case cmd := <-ex.stopCh:
 			switch {
-			case cmd == Stop:
+			case cmd == PingerStop:
 				ex.logger.Debug("%s: got stop command", ex.getLogPrefix())
 				tr.CancelRequest(request)
 				resp, ok := <-ex.incoming // wait for it to cancel
 				if ok {
 					ex.logger.Debug("%s: lagging response %s", ex.getLogPrefix(), resp)
 				}
-				stopPolling = true				
+				stopPolling = true
 			default:
 				ex.logger.Error("%s: Unknown command %d", ex.getLogPrefix(), cmd)
 				continue
@@ -304,7 +304,7 @@ func (ex *ExchangeClient) run() {
 			time.Sleep(sleepTime)
 		}
 	}
-	
+
 }
 
 func (ex *ExchangeClient) sendError(err error) {
@@ -318,7 +318,7 @@ func (ex *ExchangeClient) waitForError() {
 	case err := <-ex.err:
 		ex.lastError = err
 		ex.logger.Debug("%s: Stopping goroutines", ex.getLogPrefix())
-		ex.Action(Stop)
+		ex.Action(PingerStop)
 		return
 	}
 }
@@ -336,16 +336,20 @@ func (ex *ExchangeClient) LongPoll(wait *sync.WaitGroup) error {
 }
 
 // Action sends a command to the go routine.
-func (ex *ExchangeClient) Action(action int) error {
+func (ex *ExchangeClient) Action(action PingerCommand) error {
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
 
 	if ex.command == nil {
 		return errors.New("Not Polling")
 	}
-	
+
 	if ex.stats != nil {
-		ex.stats.Command <- action
+		switch {
+		case action == PingerStop:
+			ex.stats.Command <- Utils.StatsStop
+		default:
+		}
 	}
 	if ex.command != nil {
 		ex.command <- action

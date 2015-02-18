@@ -25,7 +25,7 @@ const (
 
 type MailClient interface {
 	LongPoll(wait *sync.WaitGroup) error
-	Action(action int) error
+	Action(action PingerCommand) error
 	Status() (MailClientStatus, error)
 }
 
@@ -136,7 +136,7 @@ func (pi *MailPingInformation) start(debug, doStats bool, logger *logging.Logger
 func (pi *MailPingInformation) stop(debug bool, logger *logging.Logger) error {
 	if pi.mailClient == nil {
 		logger.Debug("%s: Stopping polls", pi.ClientId)
-		return pi.mailClient.Action(Stop)
+		return pi.mailClient.Action(PingerStop)
 	}
 	return nil
 }
@@ -149,7 +149,7 @@ func (pi *MailPingInformation) deferPoll(timeout int64, debug bool, logger *logg
 	if timeout > 0 {
 		pi.WaitBeforeUse = timeout
 	}
-	return pi.mailClient.Action(Defer)
+	return pi.mailClient.Action(PingerDefer)
 }
 
 func (pi *MailPingInformation) validateClientId() error {

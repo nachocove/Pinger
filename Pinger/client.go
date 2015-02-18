@@ -9,16 +9,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/op/go-logging"
 	"github.com/nachocove/Pinger/Utils"
+	"github.com/op/go-logging"
 )
 
+type PingerCommand int
+
 const (
-	noCommand = 0
+	noCommand PingerCommand = 0
 	// Stop stop the client
-	Stop = 1
+	PingerStop PingerCommand = 1
 	// Defer the client, i.e. stop all activity and sleep for a time
-	Defer = 2
+	PingerDefer PingerCommand = 2
 )
 
 // Client The client structure for tracking a particular endpoint
@@ -26,7 +28,7 @@ type Client struct {
 	Connection net.Conn
 	Incoming   chan []byte
 	Outgoing   chan []byte
-	Command    chan int
+	Command    chan PingerCommand
 	Err        chan error
 
 	// private
@@ -46,7 +48,7 @@ func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, tcp
 		Connection: nil,
 		Incoming:   make(chan []byte, 2),
 		Outgoing:   make(chan []byte, 2),
-		Command:    make(chan int, 2),
+		Command:    make(chan PingerCommand, 2),
 		Err:        make(chan error),
 
 		// private
@@ -77,7 +79,7 @@ func (client *Client) Done() {
 	Utils.ActiveClientCount--
 }
 
-func (client *Client) connectionReader(Command <-chan int) {
+func (client *Client) connectionReader(Command <-chan PingerCommand) {
 	if client.buffer == nil {
 		client.buffer = make([]byte, 512)
 	}
@@ -89,7 +91,7 @@ func (client *Client) connectionReader(Command <-chan int) {
 
 		if len(Command) > 0 {
 			cmd := <-Command
-			if cmd == Stop {
+			if cmd == PingerStop {
 				if client.debug {
 					client.logger.Info("Was told to stop. Exiting")
 				}
@@ -122,10 +124,10 @@ func (client *Client) wait() {
 	defer client.closeConn()
 
 	// Start a goroutine to read from our net connection
-	connectionCommand := make(chan int, 1)
+	connectionCommand := make(chan PingerCommand, 1)
 	go client.connectionReader(connectionCommand)
-	defer func(Command chan<- int) {
-		Command <- Stop
+	defer func(Command chan<- PingerCommand) {
+		Command <- PingerStop
 	}(connectionCommand)
 
 	for {
@@ -159,7 +161,7 @@ func (client *Client) wait() {
 
 		case cmd := <-client.Command:
 			switch cmd {
-			case Stop:
+			case PingerStop:
 				if client.debug {
 					client.logger.Debug("Stopping")
 				}

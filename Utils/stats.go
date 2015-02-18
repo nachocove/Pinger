@@ -10,7 +10,7 @@ type StatLogger struct {
 	ResponseTimeCh          chan float64
 	FirstTimeResponseTimeCh chan float64
 	OverageSleepTimeCh      chan float64
-	Command                 chan int
+	Command                 chan StatsCommand
 	tallyLogger             *logging.Logger
 }
 
@@ -19,7 +19,7 @@ func NewStatLogger(logger *logging.Logger, startTally bool) *StatLogger {
 		ResponseTimeCh:          make(chan float64, 1000),
 		FirstTimeResponseTimeCh: make(chan float64, 1000),
 		OverageSleepTimeCh:      make(chan float64, 1000),
-		Command:                 make(chan int, 1),
+		Command:                 make(chan StatsCommand, 1),
 		tallyLogger:             logger,
 	}
 	if startTally {
@@ -28,9 +28,12 @@ func NewStatLogger(logger *logging.Logger, startTally bool) *StatLogger {
 	return stat
 }
 
+type StatsCommand int
+
 const (
-	Stop = iota
+	StatsStop = iota
 )
+
 func (stat *StatLogger) TallyResponseTimes() {
 	var data float64
 	normalResponseTimes := newStats()
@@ -41,7 +44,7 @@ func (stat *StatLogger) TallyResponseTimes() {
 	for {
 		select {
 		case cmd := <-stat.Command:
-			if cmd == Stop {
+			if cmd == StatsStop {
 				return
 			}
 			stat.tallyLogger.Error("unknown command %d", cmd)
@@ -73,6 +76,7 @@ type statStruct struct {
 }
 
 var ActiveClientCount int64
+
 func init() {
 	ActiveClientCount = 0
 }

@@ -110,7 +110,7 @@ func (tc *TestClient) LongPoll(pi *Pinger.MailPingInformation, wait *sync.WaitGr
 	return err // could be nil
 }
 
-func (tc *TestClient) Action(action int) error {
+func (tc *TestClient) Action(action Pinger.PingerCommand) error {
 	tc.client.Command <- action
 	return nil
 }
