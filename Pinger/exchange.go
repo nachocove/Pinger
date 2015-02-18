@@ -76,7 +76,7 @@ func (ex *ExchangeClient) doRequestResponse(client *http.Client, request *http.R
 	if DefaultPollingContext.config.Global.DumpRequests {
 		requestBytes, err := httputil.DumpRequest(request, false)
 		if err != nil {
-			ex.logger.Error("DumpRequest error; %v", err)
+			ex.logger.Error("%s: DumpRequest error; %v", ex.getLogPrefix(), err)
 		} else {
 			ex.logger.Debug("%s: sending request: %s", ex.getLogPrefix(), requestBytes)
 		}
@@ -150,34 +150,32 @@ func (ex *ExchangeClient) startLongPoll() {
 		return
 	}
 	
-	ex.logger.Debug("Starting deferTimer for %d seconds", ex.pi.WaitBeforeUse)
+	ex.logger.Debug("%s: Starting deferTimer for %d seconds", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
 	deferTimer := time.NewTimer(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
 	
 	forLoop:	
 	for {
-		ex.logger.Debug("Top of state machine loop")
 		select {
 		case <-deferTimer.C:
-			ex.logger.Debug("DeferTimer expired. Running.")
+			ex.logger.Debug("DeferTimer expired. Starting Polling.")
 			ex.mutex.Lock()
-			ex.logger.Debug("Mutex before run locked")
 			go ex.run()  // will unlock mutex, when the stop channel is initialized. Prevents race-condition where we get a Stop/Defer just as the go routine is starting
 	
 		case cmd := <-ex.command:
 			switch {
 			case cmd == Stop:
-				ex.logger.Debug("%s: got stop command", ex.getLogPrefix())
+				ex.logger.Debug("%s: got 'stop' command", ex.getLogPrefix())
 				deferTimer.Stop()
 				ex.stop()
 				break forLoop
 				
 			case cmd == Defer:
-				ex.logger.Debug("reStarting deferTimer for %d seconds", ex.pi.WaitBeforeUse)
+				ex.logger.Debug("%s: reStarting deferTimer for %d seconds", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
 				ex.stop()
 				deferTimer.Reset(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
 				
 			default:
-				ex.logger.Error("Unknown command %d", cmd)
+				ex.logger.Error("%s: Unknown command %d", ex.getLogPrefix(), cmd)
 				continue
 			
 			}
@@ -187,13 +185,10 @@ func (ex *ExchangeClient) startLongPoll() {
 
 func (ex *ExchangeClient) stop() {
 	ex.mutex.Lock()
-	ex.logger.Debug("Mutex in stop() locked")
 	defer ex.mutex.Unlock()
-	ex.logger.Debug("stopCh is %+v", ex.stopCh)
 	if ex.stopCh != nil {
 		ex.stopCh<-Stop
 	}
-	ex.logger.Debug("Mutex in stop() unlocked")
 }
 
 func (ex *ExchangeClient) run() {
@@ -202,7 +197,6 @@ func (ex *ExchangeClient) run() {
 		ex.stopCh = nil
 	}()
 	ex.mutex.Unlock()
-	ex.logger.Debug("Mutex in run unlocked")
 	
 	cookies, err := cookiejar.New(nil)
 	if err != nil {
@@ -296,7 +290,7 @@ func (ex *ExchangeClient) run() {
 				}
 				stopPolling = true				
 			default:
-				ex.logger.Error("Unknown command %d", cmd)
+				ex.logger.Error("%s: Unknown command %d", ex.getLogPrefix(), cmd)
 				continue
 			}
 		}
@@ -314,15 +308,15 @@ func (ex *ExchangeClient) run() {
 
 func (ex *ExchangeClient) sendError(err error) {
 	_, fn, line, _ := runtime.Caller(1)
-	ex.err <- errors.New(fmt.Sprintf("%s/%s:%d %s", path.Base(path.Dir(fn)), path.Base(fn), line, err))
+	ex.logger.Error("%s: %s/%s:%d %s", ex.getLogPrefix(), path.Base(path.Dir(fn)), path.Base(fn), line, err)
+	ex.err <- err
 }
 
 func (ex *ExchangeClient) waitForError() {
 	select {
 	case err := <-ex.err:
-		ex.logger.Error(err.Error())
 		ex.lastError = err
-		ex.logger.Debug("Stopping goroutines")
+		ex.logger.Debug("%s: Stopping goroutines", ex.getLogPrefix())
 		ex.Action(Stop)
 		return
 	}
@@ -343,16 +337,16 @@ func (ex *ExchangeClient) LongPoll(wait *sync.WaitGroup) error {
 // Action sends a command to the go routine.
 func (ex *ExchangeClient) Action(action int) error {
 	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+
 	if ex.command == nil {
 		return errors.New("Not Polling")
 	}
 	
-	defer ex.mutex.Unlock()
 	if ex.stats != nil {
 		ex.stats.Command <- action
 	}
 	if ex.command != nil {
-		ex.logger.Debug("Sending action %d to client %s", action, ex.getLogPrefix())
 		ex.command <- action
 	}
 	return nil
