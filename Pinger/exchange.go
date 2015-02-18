@@ -24,8 +24,9 @@ type ExchangeClient struct {
 	command   chan int
 	err       chan error
 	incoming  chan *http.Response
+	stopCh    chan int64
+	
 	lastError error
-
 	waitBeforeUse int
 	debug         bool
 	logger        *logging.Logger
@@ -33,6 +34,9 @@ type ExchangeClient struct {
 	pi            *MailPingInformation
 	urlInfo       *url.URL
 	active        bool
+	deviceInfo    *DeviceInfo
+	logPrefix     string
+	mutex         *sync.Mutex
 }
 
 var rng *rand.Rand
@@ -74,7 +78,7 @@ func (ex *ExchangeClient) doRequestResponse(client *http.Client, request *http.R
 		if err != nil {
 			ex.logger.Error("DumpRequest error; %v", err)
 		} else {
-			ex.logger.Debug("%s: sending request: %s", ex.logPrefix(), requestBytes)
+			ex.logger.Debug("%s: sending request: %s", ex.getLogPrefix(), requestBytes)
 		}
 	}
 	response, err := client.Do(request)
@@ -85,37 +89,28 @@ func (ex *ExchangeClient) doRequestResponse(client *http.Client, request *http.R
 	ex.incoming <- response
 }
 
-func (ex *ExchangeClient) logPrefix() string {
-	return fmt.Sprintf("%s@%s", ex.pi.ClientId, ex.urlInfo.Host)
+func (ex *ExchangeClient) getLogPrefix() string {
+	if ex.logPrefix == "" {
+		ex.logPrefix = fmt.Sprintf("%s@%s", ex.pi.ClientId, ex.urlInfo.Host)
+	}
+	return ex.logPrefix
 }
 
-func (ex *ExchangeClient) startLongPoll() {
-	defer recoverCrash(ex.logger)
-	var logPrefix string = ex.logPrefix()
-	ex.logger.Debug("%s: started longpoll", logPrefix)
-
-	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, ex.pi.ClientId)
-	if err != nil {
-		ex.sendError(err)
-		return
-	}
-
+func (ex *ExchangeClient) validateClient(deviceInfo *DeviceInfo) error {
 	// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
-	ex.logger.Debug("%s: Validating clientID", logPrefix)
-	err = ex.pi.validateClientId()
+	ex.logger.Debug("%s: Validating clientID", ex.getLogPrefix())
+	err := ex.pi.validateClientId()
 	if err != nil {
-		ex.sendError(err)
-		return
+		return err
 	}
 
 	if deviceInfo.AWSEndpointArn == "" {
-		ex.logger.Debug("%s: Registering %s:%s with AWS.", logPrefix, ex.pi.PushService, ex.pi.PushToken)
+		ex.logger.Debug("%s: Registering %s:%s with AWS.", ex.getLogPrefix(), ex.pi.PushService, ex.pi.PushToken)
 		err = deviceInfo.registerAws()
 		if err != nil {
-			ex.sendError(err)
-			return
+		return err
 		}
-		ex.logger.Debug("%s: endpoint created %s", logPrefix, deviceInfo.AWSEndpointArn)
+		ex.logger.Debug("%s: endpoint created %s", ex.getLogPrefix(), deviceInfo.AWSEndpointArn)
 		// TODO We should send a test-ping here, so we don't find out the endpoint is unreachable later.
 		// It's optional (we'll find out eventually), but this would speed it up.
 	} else {
@@ -123,16 +118,92 @@ func (ex *ExchangeClient) startLongPoll() {
 		// mark it as enabled again. Possibly...
 		err = deviceInfo.validateAws()
 		if err != nil {
-			ex.sendError(err)
-			return
+		return err
 		}
-		ex.logger.Debug("%s: endpoint validated %s", logPrefix, deviceInfo.AWSEndpointArn)
+		ex.logger.Debug("%s: endpoint validated %s", ex.getLogPrefix(), deviceInfo.AWSEndpointArn)
 	}
-	if ex.pi.WaitBeforeUse > 0 {
-		ex.logger.Debug("%s: WaitBeforeUse %d", logPrefix, ex.pi.WaitBeforeUse)
-		time.Sleep(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
-	}
+	ex.deviceInfo = deviceInfo
+	return nil	
+}
 
+// This function needs refactoring to better support a clean 'defer'
+func (ex *ExchangeClient) startLongPoll() {
+	defer recoverCrash(ex.logger)
+	ex.command = make(chan int, 10)
+	defer func() {
+		ex.command = nil
+		ex.active = false
+	}()
+	ex.mutex.Unlock()
+	
+	ex.logger.Debug("%s: started longpoll", ex.getLogPrefix())
+
+	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, ex.pi.ClientId)
+	if err != nil {
+		ex.sendError(err)
+		return
+	}
+	
+	err = ex.validateClient(deviceInfo)
+	if err != nil {
+		ex.sendError(err)
+		return
+	}
+	
+	ex.logger.Debug("Starting deferTimer for %d seconds", ex.pi.WaitBeforeUse)
+	deferTimer := time.NewTimer(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
+	
+	forLoop:	
+	for {
+		ex.logger.Debug("Top of state machine loop")
+		select {
+		case <-deferTimer.C:
+			ex.logger.Debug("DeferTimer expired. Running.")
+			ex.mutex.Lock()
+			ex.logger.Debug("Mutex before run locked")
+			go ex.run()  // will unlock mutex, when the stop channel is initialized. Prevents race-condition where we get a Stop/Defer just as the go routine is starting
+	
+		case cmd := <-ex.command:
+			switch {
+			case cmd == Stop:
+				ex.logger.Debug("%s: got stop command", ex.getLogPrefix())
+				deferTimer.Stop()
+				ex.stop()
+				break forLoop
+				
+			case cmd == Defer:
+				ex.logger.Debug("reStarting deferTimer for %d seconds", ex.pi.WaitBeforeUse)
+				ex.stop()
+				deferTimer.Reset(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
+				
+			default:
+				ex.logger.Error("Unknown command %d", cmd)
+				continue
+			
+			}
+		}
+	}
+}
+
+func (ex *ExchangeClient) stop() {
+	ex.mutex.Lock()
+	ex.logger.Debug("Mutex in stop() locked")
+	defer ex.mutex.Unlock()
+	ex.logger.Debug("stopCh is %+v", ex.stopCh)
+	if ex.stopCh != nil {
+		ex.stopCh<-Stop
+	}
+	ex.logger.Debug("Mutex in stop() unlocked")
+}
+
+func (ex *ExchangeClient) run() {
+	ex.stopCh = make(chan int64, 2)
+	defer func() {
+		ex.stopCh = nil
+	}()
+	ex.mutex.Unlock()
+	ex.logger.Debug("Mutex in run unlocked")
+	
 	cookies, err := cookiejar.New(nil)
 	if err != nil {
 		ex.sendError(err)
@@ -149,7 +220,7 @@ func (ex *ExchangeClient) startLongPoll() {
 		client.Timeout = time.Duration(ex.pi.ResponseTimeout) * time.Second
 	}
 
-	ex.logger.Debug("%s: New HTTP Client with timeout %d %s", logPrefix, ex.pi.ResponseTimeout, ex.pi.MailServerUrl)
+	ex.logger.Debug("%s: New HTTP Client with timeout %d %s", ex.getLogPrefix(), ex.pi.ResponseTimeout, ex.pi.MailServerUrl)
 	stopPolling := false
 	var sleepTime time.Duration
 	for {
@@ -161,7 +232,7 @@ func (ex *ExchangeClient) startLongPoll() {
 		requestSent := time.Now()
 		sleepTime = time.Duration(0)
 		go ex.doRequestResponse(client, request)
-		ex.logger.Debug("%s: Waiting for response", logPrefix)
+		ex.logger.Debug("%s: Waiting for response", ex.getLogPrefix())
 		select {
 		case response := <-ex.incoming:
 			responseBody := make([]byte, response.ContentLength)
@@ -176,36 +247,36 @@ func (ex *ExchangeClient) startLongPoll() {
 				return
 			}
 			if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
-				ex.logger.Debug("%s: response and body: %v %s", logPrefix, *response, responseBody)
+				ex.logger.Debug("%s: response and body: %v %s", ex.getLogPrefix(), *response, responseBody)
 			}
 			switch {
 			case response.StatusCode != 200:
-				ex.logger.Debug("%s: Non-200 response: %d", logPrefix, response.StatusCode)
+				ex.logger.Debug("%s: Non-200 response: %d", ex.getLogPrefix(), response.StatusCode)
 				ex.sendError(errors.New(fmt.Sprintf("Http %d status response", response.StatusCode)))
 				return
 
 			case ex.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.pi.HttpNoChangeReply) == 0:
 				// go back to polling
-				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", logPrefix)
+				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", ex.getLogPrefix())
 
 			default:
 				newMail := false
 				if bytes.Compare(responseBody, ex.pi.HttpExpectedReply) == 0 {
 					// there's new mail!
-					ex.logger.Debug("%s: Reply matched HttpExpectedReply. Send Push", logPrefix)
+					ex.logger.Debug("%s: Reply matched HttpExpectedReply. Send Push", ex.getLogPrefix())
 					newMail = true
 				} else {
 					if ex.pi.HttpNoChangeReply != nil {
 						// apparently the 'no-change' above didn't match, so this must be a change
 						newMail = true
 					} else {
-						ex.sendError(errors.New(fmt.Sprintf("%s: Unhandled response %v", logPrefix, response)))
+						ex.sendError(errors.New(fmt.Sprintf("%s: Unhandled response %v", ex.getLogPrefix(), response)))
 						return
 					}
 				}
 				if newMail {
-					ex.logger.Debug("%s: Sending push message for new mail", logPrefix)
-					err = deviceInfo.push("You've got mail!")
+					ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
+					err = ex.deviceInfo.push("You've got mail!")
 					if err != nil {
 						ex.sendError(err)
 						return
@@ -214,16 +285,16 @@ func (ex *ExchangeClient) startLongPoll() {
 			}
 			sleepTime = (time.Duration(ex.pi.ResponseTimeout) * time.Second) - time.Since(requestSent)
 
-		case cmd := <-ex.command:
+		case cmd := <- ex.stopCh:
 			switch {
 			case cmd == Stop:
-				ex.logger.Debug("%s: got stop command", logPrefix)
+				ex.logger.Debug("%s: got stop command", ex.getLogPrefix())
 				tr.CancelRequest(request)
 				resp, ok := <-ex.incoming // wait for it to cancel
 				if ok {
-					ex.logger.Debug("%s: lagging response %s", logPrefix, resp)
+					ex.logger.Debug("%s: lagging response %s", ex.getLogPrefix(), resp)
 				}
-				stopPolling = true
+				stopPolling = true				
 			default:
 				ex.logger.Error("Unknown command %d", cmd)
 				continue
@@ -234,10 +305,11 @@ func (ex *ExchangeClient) startLongPoll() {
 		}
 
 		if sleepTime.Seconds() > 0.0 {
-			ex.logger.Debug("%s: sleeping %fs before next attempt", logPrefix, sleepTime.Seconds())
+			ex.logger.Debug("%s: sleeping %fs before next attempt", ex.getLogPrefix(), sleepTime.Seconds())
 			time.Sleep(sleepTime)
 		}
 	}
+	
 }
 
 func (ex *ExchangeClient) sendError(err error) {
@@ -263,16 +335,26 @@ func (ex *ExchangeClient) LongPoll(wait *sync.WaitGroup) error {
 		go ex.stats.tallyResponseTimes()
 	}
 	go ex.waitForError()
+	ex.mutex.Lock()
 	go ex.startLongPoll()
 	return nil
 }
 
 // Action sends a command to the go routine.
 func (ex *ExchangeClient) Action(action int) error {
+	ex.mutex.Lock()
+	if ex.command == nil {
+		return errors.New("Not Polling")
+	}
+	
+	defer ex.mutex.Unlock()
 	if ex.stats != nil {
 		ex.stats.Command <- action
 	}
-	ex.command <- action
+	if ex.command != nil {
+		ex.logger.Debug("Sending action %d to client %s", action, ex.getLogPrefix())
+		ex.command <- action
+	}
 	return nil
 }
 
@@ -295,12 +377,14 @@ func NewExchangeClient(mailInfo *MailPingInformation, debug, doStats bool, logge
 		urlInfo:  urlInfo,
 		pi:       mailInfo,
 		incoming: make(chan *http.Response),
-		command:  make(chan int, 2),
+		command:  nil,
 		err:      make(chan error),
+		stopCh:   nil,
 		debug:    debug,
 		stats:    nil,
 		logger:   logger,
 		active:   true,
+		mutex:    &sync.Mutex{},
 	}
 	if doStats {
 		ex.stats = NewStatLogger(logger, false)

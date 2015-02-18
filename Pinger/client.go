@@ -16,6 +16,8 @@ const (
 	noCommand = 0
 	// Stop stop the client
 	Stop = 1
+	// Defer the client, i.e. stop all activity and sleep for a time
+	Defer = 2
 )
 
 // Client The client structure for tracking a particular endpoint

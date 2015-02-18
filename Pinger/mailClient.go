@@ -140,19 +140,15 @@ func (pi *MailPingInformation) stop(debug bool, logger *logging.Logger) error {
 	return nil
 }
 
-func (pi *MailPingInformation) deferPoll(debug bool, logger *logging.Logger) error {
+func (pi *MailPingInformation) deferPoll(timeout int64, debug bool, logger *logging.Logger) error {
 	if pi.mailClient == nil {
-		panic("pi.mailClient = nil. Perhaps the mailclient has not be started?")
+		panic("pi.mailClient = nil. Perhaps the mailclient has not been started?")
 	}
-	logger.Debug("%s: Stopping polls", pi.ClientId)
-	pi.mailClient.Action(Stop)
-	// TODO Should wait for it to be done
-	logger.Debug("%s: Starting polls", pi.ClientId)
-	err := pi.mailClient.LongPoll(nil) // MUST NOT BLOCK. Is expected to create a goroutine to do the long poll.
-	if err != nil {
-		return err
+	logger.Debug("%s: Deferring polls", pi.ClientId)
+	if timeout > 0 {
+		pi.WaitBeforeUse = timeout
 	}
-	return nil
+	return pi.mailClient.Action(Defer)
 }
 
 func (pi *MailPingInformation) validateClientId() error {
