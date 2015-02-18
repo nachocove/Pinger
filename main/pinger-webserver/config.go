@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/nachocove/Pinger/Pinger"
+	"github.com/nachocove/Pinger/Utils"
 	"github.com/op/go-logging"
 )
 
@@ -205,9 +206,9 @@ var httpsRouter = mux.NewRouter()
 func (context *Context) run() error {
 	config := context.Config
 	httpsMiddlewares := negroni.New(
-		Pinger.NewRecovery("Pinger-web", config.Global.Debug),
+		Utils.NewRecovery("Pinger-web", config.Global.Debug),
 		negroni.NewLogger(),
-		Pinger.NewStatic("/public", "/static", ""),
+		Utils.NewStatic("/public", "/static", ""),
 		NewContextMiddleWare(context))
 
 	httpsMiddlewares.UseHandler(httpsRouter)
@@ -217,9 +218,9 @@ func (context *Context) run() error {
 	// start the server on the non-tls port to redirect
 	go func() {
 		httpMiddlewares := negroni.New(
-			Pinger.NewRecovery("Pinger-web", config.Global.Debug),
+			Utils.NewRecovery("Pinger-web", config.Global.Debug),
 			negroni.NewLogger(),
-			Pinger.NewRedirectMiddleware("", config.Server.Port),
+			Utils.NewRedirectMiddleware("", config.Server.Port),
 		)
 		httpRouter := mux.NewRouter()
 		httpMiddlewares.UseHandler(httpRouter)
@@ -230,7 +231,7 @@ func (context *Context) run() error {
 		}
 	}()
 
-	Pinger.AddDebugToggleSignal(context)
+	Utils.AddDebugToggleSignal(context)
 
 	// start the https server
 	err := http.ListenAndServeTLS(addr, config.Server.ServerCertFile, config.Server.ServerKeyFile, httpsMiddlewares)

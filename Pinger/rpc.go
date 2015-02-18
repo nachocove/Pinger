@@ -13,6 +13,7 @@ import (
 	"github.com/coopernurse/gorp"
 	"github.com/op/go-logging"
 	"runtime"
+	"github.com/nachocove/Pinger/Utils"
 )
 
 type pollMapType map[string]*MailPingInformation
@@ -241,7 +242,7 @@ func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger
 		pollMap:     make(pollMapType),
 	}
 
-	AddDebugToggleSignal(DefaultPollingContext)
+	Utils.AddDebugToggleSignal(DefaultPollingContext)
 	return DefaultPollingContext, nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nachocove/Pinger/Pinger"
+	"github.com/nachocove/Pinger/Utils"
 	"github.com/op/go-logging"
 )
 
@@ -17,7 +18,7 @@ type TestClient struct {
 	pingPeriodicity int
 	debug           bool
 	logger          *logging.Logger
-	stats           *Pinger.StatLogger
+	stats           *Utils.StatLogger
 }
 
 // String convert the TestClient structure to something printable
@@ -126,6 +127,6 @@ func NewTestClient(dialString string, pingPeriodic int, reopenConnection, debug 
 		pingPeriodicity: pingPeriodic,
 		debug:           debug,
 		logger:          logger,
-		stats:           Pinger.NewStatLogger(logger, true),
+		stats:           Utils.NewStatLogger(logger, true),
 	}
 }

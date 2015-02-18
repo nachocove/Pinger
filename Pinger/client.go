@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/op/go-logging"
+	"github.com/nachocove/Pinger/Utils"
 )
 
 const (
@@ -60,13 +61,6 @@ func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, tcp
 	return client
 }
 
-// ActiveClientCount count of actively open connections
-var ActiveClientCount int
-
-func init() {
-	ActiveClientCount = 0
-}
-
 // String Convert the client structure into a printable string
 func (client *Client) String() string {
 	return fmt.Sprintf("Client %s (debug %t)", client.Connection.RemoteAddr().String(), client.debug)
@@ -80,7 +74,7 @@ func (client *Client) Done() {
 	if client.waitGroup != nil {
 		client.waitGroup.Done()
 	}
-	ActiveClientCount--
+	Utils.ActiveClientCount--
 }
 
 func (client *Client) connectionReader(Command <-chan int) {
@@ -233,6 +227,6 @@ func (client *Client) Listen(wait *sync.WaitGroup) error {
 	if client.waitGroup != nil {
 		client.waitGroup.Add(1)
 	}
-	ActiveClientCount++
+	Utils.ActiveClientCount++
 	return nil
 }

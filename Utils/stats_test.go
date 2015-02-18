@@ -1,4 +1,4 @@
-package Pinger
+package Utils
 
 import (
 	"github.com/op/go-logging"

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/nachocove/Pinger/Pinger"
+	"github.com/nachocove/Pinger/Utils"
 	"github.com/op/go-logging"
 )
 
@@ -26,13 +27,13 @@ var usage = func() {
 	flag.PrintDefaults()
 }
 
-func memStatsExtraInfo(stats *Pinger.MemStats) string {
+func memStatsExtraInfo(stats *Utils.MemStats) string {
 	k := float64(1024.0)
-	if Pinger.ActiveClientCount > 0 {
+	if Utils.ActiveClientCount > 0 {
 		allocM := float64(int64(stats.Memstats.Alloc)-int64(stats.Basememstats.Alloc)) / k
-		return fmt.Sprintf("number of connections: %d  (est. mem/conn %fk)", Pinger.ActiveClientCount, allocM/float64(Pinger.ActiveClientCount))
+		return fmt.Sprintf("number of connections: %d  (est. mem/conn %fk)", Utils.ActiveClientCount, allocM/float64(Utils.ActiveClientCount))
 	}
-	return fmt.Sprintf("number of connections: %d", Pinger.ActiveClientCount)
+	return fmt.Sprintf("number of connections: %d", Utils.ActiveClientCount)
 }
 
 var logger *logging.Logger
@@ -126,9 +127,9 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	logger.Info("Running with %d connections. (Processors: %d)", maxConnection, runtime.NumCPU())
 
-	var memstats *Pinger.MemStats
+	var memstats *Utils.MemStats
 	if printMemPeriodic > 0 || printMem {
-		memstats = Pinger.NewMemStats(memStatsExtraInfo, debug, false)
+		memstats = Utils.NewMemStats(memStatsExtraInfo, debug, false)
 		if printMemPeriodic > 0 {
 			memstats.PrintMemStatsPeriodic(printMemPeriodic)
 		}

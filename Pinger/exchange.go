@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/op/go-logging"
+	"github.com/nachocove/Pinger/Utils"
 )
 
 // ExchangeClient A client with type exchange.
@@ -30,7 +31,7 @@ type ExchangeClient struct {
 	waitBeforeUse int
 	debug         bool
 	logger        *logging.Logger
-	stats         *StatLogger
+	stats         *Utils.StatLogger
 	pi            *MailPingInformation
 	urlInfo       *url.URL
 	active        bool
@@ -326,7 +327,7 @@ func (ex *ExchangeClient) waitForError() {
 // launches 1 goroutine for periodic checking, if confgured.
 func (ex *ExchangeClient) LongPoll(wait *sync.WaitGroup) error {
 	if ex.stats != nil {
-		go ex.stats.tallyResponseTimes()
+		go ex.stats.TallyResponseTimes()
 	}
 	go ex.waitForError()
 	ex.mutex.Lock()
@@ -381,7 +382,7 @@ func NewExchangeClient(mailInfo *MailPingInformation, debug, doStats bool, logge
 		mutex:    &sync.Mutex{},
 	}
 	if doStats {
-		ex.stats = NewStatLogger(logger, false)
+		ex.stats = Utils.NewStatLogger(logger, false)
 	}
 	return ex, nil
 }

@@ -1,4 +1,4 @@
-package Pinger
+package Utils
 
 import (
 	"time"
@@ -23,12 +23,15 @@ func NewStatLogger(logger *logging.Logger, startTally bool) *StatLogger {
 		tallyLogger:             logger,
 	}
 	if startTally {
-		go stat.tallyResponseTimes()
+		go stat.TallyResponseTimes()
 	}
 	return stat
 }
 
-func (stat *StatLogger) tallyResponseTimes() {
+const (
+	Stop = iota
+)
+func (stat *StatLogger) TallyResponseTimes() {
 	var data float64
 	normalResponseTimes := newStats()
 	firstResponseTimes := newStats()
@@ -67,6 +70,11 @@ type statStruct struct {
 	sum   float64
 	avg   float64
 	count int
+}
+
+var ActiveClientCount int64
+func init() {
+	ActiveClientCount = 0
 }
 
 func newStats() *statStruct {

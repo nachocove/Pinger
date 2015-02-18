@@ -1,4 +1,4 @@
-package Pinger
+package Utils
 
 import (
 	"fmt"

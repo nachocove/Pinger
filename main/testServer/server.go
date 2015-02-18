@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/nachocove/Pinger/Pinger"
+	"github.com/nachocove/Pinger/Utils"
 	"github.com/op/go-logging"
 )
 
@@ -154,7 +155,7 @@ var usage = func() {
 	flag.PrintDefaults()
 }
 
-func memStatsExtraInfo(stats *Pinger.MemStats) string {
+func memStatsExtraInfo(stats *Utils.MemStats) string {
 	k := float64(1024.0)
 	if activeConnections > 0 {
 		var allocM = (float64(stats.Memstats.Alloc) - float64(stats.Basememstats.Alloc)) / k
@@ -262,9 +263,9 @@ func main() {
 
 	dialString := fmt.Sprintf("%s:%d", bindAddress, port)
 
-	var memstats *Pinger.MemStats
+	var memstats *Utils.MemStats
 	if printMemPeriodic > 0 {
-		memstats = Pinger.NewMemStats(memStatsExtraInfo, debug, false)
+		memstats = Utils.NewMemStats(memStatsExtraInfo, debug, false)
 		memstats.PrintMemStatsPeriodic(printMemPeriodic)
 	}
 
