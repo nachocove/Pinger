@@ -27,6 +27,7 @@ type registerPostCredentials struct {
 }
 type registerPostData struct {
 	ClientId               string
+	ClientContext          []byte
 	Platform               string
 	MailServerUrl          string
 	MailServerCredentials  registerPostCredentials
@@ -117,7 +118,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 	session.Values[SessionVarClientId] = postInfo.ClientId
 
-	_, err = Pinger.StartPoll(context.RpcConnectString, postInfo.AsMailInfo())
+	reply, err := Pinger.StartPoll(context.RpcConnectString, postInfo.AsMailInfo())
 	if err != nil {
 		context.Logger.Warning("Could not re/start polling for device %s: %s", postInfo.ClientId, err)
 		responseError(w, RPC_SERVER_ERROR)
@@ -132,10 +133,28 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	responseData := make(map[string]string)
-	//responseData["Token"] = token
-	responseData["Status"] = "OK"
-	responseData["Message"] = ""
+	
+	switch {
+	case reply.Code == Pinger.PollingReplyOK:
+		//responseData["Token"] = token
+		responseData["Status"] = "OK"
+		responseData["Message"] = ""
 
+	case reply.Code == Pinger.PollingReplyError:
+		responseData["Status"] = "ERROR"
+		responseData["Message"] = reply.Message
+
+	case reply.Code == Pinger.PollingReplyWarn:
+		//responseData["Token"] = token
+		responseData["Status"] = "OK"
+		responseData["Message"] = reply.Message
+		
+	default:
+		context.Logger.Error("Unknown PollingReply Code %d", reply.Code)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
 		context.Logger.Warning("Could not json encode reply: %v", responseData)
@@ -149,6 +168,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 type deferPost struct {
 	ClientId  string
+	Timeout   int64
 	StopToken string
 }
 
@@ -183,16 +203,32 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 		return
 	}
-	err = Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.StopToken)
+	reply, err := Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.StopToken)
 	if err != nil {
 		context.Logger.Error("Error deferring poll %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	responseData := make(map[string]string)
-	responseData["Status"] = "OK"
-	responseData["Message"] = ""
+	switch {
+	case reply.Code == Pinger.PollingReplyError:
+		responseData["Status"] = "ERROR"
+		responseData["Message"] = reply.Message
 
+	case reply.Code == Pinger.PollingReplyOK:
+		responseData["Status"] = "OK"
+		responseData["Message"] = ""
+	
+	case reply.Code == Pinger.PollingReplyWarn:
+		responseData["Status"] = "OK"
+		responseData["Message"] = reply.Message
+		
+	default:
+		context.Logger.Error("Unknown PollingReply Code %d", reply.Code)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
 		context.Logger.Warning("Could not json encode reply: %v", responseData)
