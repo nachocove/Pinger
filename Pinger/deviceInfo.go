@@ -86,7 +86,7 @@ func (di *DeviceInfo) validate() error {
 			return err
 		}
 		if matched == false {
-			return errors.New(fmt.Sprintf("Platform %s is not known", di.Platform))
+			return fmt.Errorf("Platform %s is not known", di.Platform)
 		}
 	}
 	return nil
@@ -147,7 +147,7 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId string) (*DeviceInfo, error) {
 	}
 	switch {
 	case len(devices) > 1:
-		return nil, errors.New(fmt.Sprintf("More than one entry from select: %d", len(devices)))
+		return nil, fmt.Errorf("More than one entry from select: %d", len(devices))
 
 	case len(devices) == 0:
 		return nil, nil
@@ -158,7 +158,7 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId string) (*DeviceInfo, error) {
 		return device, nil
 
 	default:
-		return nil, errors.New(fmt.Sprintf("Bad number of rows returned: %d", len(devices)))
+		return nil, fmt.Errorf("Bad number of rows returned: %d", len(devices))
 	}
 }
 
@@ -301,7 +301,7 @@ func (di *DeviceInfo) push(message string) error {
 		err = errors.New("Endpoint is disabled")
 
 	default:
-		err = errors.New(fmt.Sprintf("Unsupported push service: %s", di.PushService))
+		err = fmt.Errorf("Unsupported push service: %s", di.PushService)
 	}
 	if err == nil {
 		di.LastContactRequest = time.Now().UnixNano()
@@ -315,7 +315,7 @@ func (di *DeviceInfo) registerAws() error {
 		panic("No need to call register again. Call validate")
 	}
 	if di.PushService != "APNS" {
-		return errors.New(fmt.Sprintf("Unsupported push service %s", di.PushService))
+		return fmt.Errorf("Unsupported push service %s", di.PushService)
 	}
 	arn, err := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, di.PushToken, di.ClientId)
 	if err != nil {

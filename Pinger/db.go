@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 
+    // blank import to get the mysql mappings for gorp
 	_ "github.com/Go-SQL-Driver/MySQL"
+    // blank import to get the mysql mappings for gorp
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/coopernurse/gorp"
@@ -38,7 +40,7 @@ func (dbconfig *DBConfiguration) Validate() error {
 		break
 
 	default:
-		return errors.New(fmt.Sprintf("Unknown/Unsupported db type %s", dbconfig.Type))
+		return fmt.Errorf("Unknown/Unsupported db type %s", dbconfig.Type)
 	}
 	return nil
 }
@@ -66,7 +68,7 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *logging.Logger)
 		dbmap = initDbSqlite(dbconfig)
 
 	default:
-		return nil, errors.New(fmt.Sprintf("Unknown db type %s", dbconfig.Type))
+		return nil, fmt.Errorf("Unknown db type %s", dbconfig.Type)
 	}
 
 	if dbmap == nil {
@@ -88,7 +90,7 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *logging.Logger)
 		// use a migration tool, or create the tables via scripts
 		err := dbmap.CreateTablesIfNotExists()
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("Create tables failed: %s", err))
+			return nil, fmt.Errorf("Create tables failed: %s", err)
 		}
 	}
 	return dbmap, nil

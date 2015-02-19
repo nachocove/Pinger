@@ -1,7 +1,6 @@
 package Pinger
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -72,7 +71,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 	pi, ok := t.pollMap[args.MailInfo.ClientId]
 	if ok == true {
 		if pi == nil {
-			return errors.New(fmt.Sprintf("%s: Could not find poll session in map", args.MailInfo.ClientId))
+			return fmt.Errorf("%s: Could not find poll session in map", args.MailInfo.ClientId)
 		}
 		err := updateLastContact(t.dbm, args.MailInfo.ClientId)
 		if err != nil {
@@ -133,7 +132,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 		return nil
 	} else {
 		if pi == nil {
-			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
+			return fmt.Errorf("Could not find poll item in map: %s", args.ClientId)
 		}
 		err := updateLastContact(t.dbm, args.ClientId)
 		if err != nil {
@@ -174,7 +173,7 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 		return nil
 	} else {
 		if pi == nil {
-			return errors.New(fmt.Sprintf("Could not find poll item in map: %s", args.ClientId))
+			return fmt.Errorf("Could not find poll item in map: %s", args.ClientId)
 		}
 		err := updateLastContact(t.dbm, args.ClientId)
 		if err != nil {

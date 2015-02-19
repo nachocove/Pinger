@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httputil"
@@ -38,16 +37,6 @@ type ExchangeClient struct {
 	deviceInfo    *DeviceInfo
 	logPrefix     string
 	mutex         *sync.Mutex
-}
-
-var rng *rand.Rand
-
-func init() {
-	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
-}
-
-func randomInt(x, y int) int {
-	return rand.Intn(y-x) + x
 }
 
 func (ex *ExchangeClient) newRequest() (*http.Request, error) {
@@ -247,7 +236,7 @@ func (ex *ExchangeClient) run() {
 			switch {
 			case response.StatusCode != 200:
 				ex.logger.Debug("%s: Non-200 response: %d", ex.getLogPrefix(), response.StatusCode)
-				ex.sendError(errors.New(fmt.Sprintf("Http %d status response", response.StatusCode)))
+				ex.sendError(fmt.Errorf("Http %d status response", response.StatusCode))
 				return
 
 			case ex.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.pi.HttpNoChangeReply) == 0:
@@ -265,7 +254,7 @@ func (ex *ExchangeClient) run() {
 						// apparently the 'no-change' above didn't match, so this must be a change
 						newMail = true
 					} else {
-						ex.sendError(errors.New(fmt.Sprintf("%s: Unhandled response %v", ex.getLogPrefix(), response)))
+						ex.sendError(fmt.Errorf("%s: Unhandled response %v", ex.getLogPrefix(), response))
 						return
 					}
 				}

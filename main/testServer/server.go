@@ -27,7 +27,7 @@ func init() {
 }
 
 func randomInt(x, y int) int {
-	return rand.Intn(y-x) + x
+	return rng.Intn(y-x) + x
 }
 
 type nopCloser struct {

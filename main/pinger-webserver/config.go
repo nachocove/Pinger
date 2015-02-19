@@ -22,8 +22,8 @@ const (
 	defaultBindAddress    = "0.0.0.0"
 	defaultTemplateDir    = "templates"
 	defaultDebugging      = false
-	defaultserverCertFile = ""
-	defaultserverKeyFile  = ""
+	defaultServerCertFile = ""
+	defaultServerKeyFile  = ""
 	defaultNonTLSPort     = 80
 	defaultDevelopment    = false
 	defaultDebug          = false
@@ -70,8 +70,8 @@ func NewConfiguration() *Configuration {
 			Port:           defaultPort,
 			BindAddress:    defaultBindAddress,
 			TemplateDir:    defaultTemplateDir,
-			ServerCertFile: defaultserverCertFile,
-			ServerKeyFile:  defaultserverKeyFile,
+			ServerCertFile: defaultServerCertFile,
+			ServerKeyFile:  defaultServerKeyFile,
 			NonTlsPort:     defaultNonTLSPort,
 			SessionSecret:  "",
 		},
@@ -89,17 +89,6 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-func exists(path string) bool {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true
-	}
-	if os.IsNotExist(err) {
-		return false
-	}
-	return false
-}
-
 type Context struct {
 	Config           *Configuration
 	Logger           *logging.Logger
@@ -112,13 +101,13 @@ func NewContext(
 	config *Configuration,
 	logger *logging.Logger,
 	rpcConnectString string,
-	sessionstore *sessions.CookieStore) *Context {
+	sessionStore *sessions.CookieStore) *Context {
 	return &Context{
 		Config:           config,
 		Logger:           logger,
 		loggerLevel:      -1,
 		RpcConnectString: rpcConnectString,
-		SessionStore:     sessionstore,
+		SessionStore:     sessionStore,
 	}
 }
 

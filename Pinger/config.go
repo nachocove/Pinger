@@ -2,7 +2,6 @@ package Pinger
 
 import (
 	"code.google.com/p/gcfg"
-	"errors"
 	"fmt"
 	"github.com/op/go-logging"
 	"os"
@@ -67,7 +66,7 @@ func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel logging
 		return nil, err
 	}
 	if !exists(gconfig.LogDir) {
-		return nil, errors.New(fmt.Sprintf("Logging directory %s does not exist.\n", gconfig.LogDir))
+		return nil, fmt.Errorf("Logging directory %s does not exist.", gconfig.LogDir)
 	}
 	loggerName := path.Base(os.Args[0])
 	logger, err := InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel)

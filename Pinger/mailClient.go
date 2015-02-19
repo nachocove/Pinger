@@ -156,5 +156,5 @@ func (pi *MailPingInformation) validateClientId() error {
 	if pi.ClientId == "" {
 		return errors.New("Empty client ID is not valid")
 	}
-	return DefaultPollingContext.config.Aws.validateCognitoId(pi.ClientId)
+	return DefaultPollingContext.config.Aws.validateCognitoID(pi.ClientId)
 }

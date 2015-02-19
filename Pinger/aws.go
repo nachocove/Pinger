@@ -18,7 +18,7 @@ type AWSConfiguration struct {
 	SnsIOSPlatformArn string
 
 	CognitoIdentityRegionName string
-	CognitoIdentityPoolId     string
+	CognitoIdentityPoolID     string
 }
 
 func (config *AWSConfiguration) Validate() error {
@@ -47,7 +47,7 @@ func (config *AWSConfiguration) registerEndpointArn(service, token, customerData
 	if strings.EqualFold(service, PushServiceAPNS) {
 		platformArn = config.SnsIOSPlatformArn
 	} else {
-		return "", errors.New(fmt.Sprintf("Unsupported platform service %s", service))
+		return "", fmt.Errorf("Unsupported platform service %s", service)
 	}
 	options := sns.CreatePlatformEndpointInput{
 		Attributes:             nil,
@@ -106,7 +106,7 @@ func (config *AWSConfiguration) getCognitoIdentitySession() (*cognitoidentity.Co
 	return cognitoSession, nil
 }
 
-func (config *AWSConfiguration) validateCognitoId(clientId string) error {
+func (config *AWSConfiguration) validateCognitoID(clientId string) error {
 	cognitoSession, err := config.getCognitoIdentitySession()
 	if err != nil {
 		return err
