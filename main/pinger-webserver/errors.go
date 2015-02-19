@@ -18,26 +18,23 @@ type responseErrorType map[ResponseErrorString]ResponseError
 
 var responseErrors responseErrorType
 
-func init() {
-	responseErrors = make(responseErrorType)
-}
-
 func addResponseError(errCode ResponseErrorString, errMsg ResponseErrorMsg, httpCode int) {
 	responseErrors[errCode] = ResponseError{errCode, errMsg, httpCode}
 }
 
 const (
-	MISSING_REQUIRED_DATA ResponseErrorString = "MISSING_REQUIRED_DATA"
-	RPC_SERVER_ERROR      ResponseErrorString = "RPC_SERVER_ERROR"
-	SAVE_SESSION_ERROR    ResponseErrorString = "SAVE_SESSION_ERROR"
-	JSON_ENCODE_ERROR     ResponseErrorString = "JSON_ENCODE_ERROR"
+	MissingRequiredData ResponseErrorString = "MISSING_REQUIRED_DATA"
+	RPCServerError      ResponseErrorString = "RPC_SERVER_ERROR"
+	SaveSessionError    ResponseErrorString = "SAVE_SESSION_ERROR"
+	JSONEncodeError     ResponseErrorString = "JSON_ENCODE_ERROR"
 )
 
 func init() {
-	addResponseError("MISSING_REQUIRED_DATA", "Some data that is required was missing", http.StatusBadRequest)
-	addResponseError("RPC_SERVER_ERROR", "Could not reach RPC server", http.StatusInternalServerError)
-	addResponseError("SAVE_SESSION_ERROR", "Could not save session", http.StatusInternalServerError)
-	addResponseError("JSON_ENCODE_ERROR", "Could not encode json reply", http.StatusInternalServerError)
+    responseErrors = make(responseErrorType)
+	addResponseError("MissingRequiredData", "Some data that is required was missing", http.StatusBadRequest)
+	addResponseError("RPCServerError", "Could not reach RPC server", http.StatusInternalServerError)
+	addResponseError("SaveSessionError", "Could not save session", http.StatusInternalServerError)
+	addResponseError("JSONEncodeError", "Could not encode json reply", http.StatusInternalServerError)
 }
 
 func responseError(w http.ResponseWriter, errCode ResponseErrorString) {

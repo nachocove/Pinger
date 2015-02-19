@@ -113,7 +113,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 	if postInfo.Validate() == false {
 		context.Logger.Warning("Missing non-optional data")
-		responseError(w, MISSING_REQUIRED_DATA)
+		responseError(w, MissingRequiredData)
 		return
 	}
 
@@ -122,7 +122,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	reply, err := Pinger.StartPoll(context.RpcConnectString, postInfo.AsMailInfo())
 	if err != nil {
 		context.Logger.Warning("Could not re/start polling for device %s: %s", postInfo.ClientId, err)
-		responseError(w, RPC_SERVER_ERROR)
+		responseError(w, RPCServerError)
 		return
 	}
 	context.Logger.Debug("Re/Started Polling for %s", postInfo.ClientId)
@@ -130,7 +130,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	err = session.Save(r, w)
 	if err != nil {
 		context.Logger.Warning("Could not save session")
-		responseError(w, SAVE_SESSION_ERROR)
+		responseError(w, SaveSessionError)
 		return
 	}
 	responseData := make(map[string]string)
@@ -159,7 +159,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
 		context.Logger.Warning("Could not json encode reply: %v", responseData)
-		responseError(w, JSON_ENCODE_ERROR)
+		responseError(w, JSONEncodeError)
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")

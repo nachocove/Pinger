@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+    // needed to get the http.ListenAndServe below to pick up the profiler
 	_ "net/http/pprof"
 	"net/rpc"
 
