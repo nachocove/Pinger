@@ -128,5 +128,5 @@ func initDbMySql(dbConfig *DBConfiguration) *gorp.DbMap {
 	if err != nil {
 		log.Fatalf("Could not ping database: %v", err)
 	}
-	return &gorp.DbMap{Db: db, Dialect: gorp.MySQLDialect{Engine:"InnoDB", Encoding:"UTF8"}}
+	return &gorp.DbMap{Db: db, Dialect: gorp.MySQLDialect{Engine: "InnoDB", Encoding: "UTF8"}}
 }
