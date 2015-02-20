@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log"
 
-    // blank import to get the mysql mappings for gorp
+	// blank import to get the mysql mappings for gorp
 	_ "github.com/Go-SQL-Driver/MySQL"
-    // blank import to get the mysql mappings for gorp
+	// blank import to get the mysql mappings for gorp
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/coopernurse/gorp"

@@ -30,7 +30,7 @@ const (
 )
 
 func init() {
-    responseErrors = make(responseErrorType)
+	responseErrors = make(responseErrorType)
 	addResponseError("MissingRequiredData", "Some data that is required was missing", http.StatusBadRequest)
 	addResponseError("RPCServerError", "Could not reach RPC server", http.StatusInternalServerError)
 	addResponseError("SaveSessionError", "Could not save session", http.StatusInternalServerError)

@@ -20,7 +20,7 @@ type MailClientStatus int
 
 const (
 	MailClientStatusError   = iota
-    MailClientStatusPinging = iota
+	MailClientStatusPinging = iota
 )
 
 type MailClient interface {
