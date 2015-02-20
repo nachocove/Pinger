@@ -10,8 +10,8 @@ import (
 )
 
 func init() {
-	httpsRouter.HandleFunc("/register", registerDevice)
-	httpsRouter.HandleFunc("/defer", deferPolling)
+	httpsRouter.HandleFunc("/1/register", registerDevice)
+	httpsRouter.HandleFunc("/1/defer", deferPolling)
 }
 
 const SessionVarClientId = "ClientId"
