@@ -140,8 +140,8 @@ func (ex *ExchangeClient) startLongPoll() {
 		return
 	}
 
-	ex.logger.Debug("%s: Starting deferTimer for %d seconds", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
-	deferTimer := time.NewTimer(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
+	ex.logger.Debug("%s: Starting deferTimer for %d msecs", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
+	deferTimer := time.NewTimer(time.Duration(ex.pi.WaitBeforeUse) * time.Millisecond)
 
 forLoop:
 	for {
@@ -160,9 +160,9 @@ forLoop:
 				break forLoop
 
 			case cmd == PingerDefer:
-				ex.logger.Debug("%s: reStarting deferTimer for %d seconds", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
+				ex.logger.Debug("%s: reStarting deferTimer for %d msecs", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
 				ex.stop()
-				deferTimer.Reset(time.Duration(ex.pi.WaitBeforeUse) * time.Second)
+				deferTimer.Reset(time.Duration(ex.pi.WaitBeforeUse) * time.Millisecond)
 
 			default:
 				ex.logger.Error("%s: Unknown command %d", ex.getLogPrefix(), cmd)
@@ -201,20 +201,17 @@ func (ex *ExchangeClient) run() {
 		Transport: tr,
 	}
 	if ex.pi.ResponseTimeout > 0 {
-		client.Timeout = time.Duration(ex.pi.ResponseTimeout) * time.Second
+		client.Timeout = time.Duration(ex.pi.ResponseTimeout) * time.Millisecond
 	}
 
-	ex.logger.Debug("%s: New HTTP Client with timeout %d %s", ex.getLogPrefix(), ex.pi.ResponseTimeout, ex.pi.MailServerUrl)
+	ex.logger.Debug("%s: New HTTP Client with timeout %d msec %s", ex.getLogPrefix(), ex.pi.ResponseTimeout, ex.pi.MailServerUrl)
 	stopPolling := false
-	var sleepTime time.Duration
 	for {
 		request, err := ex.newRequest()
 		if err != nil {
 			ex.sendError(err)
 			return
 		}
-		requestSent := time.Now()
-		sleepTime = time.Duration(0)
 		go ex.doRequestResponse(client, request)
 		ex.logger.Debug("%s: Waiting for response", ex.getLogPrefix())
 		select {
@@ -267,7 +264,6 @@ func (ex *ExchangeClient) run() {
 					}
 				}
 			}
-			sleepTime = (time.Duration(ex.pi.ResponseTimeout) * time.Second) - time.Since(requestSent)
 
 		case cmd := <-ex.stopCh:
 			switch {
@@ -286,11 +282,6 @@ func (ex *ExchangeClient) run() {
 		}
 		if stopPolling == true {
 			break
-		}
-
-		if sleepTime.Seconds() > 0.0 {
-			ex.logger.Debug("%s: sleeping %fs before next attempt", ex.getLogPrefix(), sleepTime.Seconds())
-			time.Sleep(sleepTime)
 		}
 	}
 

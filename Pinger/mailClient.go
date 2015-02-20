@@ -48,8 +48,8 @@ type MailPingInformation struct {
 	HttpNoChangeReply      []byte
 	CommandTerminator      []byte // used by imap
 	CommandAcknowledgement []byte // used by imap
-	ResponseTimeout        int64  // in seconds
-	WaitBeforeUse          int64  // in seconds
+	ResponseTimeout        int64  // in milliseconds
+	WaitBeforeUse          int64  // in milliseconds
 	PushToken              string // platform dependent push token
 	PushService            string // APNS, AWS, GCM, etc.
 
@@ -147,7 +147,7 @@ func (pi *MailPingInformation) deferPoll(timeout int64, debug bool, logger *logg
 	}
 	logger.Debug("%s: Deferring polls", pi.ClientId)
 	if timeout > 0 {
-		pi.WaitBeforeUse = timeout
+		pi.itch WaitBeforeUse = timeout
 	}
 	return pi.mailClient.Action(PingerDefer)
 }

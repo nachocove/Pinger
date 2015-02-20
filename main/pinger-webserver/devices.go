@@ -38,8 +38,8 @@ type registerPostData struct {
 	HttpNoChangeReply      []byte
 	CommandTerminator      []byte // used by imap
 	CommandAcknowledgement []byte // used by imap
-	ResponseTimeout        int64  // in seconds
-	WaitBeforeUse          int64  // in seconds
+	ResponseTimeout        int64  // in milliseconds
+	WaitBeforeUse          int64  // in milliseconds
 	PushToken              string // platform dependent push token
 	PushService            string // APNS, AWS, GCM, etc.
 }
