@@ -24,7 +24,7 @@ nachobase:
 	(cd nachobase ; docker build -t nachocove/nachobase:v1 .)
 
 curl-register:
-	curl -c cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/janvD2.json https://$(PINGER_HOST)/$(PINGER_VERSION)/register
+	curl -c /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/janvD2.json https://$(PINGER_HOST)/$(PINGER_VERSION)/register
 
 curl-defer:
-	curl -b cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/janvD2-defer.json https://$(PINGER_HOST)/$(PINGER_VERSION)/defer
+	curl -b /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/janvD2-defer.json https://$(PINGER_HOST)/$(PINGER_VERSION)/defer
