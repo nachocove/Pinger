@@ -75,5 +75,5 @@ func (l *Logger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 	next(rw, r)
 
 	res := rw.(negroni.ResponseWriter)
-	l.Info("Completed %v %s in %v", res.Status(), http.StatusText(res.Status()), time.Since(start))
+	l.Info("%s %s %s %v %s (%v)", r.RemoteAddr, r.Method, r.URL.Path, res.Status(), http.StatusText(res.Status()), time.Since(start))
 }
