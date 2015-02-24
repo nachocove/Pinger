@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/codegangsta/negroni"
+	"github.com/op/go-logging"
+	"time"
 )
 
 // NewStatic create a new negroni.Static router.
@@ -54,4 +56,24 @@ func (redir *RedirectMiddleWare) ServeHTTP(rw http.ResponseWriter, r *http.Reque
 
 func NewRedirectMiddleware(host string, port int) *RedirectMiddleWare {
 	return &RedirectMiddleWare{redirectPort: port, redirectHost: host}
+}
+
+// Logger is a middleware handler that logs the request as it goes in and the response as it goes out.
+type Logger struct {
+	*logging.Logger
+}
+
+// NewLogger returns a new Logger instance
+func NewLogger() *Logger {
+	return &Logger{logging.MustGetLogger("webserver")}
+}
+
+func (l *Logger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	start := time.Now()
+	l.Info("Started %s %s", r.Method, r.URL.Path)
+
+	next(rw, r)
+
+	res := rw.(negroni.ResponseWriter)
+	l.Info("Completed %v %s in %v", res.Status(), http.StatusText(res.Status()), time.Since(start))
 }

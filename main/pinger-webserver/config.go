@@ -196,7 +196,7 @@ func (context *Context) run() error {
 	config := context.Config
 	httpsMiddlewares := negroni.New(
 		Utils.NewRecovery("Pinger-web", config.Global.Debug),
-		negroni.NewLogger(),
+		Utils.NewLogger(),
 		Utils.NewStatic("/public", "/static", ""),
 		NewContextMiddleWare(context))
 
@@ -208,7 +208,7 @@ func (context *Context) run() error {
 	go func() {
 		httpMiddlewares := negroni.New(
 			Utils.NewRecovery("Pinger-web", config.Global.Debug),
-			negroni.NewLogger(),
+			Utils.NewLogger(),
 			Utils.NewRedirectMiddleware("", config.Server.Port),
 		)
 		httpRouter := mux.NewRouter()
