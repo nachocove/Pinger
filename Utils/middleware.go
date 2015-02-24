@@ -70,7 +70,7 @@ func NewLogger() *Logger {
 
 func (l *Logger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	start := time.Now()
-	l.Info("Started %s %s", r.Method, r.URL.Path)
+	l.Debug("Started %s %s", r.Method, r.URL.Path)
 
 	next(rw, r)
 
