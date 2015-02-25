@@ -244,24 +244,21 @@ func (ex *ExchangeClient) run() {
 				ex.sendError(fmt.Errorf("Http %d status response", response.StatusCode))
 				return
 
-			case ex.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.pi.HttpNoChangeReply) == 0:
+			case bytes.Compare(responseBody, ex.pi.HttpNoChangeReply) == 0:
 				// go back to polling
 				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", ex.getLogPrefix())
 
 			default:
 				newMail := false
-				if bytes.Compare(responseBody, ex.pi.HttpExpectedReply) == 0 {
+				if ex.pi.HttpExpectedReply == nil || bytes.Compare(responseBody, ex.pi.HttpExpectedReply) == 0 {
 					// there's new mail!
-					ex.logger.Debug("%s: Reply matched HttpExpectedReply. Send Push", ex.getLogPrefix())
+					if ex.pi.HttpExpectedReply != nil {
+						ex.logger.Debug("%s: Reply matched HttpExpectedReply. Send Push", ex.getLogPrefix())
+					}
 					newMail = true
 				} else {
-					if ex.pi.HttpNoChangeReply != nil {
-						// apparently the 'no-change' above didn't match, so this must be a change
-						newMail = true
-					} else {
-						ex.sendError(fmt.Errorf("%s: Unhandled response %v", ex.getLogPrefix(), response))
-						return
-					}
+					ex.sendError(fmt.Errorf("%s: Unhandled response %v", ex.getLogPrefix(), response))
+					return
 				}
 				if newMail {
 					ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())

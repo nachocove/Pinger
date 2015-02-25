@@ -2,6 +2,7 @@ package Pinger
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -317,10 +318,19 @@ func (di *DeviceInfo) registerAws() error {
 	if di.AWSEndpointArn != "" {
 		panic("No need to call register again. Call validate")
 	}
-	if di.PushService != "APNS" {
+	var token string
+	switch {
+	case di.PushService == "APNS":
+		tokenBytes, err := base64.StdEncoding.DecodeString(di.PushToken)
+		if err != nil {
+			return err
+		}
+		token = hex.EncodeToString(tokenBytes)
+
+	default:
 		return fmt.Errorf("Unsupported push service %s", di.PushService)
 	}
-	arn, err := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, di.PushToken, di.ClientId)
+	arn, err := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, token, di.ClientId)
 	if err != nil {
 		return err
 	}
