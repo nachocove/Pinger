@@ -64,11 +64,11 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 
 func (ex *ExchangeClient) doRequestResponse(client *http.Client, request *http.Request) {
 	if DefaultPollingContext.config.Global.DumpRequests {
-		requestBytes, err := httputil.DumpRequest(request, false)
+		requestBytes, err := httputil.DumpRequest(request, true)
 		if err != nil {
 			ex.logger.Error("%s: DumpRequest error; %v", ex.getLogPrefix(), err)
 		} else {
-			ex.logger.Debug("%s: sending request: %s", ex.getLogPrefix(), requestBytes)
+			ex.logger.Debug("%s: sending request:\n%s", ex.getLogPrefix(), requestBytes)
 		}
 	}
 	response, err := client.Do(request)
@@ -228,7 +228,7 @@ func (ex *ExchangeClient) run() {
 				return
 			}
 			if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
-				ex.logger.Debug("%s: response and body: %v %s", ex.getLogPrefix(), *response, responseBody)
+				ex.logger.Debug("%s: response and body:\n%v %s", ex.getLogPrefix(), *response, responseBody)
 			}
 			switch {
 			case response.StatusCode != 200:
