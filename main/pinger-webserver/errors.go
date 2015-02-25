@@ -37,7 +37,7 @@ func init() {
 	addResponseError(JSONEncodeError, "Could not encode json reply", http.StatusInternalServerError)
 }
 
-func responseError(w http.ResponseWriter, errCode ResponseErrorString) {
+func responseError(w http.ResponseWriter, errCode ResponseErrorString, extra string) {
 	errResponse, ok := responseErrors[errCode]
 	if !ok {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -46,6 +46,9 @@ func responseError(w http.ResponseWriter, errCode ResponseErrorString) {
 	responseData := make(map[string]string)
 	responseData["Status"] = string(errResponse.ErrorCode)
 	responseData["Message"] = string(errResponse.ErrorMsg)
+	if extra != "" {
+		responseData["Extra"] = extra
+	}
 
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {

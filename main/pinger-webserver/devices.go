@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httputil"
+	"strings"
 
 	"github.com/nachocove/Pinger/Pinger"
 )
@@ -45,11 +46,27 @@ type registerPostData struct {
 }
 
 // Validate validate the structure/information to make sure required information exists.
-func (pd *registerPostData) Validate() bool {
-	return (pd.ClientId != "" &&
-		pd.MailServerUrl != "" &&
-		len(pd.HttpRequestData) > 0 &&
-		len(pd.HttpExpectedReply) > 0)
+func (pd *registerPostData) Validate() (bool, []string) {
+	ok := true
+	MissingFields := []string{}
+	if pd.ClientId == "" {
+		MissingFields = append(MissingFields, "ClientId")
+		ok = false
+	}
+	if pd.MailServerUrl == "" {
+		MissingFields = append(MissingFields, "MailServerUrl")
+		ok = false
+	}
+	if len(pd.HttpRequestData) <= 0 {
+		MissingFields = append(MissingFields, "HttpRequestData")
+		ok = false
+	}
+
+	if len(pd.HttpExpectedReply) <= 0 {
+		MissingFields = append(MissingFields, "HttpExpectedReply")
+		ok = false
+	}
+	return ok, MissingFields
 }
 
 func (pd *registerPostData) AsMailInfo() *Pinger.MailPingInformation {
@@ -111,9 +128,10 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if postInfo.Validate() == false {
-		context.Logger.Warning("Missing non-optional data")
-		responseError(w, MissingRequiredData)
+	ok, missingFields := postInfo.Validate()
+	if ok == false {
+		context.Logger.Warning("Missing non-optional data: %s", strings.Join(missingFields, ","))
+		responseError(w, MissingRequiredData, strings.Join(missingFields, ","))
 		return
 	}
 
@@ -122,7 +140,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	reply, err := Pinger.StartPoll(context.RpcConnectString, postInfo.AsMailInfo())
 	if err != nil {
 		context.Logger.Warning("Could not re/start polling for device %s: %s", postInfo.ClientId, err)
-		responseError(w, RPCServerError)
+		responseError(w, RPCServerError, "")
 		return
 	}
 	context.Logger.Debug("Re/Started Polling for %s", postInfo.ClientId)
@@ -130,7 +148,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	err = session.Save(r, w)
 	if err != nil {
 		context.Logger.Warning("Could not save session")
-		responseError(w, SaveSessionError)
+		responseError(w, SaveSessionError, "")
 		return
 	}
 	responseData := make(map[string]string)
@@ -159,7 +177,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
 		context.Logger.Warning("Could not json encode reply: %v", responseData)
-		responseError(w, JSONEncodeError)
+		responseError(w, JSONEncodeError, "")
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
