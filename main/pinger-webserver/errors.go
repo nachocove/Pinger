@@ -31,10 +31,10 @@ const (
 
 func init() {
 	responseErrors = make(responseErrorType)
-	addResponseError("MissingRequiredData", "Some data that is required was missing", http.StatusBadRequest)
-	addResponseError("RPCServerError", "Could not reach RPC server", http.StatusInternalServerError)
-	addResponseError("SaveSessionError", "Could not save session", http.StatusInternalServerError)
-	addResponseError("JSONEncodeError", "Could not encode json reply", http.StatusInternalServerError)
+	addResponseError(MissingRequiredData, "Some data that is required was missing", http.StatusBadRequest)
+	addResponseError(RPCServerError, "Could not reach RPC server", http.StatusInternalServerError)
+	addResponseError(SaveSessionError, "Could not save session", http.StatusInternalServerError)
+	addResponseError(JSONEncodeError, "Could not encode json reply", http.StatusInternalServerError)
 }
 
 func responseError(w http.ResponseWriter, errCode ResponseErrorString) {
@@ -44,7 +44,6 @@ func responseError(w http.ResponseWriter, errCode ResponseErrorString) {
 		return
 	}
 	responseData := make(map[string]string)
-	//responseData["Token"] = ""
 	responseData["Status"] = string(errResponse.ErrorCode)
 	responseData["Message"] = string(errResponse.ErrorMsg)
 
