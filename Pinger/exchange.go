@@ -80,7 +80,7 @@ func (ex *ExchangeClient) doRequestResponse(client *http.Client, request *http.R
 		responseBytes, err := httputil.DumpResponse(response, true)
 		cached_data := ioutil.NopCloser(bytes.NewReader(responseBytes))
 		response.Body.Close()
-		response.Body = cached_data		
+		response.Body = cached_data
 		if err != nil {
 			ex.logger.Error("%s: Could not dump response %+v", ex.getLogPrefix(), response)
 		} else {
