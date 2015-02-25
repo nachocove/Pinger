@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httputil"
@@ -75,6 +75,17 @@ func (ex *ExchangeClient) doRequestResponse(client *http.Client, request *http.R
 	if err != nil {
 		ex.sendError(err)
 		return
+	}
+	if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
+		responseBytes, err := httputil.DumpResponse(response, true)
+		cached_data := ioutil.NopCloser(bytes.NewReader(responseBytes))
+		response.Body.Close()
+		response.Body = cached_data		
+		if err != nil {
+			ex.logger.Error("%s: Could not dump response %+v", ex.getLogPrefix(), response)
+		} else {
+			ex.logger.Debug("%s: response:\n%s", ex.getLogPrefix(), responseBytes)
+		}
 	}
 	ex.incoming <- response
 }
@@ -216,19 +227,16 @@ func (ex *ExchangeClient) run() {
 		ex.logger.Debug("%s: Waiting for response", ex.getLogPrefix())
 		select {
 		case response := <-ex.incoming:
-			responseBody := make([]byte, response.ContentLength)
-			_, err := response.Body.Read(responseBody)
-			if err != nil && err != io.EOF {
+			responseBody, err := ioutil.ReadAll(response.Body)
+			if err != nil {
 				ex.sendError(err)
+				response.Body.Close() // attempt to close. Ignore any errors.
 				return
 			}
 			err = response.Body.Close()
 			if err != nil {
 				ex.sendError(err)
 				return
-			}
-			if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
-				ex.logger.Debug("%s: response and body:\n%v %s", ex.getLogPrefix(), *response, responseBody)
 			}
 			switch {
 			case response.StatusCode != 200:
@@ -262,6 +270,7 @@ func (ex *ExchangeClient) run() {
 						ex.sendError(err)
 						return
 					}
+					ex.stop() // TODO Is this the right thing to do here?
 				}
 			}
 

@@ -322,13 +322,13 @@ func echoServer(w http.ResponseWriter, r *http.Request) {
 	//		return
 	//	}
 	//	logger.Debug("Request: %s", body)
-	body := make([]byte, r.ContentLength)
-	n, err := r.Body.Read(body)
-	if err != nil && err != io.EOF {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		r.Body.Close()
 		return
 	}
-	logger.Debug("Request body(%d): %s", n, body)
 	r.Body.Close()
+	logger.Debug("Request body(%d): %s", len(body), body)
 	fmt.Fprintf(w, "%s", string(body))
 }
