@@ -62,8 +62,8 @@ func (pd *registerPostData) Validate() (bool, []string) {
 		ok = false
 	}
 
-	if len(pd.HttpExpectedReply) <= 0 {
-		MissingFields = append(MissingFields, "HttpExpectedReply")
+	if len(pd.HttpNoChangeReply) <= 0 {
+		MissingFields = append(MissingFields, "HttpNoChangeReply")
 		ok = false
 	}
 	return ok, MissingFields
