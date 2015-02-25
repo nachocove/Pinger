@@ -328,8 +328,9 @@ func (di *DeviceInfo) registerAws() error {
 		token = hex.EncodeToString(tokenBytes)
 
 	default:
-		return fmt.Errorf("Unsupported push service %s", di.PushService)
+		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
 	}
+
 	arn, err := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, token, di.ClientId)
 	if err != nil {
 		return err

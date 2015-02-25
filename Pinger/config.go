@@ -15,11 +15,12 @@ type Configuration struct {
 }
 
 type GlobalConfiguration struct {
-	DumpRequests bool
-	LogDir       string
-	LogFileName  string
-	LogFileLevel string
-	Debug        bool
+	DumpRequests      bool
+	IgnorePushFailure bool
+	LogDir            string
+	LogFileName       string
+	LogFileLevel      string
+	Debug             bool
 
 	// private
 	logFileLevel logging.Level
@@ -35,11 +36,12 @@ func NewGlobalConfiguration() *GlobalConfiguration {
 }
 
 const (
-	defaultDumpRequests = false
-	defaultDebug        = false
-	defaultLogDir       = "./log"
-	defaultLogFileName  = ""
-	defaultLogFileLevel = "INFO"
+	defaultDumpRequests      = false
+	defaultIgnorePushFailure = false
+	defaultDebug             = false
+	defaultLogDir            = "./log"
+	defaultLogFileName       = ""
+	defaultLogFileLevel      = "INFO"
 )
 
 func NewConfiguration() *Configuration {

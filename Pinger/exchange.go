@@ -87,7 +87,11 @@ func (ex *ExchangeClient) doRequestResponse(client *http.Client, request *http.R
 			ex.logger.Debug("%s: response:\n%s", ex.getLogPrefix(), responseBytes)
 		}
 	}
-	ex.incoming <- response
+	if ex.incoming != nil {
+		ex.incoming <- response
+	} else {
+		response.Body.Close()
+	}
 }
 
 func (ex *ExchangeClient) getLogPrefix() string {
@@ -109,9 +113,14 @@ func (ex *ExchangeClient) validateClient(deviceInfo *DeviceInfo) error {
 		ex.logger.Debug("%s: Registering %s:%s with AWS.", ex.getLogPrefix(), ex.pi.PushService, ex.pi.PushToken)
 		err = deviceInfo.registerAws()
 		if err != nil {
-			return err
+			if DefaultPollingContext.config.Global.IgnorePushFailure == false {
+				return err
+			} else {
+				ex.logger.Warning("%s: Registering %s:%s error: %s", ex.getLogPrefix(), ex.pi.PushService, ex.pi.PushToken, err.Error())
+			}
+		} else {
+			ex.logger.Debug("%s: endpoint created %s", ex.getLogPrefix(), deviceInfo.AWSEndpointArn)
 		}
-		ex.logger.Debug("%s: endpoint created %s", ex.getLogPrefix(), deviceInfo.AWSEndpointArn)
 		// TODO We should send a test-ping here, so we don't find out the endpoint is unreachable later.
 		// It's optional (we'll find out eventually), but this would speed it up.
 	} else {
@@ -119,15 +128,19 @@ func (ex *ExchangeClient) validateClient(deviceInfo *DeviceInfo) error {
 		// mark it as enabled again. Possibly...
 		err = deviceInfo.validateAws()
 		if err != nil {
-			return err
+			if DefaultPollingContext.config.Global.IgnorePushFailure == false {
+				return err
+			} else {
+				ex.logger.Warning("%s: Validating %s:%s error: %s", ex.getLogPrefix(), ex.pi.PushService, ex.pi.PushToken, err.Error())
+			}
+		} else {
+			ex.logger.Debug("%s: endpoint validated %s", ex.getLogPrefix(), deviceInfo.AWSEndpointArn)
 		}
-		ex.logger.Debug("%s: endpoint validated %s", ex.getLogPrefix(), deviceInfo.AWSEndpointArn)
 	}
 	ex.deviceInfo = deviceInfo
 	return nil
 }
 
-// This function needs refactoring to better support a clean 'defer'
 func (ex *ExchangeClient) startLongPoll() {
 	defer recoverCrash(ex.logger)
 	ex.command = make(chan PingerCommand, 10)
@@ -193,9 +206,11 @@ func (ex *ExchangeClient) stop() {
 }
 
 func (ex *ExchangeClient) run() {
+	defer recoverCrash(ex.logger)
 	ex.stopCh = make(chan PingerCommand, 2)
 	defer func() {
 		ex.stopCh = nil
+		ex.incoming = nil
 	}()
 	ex.mutex.Unlock()
 
@@ -207,6 +222,13 @@ func (ex *ExchangeClient) run() {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: ex.debug},
 	}
+	var request *http.Request
+	defer func(request *http.Request) {
+		if request != nil {
+			tr.CancelRequest(request)
+		}
+	}(request)
+
 	client := &http.Client{
 		Jar:       cookies,
 		Transport: tr,
@@ -218,13 +240,15 @@ func (ex *ExchangeClient) run() {
 	ex.logger.Debug("%s: New HTTP Client with timeout %d msec %s", ex.getLogPrefix(), ex.pi.ResponseTimeout, ex.pi.MailServerUrl)
 	stopPolling := false
 	for {
-		request, err := ex.newRequest()
-		if err != nil {
-			ex.sendError(err)
-			return
+		if stopPolling == false {
+			request, err = ex.newRequest()
+			if err != nil {
+				ex.sendError(err)
+				return
+			}
+			go ex.doRequestResponse(client, request)
+			ex.logger.Debug("%s: Waiting for response", ex.getLogPrefix())
 		}
-		go ex.doRequestResponse(client, request)
-		ex.logger.Debug("%s: Waiting for response", ex.getLogPrefix())
 		select {
 		case response := <-ex.incoming:
 			responseBody, err := ioutil.ReadAll(response.Body)
@@ -264,10 +288,15 @@ func (ex *ExchangeClient) run() {
 					ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
 					err = ex.deviceInfo.push(ex.pi.ClientContext)
 					if err != nil {
-						ex.sendError(err)
-						return
+						if DefaultPollingContext.config.Global.IgnorePushFailure == false {
+							ex.sendError(err)
+							return
+						} else {
+							ex.logger.Warning("%s: Push failed but ignored: %s", ex.getLogPrefix(), err.Error())
+						}
 					}
 					ex.stop() // TODO Is this the right thing to do here?
+					stopPolling = true
 				}
 			}
 
@@ -275,19 +304,23 @@ func (ex *ExchangeClient) run() {
 			switch {
 			case cmd == PingerStop:
 				ex.logger.Debug("%s: got stop command", ex.getLogPrefix())
-				tr.CancelRequest(request)
+				if request != nil {
+					tr.CancelRequest(request)
+				}
 				resp, ok := <-ex.incoming // wait for it to cancel
 				if ok {
-					ex.logger.Debug("%s: lagging response %s", ex.getLogPrefix(), resp)
+					responseBytes, err := httputil.DumpResponse(resp, true)
+					if err != nil {
+						ex.logger.Error("Could not dump response: %s", err.Error())
+					} else {
+						ex.logger.Debug("%s: lagging response:\n%s", ex.getLogPrefix(), responseBytes)
+					}
 				}
-				stopPolling = true
+				return
 			default:
 				ex.logger.Error("%s: Unknown command %d", ex.getLogPrefix(), cmd)
 				continue
 			}
-		}
-		if stopPolling == true {
-			break
 		}
 	}
 
