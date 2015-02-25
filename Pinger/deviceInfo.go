@@ -293,12 +293,15 @@ func (di *DeviceInfo) insert() error {
 
 func (di *DeviceInfo) push(message string) error {
 	var err error
+	if message == "" {
+		message = "New Mail"
+	}
 	switch {
 	case di.AWSEndpointArn != "":
 		err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, message)
 
 	case di.Enabled == false:
-		err = errors.New("Endpoint is disabled")
+		err = errors.New("Endpoint is disabled. Can not push.")
 
 	default:
 		err = fmt.Errorf("Unsupported push service: %s", di.PushService)
