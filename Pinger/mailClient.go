@@ -100,7 +100,7 @@ func (pi *MailPingInformation) createToken() {
 	}
 }
 
-func (pi *MailPingInformation) validateStopToken(token string) bool {
+func (pi *MailPingInformation) validateToken(token string) bool {
 	return pi.stopToken == token
 }
 

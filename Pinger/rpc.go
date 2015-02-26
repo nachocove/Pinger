@@ -141,9 +141,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 			reply.Code = PollingReplyError
 			return nil
 		}
-		//validToken := pi.validateStopToken(args.StopToken)
-		t.logger.Warning("ignoring token")
-		validToken := true
+		validToken := pi.validateToken(args.StopToken)
 		if validToken == false {
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
@@ -182,9 +180,7 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 			reply.Message = err.Error()
 			return nil
 		}
-		//validToken := pi.validateStopToken(args.StopToken)
-		t.logger.Warning("ignoring token")
-		validToken := true
+		validToken := pi.validateToken(args.StopToken)
 		if validToken == false {
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
