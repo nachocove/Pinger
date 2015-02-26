@@ -28,3 +28,6 @@ curl-register:
 
 curl-defer:
 	curl -b /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/janvD2-defer.json https://$(PINGER_HOST)/$(PINGER_VERSION)/defer
+
+curl-stop:
+	curl -b /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/janvD2-stop.json https://$(PINGER_HOST)/$(PINGER_VERSION)/stop
