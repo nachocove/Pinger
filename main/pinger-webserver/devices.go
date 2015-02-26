@@ -13,6 +13,7 @@ import (
 func init() {
 	httpsRouter.HandleFunc("/1/register", registerDevice)
 	httpsRouter.HandleFunc("/1/defer", deferPolling)
+	httpsRouter.HandleFunc("/1/stop", stopPolling)
 }
 
 const SessionVarClientId = "ClientId"
@@ -228,6 +229,79 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	reply, err := Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.Timeout, deferData.StopToken)
 	if err != nil {
 		context.Logger.Error("Error deferring poll %s", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	responseData := make(map[string]string)
+	switch {
+	case reply.Code == Pinger.PollingReplyError:
+		responseData["Status"] = "ERROR"
+		responseData["Message"] = reply.Message
+
+	case reply.Code == Pinger.PollingReplyOK:
+		responseData["Status"] = "OK"
+		responseData["Message"] = ""
+
+	case reply.Code == Pinger.PollingReplyWarn:
+		responseData["Status"] = "WARN"
+		responseData["Message"] = reply.Message
+
+	default:
+		context.Logger.Error("Unknown PollingReply Code %d", reply.Code)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	responseJson, err := json.Marshal(responseData)
+	if err != nil {
+		context.Logger.Warning("Could not json encode reply: %v", responseData)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Add("Content-Type", "application/json")
+	fmt.Fprintf(w, string(responseJson))
+	return
+}
+
+type stopPost struct {
+	ClientId  string
+	StopToken string
+}
+
+func stopPolling(w http.ResponseWriter, r *http.Request) {
+	context := GetContext(r)
+	if r.Method != "POST" {
+		context.Logger.Warning("Received %s method call from %s", r.Method, r.RemoteAddr)
+		http.Error(w, "UNKNOWN METHOD", http.StatusBadRequest)
+		return
+	}
+	session, err := context.SessionStore.Get(r, "pinger-session")
+	if err != nil {
+		context.Logger.Warning("Could not get session")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
+		return
+	}
+
+	stopData := stopPost{}
+	decoder := json.NewDecoder(r.Body)
+	err = decoder.Decode(&stopData)
+	if err != nil {
+		context.Logger.Error("Could not parse json %s", err)
+		http.Error(w, "Could not parse json", http.StatusBadRequest)
+		return
+	}
+	if session.Values[SessionVarClientId] != stopData.ClientId {
+		context.Logger.Error("Client ID %s does not match session", stopData.ClientId)
+		http.Error(w, "Unknown Client ID", http.StatusForbidden)
+		return
+	}
+	reply, err := Pinger.StopPoll(context.RpcConnectString, stopData.ClientId, stopData.StopToken)
+	if err != nil {
+		context.Logger.Error("Error stopping poll %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
