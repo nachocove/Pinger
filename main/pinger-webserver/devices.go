@@ -61,10 +61,13 @@ func (pd *registerPostData) Validate() (bool, []string) {
 		MissingFields = append(MissingFields, "HttpRequestData")
 		ok = false
 	}
-
 	if len(pd.HttpNoChangeReply) <= 0 {
 		MissingFields = append(MissingFields, "HttpNoChangeReply")
 		ok = false
+	}
+	if pd.ClientContext == "" {
+		MissingFields = append(MissingFields, "ClientContext")
+		ok = false		
 	}
 	return ok, MissingFields
 }

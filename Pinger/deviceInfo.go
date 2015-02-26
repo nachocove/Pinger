@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -26,7 +27,8 @@ type DeviceInfo struct {
 	LastContact        int64 `db:"last_contact"`
 	LastContactRequest int64 `db:"last_contact_request"`
 
-	ClientId       string `db:"client_id"`       // us-east-1a-XXXXXXXX
+	ClientId       string `db:"client_id"` // us-east-1a-XXXXXXXX
+	ClientContext  string `db:"client_context"`
 	Platform       string `db:"device_platform"` // "ios", "android", etc..
 	PushToken      string `db:"push_token"`
 	PushService    string `db:"push_service"` // APNS, GCM, ...
@@ -92,13 +94,14 @@ func (di *DeviceInfo) validate() error {
 	}
 	return nil
 }
-func newDeviceInfo(clientID, pushToken, pushService, platform string) (*DeviceInfo, error) {
+func newDeviceInfo(clientID, clientContext, pushToken, pushService, platform string) (*DeviceInfo, error) {
 	di := &DeviceInfo{
-		ClientId:    clientID,
-		PushToken:   pushToken,
-		PushService: pushService,
-		Platform:    platform,
-		Enabled:     false,
+		ClientId:      clientID,
+		ClientContext: clientContext,
+		PushToken:     pushToken,
+		PushService:   pushService,
+		Platform:      platform,
+		Enabled:       false,
 	}
 	err := di.validate()
 	if err != nil {
@@ -226,6 +229,7 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation) error {
 	if di == nil {
 		di, err = newDeviceInfo(
 			pi.ClientId,
+			pi.ClientContext,
 			pi.PushToken,
 			pi.PushService,
 			pi.Platform)
@@ -292,14 +296,27 @@ func (di *DeviceInfo) insert() error {
 	return di.dbm.Insert(di)
 }
 
-func (di *DeviceInfo) push(message string) error {
+type PingerNotification string
+
+const (
+	PingerNotificationRegister PingerNotification = "register"
+	PingerNotificationNewMail  PingerNotification = "new"
+)
+
+func (di *DeviceInfo) push(message PingerNotification) error {
 	var err error
 	if message == "" {
 		message = "New Mail"
 	}
+	var notificationMap = make(map[string]string)
+	notificationMap[di.ClientContext] = string(message)
+	messageString, err := json.Marshal(notificationMap)
+	if err != nil {
+		return err
+	}
 	switch {
 	case di.AWSEndpointArn != "":
-		err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, message)
+		err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, string(messageString))
 
 	case di.Enabled == false:
 		err = errors.New("Endpoint is disabled. Can not push.")
@@ -320,7 +337,7 @@ func (di *DeviceInfo) registerAws() error {
 	}
 	var token string
 	switch {
-	case di.PushService == "APNS":
+	case di.PushService == PushServiceAPNS:
 		tokenBytes, err := base64.StdEncoding.DecodeString(di.PushToken)
 		if err != nil {
 			return err

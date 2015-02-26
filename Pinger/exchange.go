@@ -265,39 +265,38 @@ func (ex *ExchangeClient) run() {
 			switch {
 			case response.StatusCode != 200:
 				ex.logger.Debug("%s: Non-200 response: %d", ex.getLogPrefix(), response.StatusCode)
+				// ask the client to re-register, since something is bad.
+				err = ex.deviceInfo.push(PingerNotificationRegister)
+				if err != nil {
+					// don't bother with this error. The real/main error is the http status. Just log it.
+					ex.logger.Error("%s: Push failed but ignored: %s", ex.getLogPrefix(), err.Error())
+				}
 				ex.sendError(fmt.Errorf("Http %d status response", response.StatusCode))
 				return
 
-			case bytes.Compare(responseBody, ex.pi.HttpNoChangeReply) == 0:
+			case ex.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.pi.HttpNoChangeReply) == 0:
 				// go back to polling
 				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", ex.getLogPrefix())
 
+			case ex.pi.HttpExpectedReply == nil || bytes.Compare(responseBody, ex.pi.HttpExpectedReply) == 0:
+				// there's new mail!
+				ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
+				err = ex.deviceInfo.push(PingerNotificationNewMail)
+				if err != nil {
+					if DefaultPollingContext.config.Global.IgnorePushFailure == false {
+						ex.sendError(err)
+						return
+					} else {
+						ex.logger.Warning("%s: Push failed but ignored: %s", ex.getLogPrefix(), err.Error())
+					}
+				}
+				ex.stop() // TODO Is this the right thing to do here?
+				stopPolling = true
+				
 			default:
-				newMail := false
-				if ex.pi.HttpExpectedReply == nil || bytes.Compare(responseBody, ex.pi.HttpExpectedReply) == 0 {
-					// there's new mail!
-					if ex.pi.HttpExpectedReply != nil {
-						ex.logger.Debug("%s: Reply matched HttpExpectedReply. Send Push", ex.getLogPrefix())
-					}
-					newMail = true
-				} else {
-					ex.sendError(fmt.Errorf("%s: Unhandled response %v", ex.getLogPrefix(), response))
-					return
-				}
-				if newMail {
-					ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
-					err = ex.deviceInfo.push(ex.pi.ClientContext)
-					if err != nil {
-						if DefaultPollingContext.config.Global.IgnorePushFailure == false {
-							ex.sendError(err)
-							return
-						} else {
-							ex.logger.Warning("%s: Push failed but ignored: %s", ex.getLogPrefix(), err.Error())
-						}
-					}
-					ex.stop() // TODO Is this the right thing to do here?
-					stopPolling = true
-				}
+				ex.sendError(fmt.Errorf("%s: Unhandled response %v", ex.getLogPrefix(), response))
+				return
+
 			}
 
 		case cmd := <-ex.stopCh:
