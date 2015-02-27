@@ -37,7 +37,7 @@ type DeviceInfo struct {
 	Enabled        bool   `db:"enabled"`
 	Pinger         string `db:"pinger"`
 
-	dbm *gorp.DbMap `db:"-"`
+	dbm    *gorp.DbMap     `db:"-"`
 	logger *logging.Logger `db:"-"`
 }
 
