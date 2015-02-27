@@ -180,6 +180,9 @@ func getAllMyDeviceInfo(dbm *gorp.DbMap) ([]DeviceInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	for k := range devices {
+		devices[k].dbm = dbm
+	}
 	return devices, nil
 }
 
@@ -200,10 +203,6 @@ func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
 		di.Pinger = pingerHostId
 	}
 	return di.validate()
-}
-
-func (di *DeviceInfo) setDbm(dbm *gorp.DbMap) {
-	di.dbm = dbm
 }
 
 func updateLastContact(dbm *gorp.DbMap, clientId string) error {
@@ -238,13 +237,12 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation) error {
 		if di == nil {
 			return errors.New("Could not create DeviceInfo")
 		}
-		di.dbm = dbm
-		err = di.insert()
+		err = di.insert(dbm)
 		if err != nil {
 			return err
 		}
 	} else {
-		_, err := di.updateDeviceInfo(pi)
+		_, err := di.updateDeviceInfo(pi.PushService, pi.PushToken, pi.Platform)
 		if err != nil {
 			return err
 		}
@@ -252,21 +250,22 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation) error {
 	return nil
 }
 
-func (di *DeviceInfo) updateDeviceInfo(pi *MailPingInformation) (bool, error) {
+func (di *DeviceInfo) updateDeviceInfo(pushService, pushToken, platform string) (bool, error) {
 	changed := false
-	if di.ClientId != pi.ClientId {
-		panic("Can not have a different ClientID")
-	}
-	if di.Platform != pi.Platform {
-		di.Platform = pi.Platform
+	if di.Platform != platform {
+		di.Platform = platform
 		changed = true
 	}
-	if di.PushService != pi.PushService {
-		di.PushService = pi.PushService
+	// TODO if the push token or service change, then the AWS endpoint is no longer valid: We should send a delete to AWS for the endpoint
+	if di.PushService != pushService {
+		di.PushService = pushService
+		di.PushToken = ""
+		di.AWSEndpointArn = ""
 		changed = true
 	}
-	if di.PushToken != pi.PushToken {
-		di.PushToken = pi.PushToken
+	if di.PushToken != pushToken {
+		di.PushToken = pushToken
+		di.AWSEndpointArn = ""
 		changed = true
 	}
 	if changed {
@@ -288,11 +287,14 @@ func (di *DeviceInfo) update() (int64, error) {
 	return di.dbm.Update(di)
 }
 
-func (di *DeviceInfo) insert() error {
-	if di.dbm == nil {
-		panic("Can not insert device info without having fetched it")
+func (di *DeviceInfo) insert(dbm *gorp.DbMap) error {
+	if dbm == nil {
+		dbm = di.dbm
 	}
-	return di.dbm.Insert(di)
+	if dbm == nil {
+		panic("Can not insert device info without db information")
+	}
+	return dbm.Insert(di)
 }
 
 type PingerNotification string
