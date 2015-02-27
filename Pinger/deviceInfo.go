@@ -304,6 +304,30 @@ const (
 	PingerNotificationNewMail  PingerNotification = "new"
 )
 
+func (di *DeviceInfo) pushMessage(message PingerNotification) (string, error) {
+	if message == "" {
+		return "", fmt.Errorf("Message can not be empty")
+	}
+	notificationMap := map[string]interface{}{}
+	notificationMap["pinger"] = map[string]string{di.ClientContext: string(message)}
+	var notificationBytes []byte
+	var err error
+	switch {
+	case di.PushService == PushServiceAPNS:
+		notificationMap["aps"] = nil
+		notificationBytes, err = json.Marshal(notificationMap)
+		if err != nil {
+			return "", err
+		}
+
+	default:
+		return "", fmt.Errorf("Unsupported push service: %s", di.PushService)
+	}
+	if len(notificationBytes) == 0 {
+		return "", fmt.Errorf("No notificationBytes created")
+	}
+	return string(notificationBytes), nil
+}
 type StringInterfaceMap map[string]interface{}
 type APNSPushNotification struct {
 	aps *StringInterfaceMap
@@ -311,34 +335,17 @@ type APNSPushNotification struct {
 }
 func (di *DeviceInfo) push(message PingerNotification) error {
 	var err error
-	if message == "" {
-		panic("Message can not be empty")
-	}
 	if di.Enabled == false {
 		return errors.New("Endpoint is disabled. Can not push.")
 	}
 	if di.AWSEndpointArn == "" {
 		return errors.New("Endpoint not registered.")
 	}
-	
-	notificationMap := map[string]interface{}{}
-	notificationMap["pinger"] = map[string]string{di.ClientContext: string(message)}
-	var notificationBytes []byte
-	switch {
-	case di.PushService == PushServiceAPNS:
-		notificationMap["aps"] = nil
-		notificationBytes, err = json.Marshal(notificationMap)
-		if err != nil {
-			return err
-		}
-
-	default:
-		return fmt.Errorf("Unsupported push service: %s", di.PushService)
-	}
-	if len(notificationBytes) == 0 {
-		return fmt.Errorf("No notificationBytes created")
-	}
-	err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, string(notificationBytes))
+	pushMessage, err := di.pushMessage(message)
+	if err != nil {
+		return err
+	}	
+	err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, pushMessage)
 	if err == nil {
 		di.LastContactRequest = time.Now().UnixNano()
 		_, err = di.update()

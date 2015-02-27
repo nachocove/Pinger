@@ -1,7 +1,6 @@
 package Pinger
 
 import (
-	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
@@ -94,7 +93,6 @@ func TestDeviceInfoUpdate(t *testing.T) {
 	assert.Equal(1, len(deviceList))
 	di := deviceList[0]
 	assert.NotNil(di.dbm)
-	fmt.Printf("di.dbm is%+v\n", di.dbm)
 
 	di.AWSEndpointArn = "some endpoint"
 	_, err = di.update()
@@ -112,4 +110,13 @@ func TestDeviceInfoUpdate(t *testing.T) {
 	assert.True(changed)
 	assert.Equal(newToken, di.PushToken)
 	assert.Empty(di.AWSEndpointArn)
+}
+
+func TestDevicePushMessageCreate(t *testing.T) {
+	assert := assert.New(t)
+	di := DeviceInfo{Platform: "ios", PushService: PushServiceAPNS, ClientContext: "FOO"}
+	message, err := di.pushMessage(PingerNotificationRegister)
+	assert.NoError(err)
+	assert.NotEmpty(message)
+	assert.Equal("{\"aps\":null,\"pinger\":{\"FOO\":\"register\"}}", message)
 }
