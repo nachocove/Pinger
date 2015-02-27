@@ -15,6 +15,7 @@ import (
 
 type TestClient struct {
 	client          *Pinger.Client
+	stopCh          chan int
 	pingPeriodicity int
 	debug           bool
 	logger          *logging.Logger
@@ -122,11 +123,13 @@ func NewTestClient(dialString string, pingPeriodic int, reopenConnection, debug 
 		logger.Error("Could not get Client")
 		return nil
 	}
+	stopCh := make(chan int)
 	return &TestClient{
 		client:          client,
 		pingPeriodicity: pingPeriodic,
 		debug:           debug,
 		logger:          logger,
-		stats:           Utils.NewStatLogger(logger, true),
+		stopCh:          client.StopCh,
+		stats:           Utils.NewStatLogger(stopCh, logger, true),
 	}
 }

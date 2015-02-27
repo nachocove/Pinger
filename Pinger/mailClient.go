@@ -12,8 +12,15 @@ import (
 	"sync"
 )
 
+type MailClient interface {
+	LongPoll(wait *sync.WaitGroup) error
+	Action(action PingerCommand) error
+	Status() (MailClientStatus, error)
+	SelfDelete()
+}
+
 const (
-	MailClientActivesync = "ActiveSync"
+	MailClientActiveSync = "ActiveSync"
 )
 
 type MailClientStatus int
@@ -24,13 +31,8 @@ const (
 )
 
 const (
-	DefaultMaxPollTimeout int64 = 2*24*60*60*1000 // 2 days in milliseconds
+	DefaultMaxPollTimeout int64 = 2 * 24 * 60 * 60 * 1000 // 2 days in milliseconds
 )
-type MailClient interface {
-	LongPoll(wait *sync.WaitGroup) error
-	Action(action PingerCommand) error
-	Status() (MailClientStatus, error)
-}
 
 type MailServerCredentials struct {
 	Username string
@@ -58,13 +60,38 @@ type MailPingInformation struct {
 	MaxPollTimeout         int64  // max polling lifetime. Default 2 days.
 
 	// private
-	mailClient       MailClient // a mail client with the MailClient interface
-	_userCredentials map[string]string
-	stopToken        string
+	mailClient MailClient // a mail client with the MailClient interface
+	stopToken  string
+	logger     *logging.Logger
 }
 
 func (pi *MailPingInformation) status() (MailClientStatus, error) {
 	return pi.mailClient.Status()
+}
+func (pi *MailPingInformation) SelfDelete() {
+	pi.logger.Debug("%s@%s: Cleaning up MailPingInformation struct", pi.ClientId, pi.ClientContext)
+	pi.ClientId = ""
+	pi.ClientContext = ""
+	pi.Platform = ""
+	pi.MailServerUrl = ""
+	pi.MailServerCredentials.Password = ""
+	pi.MailServerCredentials.Username = ""
+	pi.Protocol = ""
+	for k := range pi.HttpHeaders {
+		delete(pi.HttpHeaders, k)
+	}
+	pi.HttpRequestData = nil
+	pi.HttpExpectedReply = nil
+	pi.HttpNoChangeReply = nil
+	pi.CommandTerminator = nil
+	pi.CommandAcknowledgement = nil
+	pi.PushToken = ""
+	pi.PushService = ""
+	if pi.mailClient != nil {
+		pi.mailClient.SelfDelete()
+		pi.mailClient = nil
+	}
+	pi.stopToken = ""
 }
 
 func (pi *MailPingInformation) String() string {
@@ -73,6 +100,9 @@ func (pi *MailPingInformation) String() string {
 	jsonstring, err := json.Marshal(mailcopy)
 	if err != nil {
 		panic("Could not encode struct")
+	}
+	if pi.MailServerCredentials.Password == "REDACTED" {
+		panic("This should not have happened")
 	}
 	return string(jsonstring)
 }
@@ -112,9 +142,24 @@ func (pi *MailPingInformation) start(debug, doStats bool, logger *logging.Logger
 	var client MailClient
 	var err error
 
+	logger.Debug("%s: Validating clientID", pi.ClientId)
+	err = pi.validateClientId()
+	if err != nil {
+		return "", err
+	}
+
+	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, logger)
+	if err != nil {
+		return "", err
+	}
+	err = deviceInfo.validateClient()
+	if err != nil {
+		return "", err
+	}
+
 	switch {
-	case strings.EqualFold(pi.Protocol, MailClientActivesync):
-		client, err = NewExchangeClient(pi, debug, doStats, logger)
+	case strings.EqualFold(pi.Protocol, MailClientActiveSync):
+		client, err = NewExchangeClient(pi, deviceInfo, debug, doStats, logger)
 		if err != nil {
 			return "", err
 		}

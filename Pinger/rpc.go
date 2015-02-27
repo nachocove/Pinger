@@ -101,6 +101,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 	}
 	// nothing started. So start it.
 	pi = args.MailInfo
+	pi.logger = t.logger
 
 	err := newDeviceInfoPI(t.dbm, pi, t.logger)
 	if err != nil {

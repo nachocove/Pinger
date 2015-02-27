@@ -37,8 +37,9 @@ type DeviceInfo struct {
 	Enabled        bool   `db:"enabled"`
 	Pinger         string `db:"pinger"`
 
-	dbm    *gorp.DbMap     `db:"-"`
-	logger *logging.Logger `db:"-"`
+	dbm       *gorp.DbMap     `db:"-"`
+	logger    *logging.Logger `db:"-"`
+	logPrefix string          `db:"-"`
 }
 
 const (
@@ -111,6 +112,17 @@ func newDeviceInfo(clientID, clientContext, pushToken, pushService, platform str
 		return nil, err
 	}
 	return di, nil
+}
+
+func (di *DeviceInfo) selfDelete() {
+	di.logger.Debug("%s: Cleaning up DeviceInfo", di.getLogPrefix())
+	di.ClientId = ""
+	di.ClientContext = ""
+	di.PushToken = ""
+	di.PushService = ""
+	di.Platform = ""
+	di.dbm.Delete(di.Id)
+	di.Id = 0
 }
 
 var pingerHostId string
@@ -447,4 +459,44 @@ func (di *DeviceInfo) validateAws() error {
 		di.update()
 	}
 	return nil
+}
+
+func (di *DeviceInfo) validateClient() error {
+	// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
+	if di.AWSEndpointArn == "" {
+		di.logger.Debug("%s: Registering %s:%s with AWS.", di.getLogPrefix(), di.PushService, di.PushToken)
+		err := di.registerAws()
+		if err != nil {
+			if DefaultPollingContext.config.Global.IgnorePushFailure == false {
+				return err
+			} else {
+				di.logger.Warning("%s: Registering %s:%s error (ignored): %s", di.getLogPrefix(), di.PushService, di.PushToken, err.Error())
+			}
+		} else {
+			di.logger.Debug("%s: endpoint created %s", di.getLogPrefix(), di.AWSEndpointArn)
+		}
+		// TODO We should send a test-ping here, so we don't find out the endpoint is unreachable later.
+		// It's optional (we'll find out eventually), but this would speed it up.
+	} else {
+		// Validate this even if the device is marked as deviceInfo.Enabled=false, because this might
+		// mark it as enabled again. Possibly...
+		err := di.validateAws()
+		if err != nil {
+			if DefaultPollingContext.config.Global.IgnorePushFailure == false {
+				return err
+			} else {
+				di.logger.Warning("%s: Validating %s:%s error (ignored): %s", di.getLogPrefix(), di.PushService, di.PushToken, err.Error())
+			}
+		} else {
+			di.logger.Debug("%s: endpoint validated %s", di.getLogPrefix(), di.AWSEndpointArn)
+		}
+	}
+	return nil
+}
+
+func (di *DeviceInfo) getLogPrefix() string {
+	if di.logPrefix == "" {
+		di.logPrefix = fmt.Sprintf("%s@%s", di.ClientId, di.ClientContext)
+	}
+	return di.logPrefix
 }

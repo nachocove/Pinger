@@ -29,6 +29,7 @@ type Client struct {
 	Incoming   chan []byte
 	Outgoing   chan []byte
 	Command    chan PingerCommand
+	StopCh     chan int
 	Err        chan error
 
 	// private
@@ -50,6 +51,7 @@ func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, tcp
 		Outgoing:   make(chan []byte, 2),
 		Command:    make(chan PingerCommand, 2),
 		Err:        make(chan error),
+		StopCh:     make(chan int),
 
 		// private
 		dialString:    dialString,
@@ -70,6 +72,7 @@ func (client *Client) String() string {
 
 // Done The client is exiting. Cleanup and alert anyone waiting.
 func (client *Client) Done() {
+	close(client.StopCh)
 	if client.debug {
 		client.logger.Info("Finished with Client")
 	}

@@ -10,16 +10,16 @@ type StatLogger struct {
 	ResponseTimeCh          chan float64
 	FirstTimeResponseTimeCh chan float64
 	OverageSleepTimeCh      chan float64
-	Command                 chan StatsCommand
+	stopCh                  chan int
 	tallyLogger             *logging.Logger
 }
 
-func NewStatLogger(logger *logging.Logger, startTally bool) *StatLogger {
+func NewStatLogger(stopCh chan int, logger *logging.Logger, startTally bool) *StatLogger {
 	stat := &StatLogger{
 		ResponseTimeCh:          make(chan float64, 1000),
 		FirstTimeResponseTimeCh: make(chan float64, 1000),
 		OverageSleepTimeCh:      make(chan float64, 1000),
-		Command:                 make(chan StatsCommand, 1),
+		stopCh:                  stopCh,
 		tallyLogger:             logger,
 	}
 	if startTally {
@@ -43,11 +43,8 @@ func (stat *StatLogger) TallyResponseTimes() {
 	logTimer := time.NewTimer(logTimeout)
 	for {
 		select {
-		case cmd := <-stat.Command:
-			if cmd == StatsStop {
-				return
-			}
-			stat.tallyLogger.Error("unknown command %d", cmd)
+		case <-stat.stopCh:
+			return
 
 		case data = <-stat.ResponseTimeCh:
 			normalResponseTimes.addDataPoint(data)
