@@ -308,31 +308,50 @@ func (di *DeviceInfo) pushMessage(message PingerNotification) (string, error) {
 	if message == "" {
 		return "", fmt.Errorf("Message can not be empty")
 	}
-	notificationMap := map[string]interface{}{}
-	notificationMap["pinger"] = map[string]string{di.ClientContext: string(message)}
-	var notificationBytes []byte
-	var err error
-	switch {
-	case di.PushService == PushServiceAPNS:
-		notificationMap["aps"] = nil
-		notificationBytes, err = json.Marshal(notificationMap)
-		if err != nil {
-			return "", err
-		}
+	pingerMap := map[string]interface{}{}
+	pingerMap["pinger"] = map[string]string{di.ClientContext: string(message)}
 
-	default:
-		return "", fmt.Errorf("Unsupported push service: %s", di.PushService)
+	notificationMap := map[string]string{}
+	APNSMap := map[string]interface{}{}
+	APNSMap["pinger"] = pingerMap["pinger"]
+	APNSMap["aps"] = nil
+	b, err := json.Marshal(APNSMap)
+	if err != nil {
+		return "", err
+	}
+	notificationMap["APNS"] = string(b)
+
+	GCMMap := map[string]interface{}{}
+	GCMMap["data"] = pingerMap
+	b, err = json.Marshal(GCMMap)
+	if err != nil {
+		return "", err
+	}
+	notificationMap["GCM"] = string(b)
+
+	b, err = json.Marshal(pingerMap)
+	if err != nil {
+		return "", err
+	}
+	notificationMap["default"] = string(b)
+
+	var notificationBytes []byte
+	notificationBytes, err = json.Marshal(notificationMap)
+	if err != nil {
+		return "", err
 	}
 	if len(notificationBytes) == 0 {
 		return "", fmt.Errorf("No notificationBytes created")
 	}
 	return string(notificationBytes), nil
 }
+
 type StringInterfaceMap map[string]interface{}
 type APNSPushNotification struct {
-	aps *StringInterfaceMap
+	aps    *StringInterfaceMap
 	pinger *StringInterfaceMap
 }
+
 func (di *DeviceInfo) push(message PingerNotification) error {
 	var err error
 	if di.Enabled == false {
@@ -344,7 +363,7 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 	pushMessage, err := di.pushMessage(message)
 	if err != nil {
 		return err
-	}	
+	}
 	err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, pushMessage)
 	if err == nil {
 		di.LastContactRequest = time.Now().UnixNano()
@@ -361,7 +380,7 @@ func (di *DeviceInfo) registerAws() error {
 	var err error
 	switch {
 	case di.PushService == PushServiceAPNS:
-	    token, err = decodeAPNSPushToken(di.PushToken)
+		token, err = decodeAPNSPushToken(di.PushToken)
 		if err != nil {
 			return err
 		}

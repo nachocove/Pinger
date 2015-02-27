@@ -103,7 +103,7 @@ func TestDeviceInfoUpdate(t *testing.T) {
 	assert.NoError(err)
 	assert.False(changed)
 	assert.NotEmpty(di.AWSEndpointArn)
-	
+
 	newToken := "some updated token"
 	changed, err = di.updateDeviceInfo(di.PushService, newToken, di.Platform)
 	assert.NoError(err)
@@ -118,5 +118,7 @@ func TestDevicePushMessageCreate(t *testing.T) {
 	message, err := di.pushMessage(PingerNotificationRegister)
 	assert.NoError(err)
 	assert.NotEmpty(message)
-	assert.Equal("{\"aps\":null,\"pinger\":{\"FOO\":\"register\"}}", message)
+	assert.Equal(
+		"{\"APNS\":\"{\\\"aps\\\":null,\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
+		message)
 }
