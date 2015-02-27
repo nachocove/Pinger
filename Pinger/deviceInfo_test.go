@@ -119,6 +119,6 @@ func TestDevicePushMessageCreate(t *testing.T) {
 	assert.NoError(err)
 	assert.NotEmpty(message)
 	assert.Equal(
-		"{\"APNS\":\"{\\\"aps\\\":null,\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
+		"{\"APNS\":\"{\\\"aps\\\":null,\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"collapse_key\\\":\\\"10e23d6b0b515fbff01dff49948afebea929a763\\\",\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
 		message)
 }

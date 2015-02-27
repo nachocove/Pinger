@@ -1,6 +1,7 @@
 package Pinger
 
 import (
+	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -310,8 +311,18 @@ func (di *DeviceInfo) pushMessage(message PingerNotification) (string, error) {
 	}
 	pingerMap := map[string]interface{}{}
 	pingerMap["pinger"] = map[string]string{di.ClientContext: string(message)}
+	pingerJson, err := json.Marshal(pingerMap)
+	if err != nil {
+		return "", err
+	}
+	hash := sha1.New()
+	hash.Write(pingerJson)
+	md := hash.Sum(nil)
+	pingerMapSha := hex.EncodeToString(md)
 
 	notificationMap := map[string]string{}
+	notificationMap["default"] = string(pingerJson)
+
 	APNSMap := map[string]interface{}{}
 	APNSMap["pinger"] = pingerMap["pinger"]
 	APNSMap["aps"] = nil
@@ -323,17 +334,13 @@ func (di *DeviceInfo) pushMessage(message PingerNotification) (string, error) {
 
 	GCMMap := map[string]interface{}{}
 	GCMMap["data"] = pingerMap
+	GCMMap["collapse_key"] = string(pingerMapSha)
+
 	b, err = json.Marshal(GCMMap)
 	if err != nil {
 		return "", err
 	}
 	notificationMap["GCM"] = string(b)
-
-	b, err = json.Marshal(pingerMap)
-	if err != nil {
-		return "", err
-	}
-	notificationMap["default"] = string(b)
 
 	var notificationBytes []byte
 	notificationBytes, err = json.Marshal(notificationMap)
