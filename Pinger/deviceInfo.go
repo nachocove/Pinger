@@ -2,7 +2,6 @@ package Pinger
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -303,27 +302,41 @@ const (
 	PingerNotificationNewMail  PingerNotification = "new"
 )
 
+type StringInterfaceMap map[string]interface{}
+type APNSPushNotification struct {
+	aps *StringInterfaceMap
+	pinger *StringInterfaceMap
+}
 func (di *DeviceInfo) push(message PingerNotification) error {
 	var err error
 	if message == "" {
-		message = "New Mail"
+		panic("Message can not be empty")
 	}
-	var notificationMap = make(map[string]string)
-	notificationMap[di.ClientContext] = string(message)
-	messageString, err := json.Marshal(notificationMap)
-	if err != nil {
-		return err
+	if di.Enabled == false {
+		return errors.New("Endpoint is disabled. Can not push.")
 	}
+	if di.AWSEndpointArn == "" {
+		return errors.New("Endpoint not registered.")
+	}
+	
+	notificationMap := map[string]interface{}{}
+	notificationMap["pinger"] = map[string]string{di.ClientContext: string(message)}
+	var notificationBytes []byte
 	switch {
-	case di.AWSEndpointArn != "":
-		err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, string(messageString))
-
-	case di.Enabled == false:
-		err = errors.New("Endpoint is disabled. Can not push.")
+	case di.PushService == PushServiceAPNS:
+		notificationMap["aps"] = nil
+		notificationBytes, err = json.Marshal(notificationMap)
+		if err != nil {
+			return err
+		}
 
 	default:
-		err = fmt.Errorf("Unsupported push service: %s", di.PushService)
+		return fmt.Errorf("Unsupported push service: %s", di.PushService)
 	}
+	if len(notificationBytes) == 0 {
+		return fmt.Errorf("No notificationBytes created")
+	}
+	err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, string(notificationBytes))
 	if err == nil {
 		di.LastContactRequest = time.Now().UnixNano()
 		_, err = di.update()
@@ -336,13 +349,13 @@ func (di *DeviceInfo) registerAws() error {
 		panic("No need to call register again. Call validate")
 	}
 	var token string
+	var err error
 	switch {
 	case di.PushService == PushServiceAPNS:
-		tokenBytes, err := base64.StdEncoding.DecodeString(di.PushToken)
+	    token, err = decodeAPNSPushToken(di.PushToken)
 		if err != nil {
 			return err
 		}
-		token = hex.EncodeToString(tokenBytes)
 
 	default:
 		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
