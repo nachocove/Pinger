@@ -86,8 +86,10 @@ func (config *AWSConfiguration) sendPushNotification(endpointArn, message string
 	if err != nil {
 		return err
 	}
+	messageType := "json"
 	input := sns.PublishInput{
 		Message:   aws.StringValue(&message),
+		MessageStructure: aws.StringValue(&messageType),
 		TargetARN: aws.StringValue(&endpointArn),
 	}
 	response, err := snsSession.Publish(&input)
