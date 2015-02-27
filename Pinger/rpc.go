@@ -74,7 +74,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 		if pi == nil {
 			return fmt.Errorf("%s: Could not find poll session in map", args.MailInfo.ClientId)
 		}
-		err := updateLastContact(t.dbm, args.MailInfo.ClientId)
+		err := updateLastContact(t.dbm, args.MailInfo.ClientId, t.logger)
 		if err != nil {
 			reply.Message = err.Error()
 			reply.Code = PollingReplyError
@@ -102,7 +102,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 	// nothing started. So start it.
 	pi = args.MailInfo
 
-	err := newDeviceInfoPI(t.dbm, pi)
+	err := newDeviceInfoPI(t.dbm, pi, t.logger)
 	if err != nil {
 		message := fmt.Sprintf("Could not save deviceInfo: %s", err)
 		t.logger.Warning(message)
@@ -135,7 +135,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 		if pi == nil {
 			return fmt.Errorf("Could not find poll item in map: %s", args.ClientId)
 		}
-		err := updateLastContact(t.dbm, args.ClientId)
+		err := updateLastContact(t.dbm, args.ClientId, t.logger)
 		if err != nil {
 			reply.Message = err.Error()
 			reply.Code = PollingReplyError
@@ -174,7 +174,7 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 		if pi == nil {
 			return fmt.Errorf("Could not find poll item in map: %s", args.ClientId)
 		}
-		err := updateLastContact(t.dbm, args.ClientId)
+		err := updateLastContact(t.dbm, args.ClientId, t.logger)
 		if err != nil {
 			reply.Code = PollingReplyError
 			reply.Message = err.Error()

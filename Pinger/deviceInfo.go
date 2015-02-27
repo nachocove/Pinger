@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/coopernurse/gorp"
+	"github.com/op/go-logging"
 )
 
 const (
@@ -37,6 +38,7 @@ type DeviceInfo struct {
 	Pinger         string `db:"pinger"`
 
 	dbm *gorp.DbMap `db:"-"`
+	logger *logging.Logger `db:"-"`
 }
 
 const (
@@ -94,7 +96,7 @@ func (di *DeviceInfo) validate() error {
 	}
 	return nil
 }
-func newDeviceInfo(clientID, clientContext, pushToken, pushService, platform string) (*DeviceInfo, error) {
+func newDeviceInfo(clientID, clientContext, pushToken, pushService, platform string, logger *logging.Logger) (*DeviceInfo, error) {
 	di := &DeviceInfo{
 		ClientId:      clientID,
 		ClientContext: clientContext,
@@ -102,6 +104,7 @@ func newDeviceInfo(clientID, clientContext, pushToken, pushService, platform str
 		PushService:   pushService,
 		Platform:      platform,
 		Enabled:       false,
+		logger:        logger,
 	}
 	err := di.validate()
 	if err != nil {
@@ -129,7 +132,7 @@ func init() {
 	}
 }
 
-func getDeviceInfo(dbm *gorp.DbMap, clientId string) (*DeviceInfo, error) {
+func getDeviceInfo(dbm *gorp.DbMap, clientId string, logger *logging.Logger) (*DeviceInfo, error) {
 	s := reflect.TypeOf(DeviceInfo{})
 	clientIdField, ok := s.FieldByName("ClientId")
 	if ok == false {
@@ -159,6 +162,7 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId string) (*DeviceInfo, error) {
 	case len(devices) == 1:
 		device := &(devices[0])
 		device.dbm = dbm
+		device.logger = logger
 		return device, nil
 
 	default:
@@ -166,7 +170,7 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId string) (*DeviceInfo, error) {
 	}
 }
 
-func getAllMyDeviceInfo(dbm *gorp.DbMap) ([]DeviceInfo, error) {
+func getAllMyDeviceInfo(dbm *gorp.DbMap, logger *logging.Logger) ([]DeviceInfo, error) {
 	s := reflect.TypeOf(DeviceInfo{})
 	pingerField, ok := s.FieldByName("Pinger")
 	if ok == false {
@@ -183,6 +187,7 @@ func getAllMyDeviceInfo(dbm *gorp.DbMap) ([]DeviceInfo, error) {
 	}
 	for k := range devices {
 		devices[k].dbm = dbm
+		devices[k].logger = logger
 	}
 	return devices, nil
 }
@@ -206,8 +211,8 @@ func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
 	return di.validate()
 }
 
-func updateLastContact(dbm *gorp.DbMap, clientId string) error {
-	di, err := getDeviceInfo(dbm, clientId)
+func updateLastContact(dbm *gorp.DbMap, clientId string, logger *logging.Logger) error {
+	di, err := getDeviceInfo(dbm, clientId, logger)
 	if err != nil {
 		return err
 	}
@@ -219,9 +224,9 @@ func updateLastContact(dbm *gorp.DbMap, clientId string) error {
 	return nil
 }
 
-func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation) error {
+func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.Logger) error {
 	var err error
-	di, err := getDeviceInfo(dbm, pi.ClientId)
+	di, err := getDeviceInfo(dbm, pi.ClientId, logger)
 	if err != nil {
 		return err
 	}
@@ -231,7 +236,8 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation) error {
 			pi.ClientContext,
 			pi.PushToken,
 			pi.PushService,
-			pi.Platform)
+			pi.Platform,
+			logger)
 		if err != nil {
 			return err
 		}
@@ -374,6 +380,7 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 	if err != nil {
 		return err
 	}
+	di.logger.Debug("%s: Sending push message to AWS: %s", di.ClientId, pushMessage)
 	err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, pushMessage)
 	if err == nil {
 		di.LastContactRequest = time.Now().UnixNano()

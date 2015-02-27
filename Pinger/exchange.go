@@ -152,7 +152,7 @@ func (ex *ExchangeClient) startLongPoll() {
 
 	ex.logger.Debug("%s: started longpoll", ex.getLogPrefix())
 
-	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, ex.pi.ClientId)
+	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, ex.pi.ClientId, ex.logger)
 	if err != nil {
 		ex.sendError(err)
 		return
