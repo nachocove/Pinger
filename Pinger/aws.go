@@ -7,6 +7,8 @@ import (
 	cognitoidentity "github.com/awslabs/aws-sdk-go/gen/cognito/identity"
 	"github.com/awslabs/aws-sdk-go/gen/sns"
 	"strings"
+	"encoding/hex"
+	"encoding/base64"
 )
 
 type AWSConfiguration struct {
@@ -120,4 +122,25 @@ func (config *AWSConfiguration) validateCognitoID(clientId string) error {
 		return errors.New("No IdentityId returned.")
 	}
 	return nil
+}
+
+func decodeAPNSPushToken(token string) (string, error) {
+	if len(token) == 64 {
+		// see if the string decodes, in which case it's probably already passed to us in hex
+		_, err := hex.DecodeString(token)
+		if err == nil {
+			return token, nil
+		}
+	} else {
+		tokenBytes, err := base64.StdEncoding.DecodeString(token)
+		if err != nil {
+			return "", err
+		}
+		tokenstring := hex.EncodeToString(tokenBytes)
+		if len(tokenstring) != 64 {
+			return "", fmt.Errorf("Decoded token is not 64 bytes long")
+		}
+		return tokenstring, nil
+	}
+	return "", fmt.Errorf("Could not determine push token format: %s", token)
 }
