@@ -292,7 +292,7 @@ func (ex *ExchangeClient) run() {
 				}
 				ex.stop() // TODO Is this the right thing to do here?
 				stopPolling = true
-				
+
 			default:
 				ex.sendError(fmt.Errorf("%s: Unhandled response %v", ex.getLogPrefix(), response))
 				return

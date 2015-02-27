@@ -1,14 +1,14 @@
 package Pinger
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/awslabs/aws-sdk-go/aws"
 	cognitoidentity "github.com/awslabs/aws-sdk-go/gen/cognito/identity"
 	"github.com/awslabs/aws-sdk-go/gen/sns"
 	"strings"
-	"encoding/hex"
-	"encoding/base64"
 )
 
 type AWSConfiguration struct {

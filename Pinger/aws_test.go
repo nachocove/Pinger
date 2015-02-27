@@ -10,7 +10,7 @@ func TestAPNSToken(t *testing.T) {
 
 	pushb64 := "pOsktxj+u6C/w7Tew4bIEiafcB4ZkBnDdbG4y/yLLoA="
 	pushraw := "BEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
-	
+
 	token, err := decodeAPNSPushToken(pushb64)
 	assert.NotEmpty(token)
 	assert.NoError(err)
