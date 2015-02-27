@@ -5,6 +5,10 @@ import (
 	"os"
 )
 
+// TODO Need to abstract out the logging stuff and make it a pinger logger. That way we can change the underlying logging later.
+// Also, it will allow us to cache and do a more python-logging type thing where we have a global array of loggers and can
+// just fetch them at any time, rather than passing around the logger everywhere.
+
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	if err == nil {
