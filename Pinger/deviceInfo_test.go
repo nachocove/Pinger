@@ -9,10 +9,11 @@ import (
 )
 
 var dbmap *gorp.DbMap
+var logger *logging.Logger
 
 func TestMain(m *testing.M) {
 	var err error
-	logger := logging.MustGetLogger("unittest")
+	logger = logging.MustGetLogger("unittest")
 	testDbFilename := "unittest.db"
 	os.Remove(testDbFilename)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: testDbFilename}
@@ -35,10 +36,10 @@ func TestDeviceInfoCreate(t *testing.T) {
 	testPushService := "pushService"
 	testPlatform := "ios"
 
-	deviceList, err := getAllMyDeviceInfo(dbmap)
+	deviceList, err := getAllMyDeviceInfo(dbmap, logger)
 	assert.Equal(len(deviceList), 0)
 
-	di, err := newDeviceInfo(testClientID, testClientContext, testPushToken, testPushService, testPlatform)
+	di, err := newDeviceInfo(testClientID, testClientContext, testPushToken, testPushService, testPlatform, logger)
 	assert.NoError(err)
 	assert.NotNil(di)
 
@@ -56,10 +57,10 @@ func TestDeviceInfoCreate(t *testing.T) {
 	assert.Equal(0, di.LastContactRequest)
 	assert.Empty(di.AWSEndpointArn)
 
-	deviceList, err = getAllMyDeviceInfo(dbmap)
+	deviceList, err = getAllMyDeviceInfo(dbmap, logger)
 	assert.Equal(0, len(deviceList))
 
-	diInDb, err := getDeviceInfo(dbmap, testClientID)
+	diInDb, err := getDeviceInfo(dbmap, testClientID, logger)
 	assert.NoError(err)
 	assert.Nil(diInDb)
 
@@ -75,12 +76,12 @@ func TestDeviceInfoCreate(t *testing.T) {
 
 	assert.Equal(pingerHostId, di.Pinger)
 
-	diInDb, err = getDeviceInfo(dbmap, testClientID)
+	diInDb, err = getDeviceInfo(dbmap, testClientID, logger)
 	assert.NoError(err)
 	assert.NotNil(diInDb)
 	assert.Equal(di.Id, diInDb.Id)
 
-	deviceList, err = getAllMyDeviceInfo(dbmap)
+	deviceList, err = getAllMyDeviceInfo(dbmap, logger)
 	assert.NoError(err)
 	assert.Equal(1, len(deviceList))
 }
@@ -88,7 +89,7 @@ func TestDeviceInfoCreate(t *testing.T) {
 func TestDeviceInfoUpdate(t *testing.T) {
 	assert := assert.New(t)
 
-	deviceList, err := getAllMyDeviceInfo(dbmap)
+	deviceList, err := getAllMyDeviceInfo(dbmap, logger)
 	assert.NoError(err)
 	assert.Equal(1, len(deviceList))
 	di := deviceList[0]
@@ -99,13 +100,13 @@ func TestDeviceInfoUpdate(t *testing.T) {
 	assert.NoError(err)
 	assert.NotEmpty(di.AWSEndpointArn)
 
-	changed, err := di.updateDeviceInfo(di.PushService, di.PushToken, di.Platform)
+	changed, err := di.updateDeviceInfo(di.ClientContext, di.PushService, di.PushToken, di.Platform)
 	assert.NoError(err)
 	assert.False(changed)
 	assert.NotEmpty(di.AWSEndpointArn)
 
 	newToken := "some updated token"
-	changed, err = di.updateDeviceInfo(di.PushService, newToken, di.Platform)
+	changed, err = di.updateDeviceInfo(di.ClientContext, di.PushService, newToken, di.Platform)
 	assert.NoError(err)
 	assert.True(changed)
 	assert.Equal(newToken, di.PushToken)
@@ -121,6 +122,6 @@ func TestDevicePushMessageCreate(t *testing.T) {
 	assert.NoError(err)
 	assert.NotEmpty(message)
 	assert.Equal(
-		"{\"APNS\":\"{\\\"aps\\\":{\\\"content-available\\\":1},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"collapse_key\\\":\\\"10e23d6b0b515fbff01dff49948afebea929a763\\\",\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}},\\\"delay_while_idle\\\":false,\\\"time_to_live\\\":2419200}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
+		"{\"APNS\":\"{\\\"aps\\\":{\\\"content-available\\\":1},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"APNS_SANDBOX\":\"{\\\"aps\\\":{\\\"content-available\\\":1},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"collapse_key\\\":\\\"10e23d6b0b515fbff01dff49948afebea929a763\\\",\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}},\\\"delay_while_idle\\\":false,\\\"time_to_live\\\":2419200}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
 		message)
 }

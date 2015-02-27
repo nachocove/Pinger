@@ -341,6 +341,7 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 		return "", err
 	}
 	notificationMap["APNS"] = string(b)
+	notificationMap["APNS_SANDBOX"] = string(b)
 
 	GCMMap := map[string]interface{}{}
 	GCMMap["data"] = pingerMap
