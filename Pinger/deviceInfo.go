@@ -249,7 +249,7 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 			return err
 		}
 	} else {
-		_, err := di.updateDeviceInfo(pi.PushService, pi.PushToken, pi.Platform)
+		_, err := di.updateDeviceInfo(pi.ClientContext, pi.PushService, pi.PushToken, pi.Platform)
 		if err != nil {
 			return err
 		}
@@ -257,8 +257,12 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 	return nil
 }
 
-func (di *DeviceInfo) updateDeviceInfo(pushService, pushToken, platform string) (bool, error) {
+func (di *DeviceInfo) updateDeviceInfo(clientContext, pushService, pushToken, platform string) (bool, error) {
 	changed := false
+	if di.ClientContext != clientContext {
+		di.ClientContext = clientContext
+		changed = true
+	}
 	if di.Platform != platform {
 		di.Platform = platform
 		changed = true
