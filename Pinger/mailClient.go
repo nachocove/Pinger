@@ -23,6 +23,9 @@ const (
 	MailClientStatusPinging = iota
 )
 
+const (
+	DefaultMaxPollTimeout int64 = 2*24*60*60*1000 // 2 days in milliseconds
+)
 type MailClient interface {
 	LongPoll(wait *sync.WaitGroup) error
 	Action(action PingerCommand) error
@@ -52,6 +55,7 @@ type MailPingInformation struct {
 	WaitBeforeUse          int64  // in milliseconds
 	PushToken              string // platform dependent push token
 	PushService            string // APNS, AWS, GCM, etc.
+	MaxPollTimeout         int64  // max polling lifetime. Default 2 days.
 
 	// private
 	mailClient       MailClient // a mail client with the MailClient interface

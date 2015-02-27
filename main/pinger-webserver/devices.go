@@ -44,6 +44,7 @@ type registerPostData struct {
 	WaitBeforeUse          int64  // in milliseconds
 	PushToken              string // platform dependent push token
 	PushService            string // APNS, AWS, GCM, etc.
+	MaxPollTimeout         int64  // maximum time to poll. Default is 2 days. 
 }
 
 // Validate validate the structure/information to make sure required information exists.
@@ -93,6 +94,11 @@ func (pd *registerPostData) AsMailInfo() *Pinger.MailPingInformation {
 	pi.WaitBeforeUse = pd.WaitBeforeUse
 	pi.PushToken = pd.PushToken
 	pi.PushService = pd.PushService
+	if pd.MaxPollTimeout == 0 {
+		pi.MaxPollTimeout = Pinger.DefaultMaxPollTimeout
+	} else {
+		pi.MaxPollTimeout = pd.MaxPollTimeout
+	}
 	return &pi
 }
 
