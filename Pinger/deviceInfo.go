@@ -305,7 +305,7 @@ const (
 	PingerNotificationNewMail  PingerNotification = "new"
 )
 
-func (di *DeviceInfo) pushMessage(message PingerNotification) (string, error) {
+func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string, error) {
 	if message == "" {
 		return "", fmt.Errorf("Message can not be empty")
 	}
@@ -325,7 +325,7 @@ func (di *DeviceInfo) pushMessage(message PingerNotification) (string, error) {
 
 	APNSMap := map[string]interface{}{}
 	APNSMap["pinger"] = pingerMap["pinger"]
-	APNSMap["aps"] = nil
+	APNSMap["aps"] = map[string]interface{}{"content-available": 1}
 	b, err := json.Marshal(APNSMap)
 	if err != nil {
 		return "", err
@@ -335,6 +335,8 @@ func (di *DeviceInfo) pushMessage(message PingerNotification) (string, error) {
 	GCMMap := map[string]interface{}{}
 	GCMMap["data"] = pingerMap
 	GCMMap["collapse_key"] = string(pingerMapSha)
+	GCMMap["time_to_live"] = ttl
+	GCMMap["delay_while_idle"] = false
 
 	b, err = json.Marshal(GCMMap)
 	if err != nil {
@@ -367,7 +369,8 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 	if di.AWSEndpointArn == "" {
 		return errors.New("Endpoint not registered.")
 	}
-	pushMessage, err := di.pushMessage(message)
+	var days_28 int64 = 2419200
+	pushMessage, err := di.pushMessage(message, days_28)
 	if err != nil {
 		return err
 	}

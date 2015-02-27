@@ -115,10 +115,12 @@ func TestDeviceInfoUpdate(t *testing.T) {
 func TestDevicePushMessageCreate(t *testing.T) {
 	assert := assert.New(t)
 	di := DeviceInfo{Platform: "ios", PushService: PushServiceAPNS, ClientContext: "FOO"}
-	message, err := di.pushMessage(PingerNotificationRegister)
+	var days_28 int64 = 2419200
+
+	message, err := di.pushMessage(PingerNotificationRegister, days_28)
 	assert.NoError(err)
 	assert.NotEmpty(message)
 	assert.Equal(
-		"{\"APNS\":\"{\\\"aps\\\":null,\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"collapse_key\\\":\\\"10e23d6b0b515fbff01dff49948afebea929a763\\\",\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
+		"{\"APNS\":\"{\\\"aps\\\":{\\\"content-available\\\":1},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"collapse_key\\\":\\\"10e23d6b0b515fbff01dff49948afebea929a763\\\",\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}},\\\"delay_while_idle\\\":false,\\\"time_to_live\\\":2419200}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
 		message)
 }
