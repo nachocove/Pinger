@@ -31,7 +31,7 @@ func InitLogging(loggerName string, logFileName string, fileLevel logging.Level,
 		return nil, err
 	}
 
-	format := logging.MustStringFormatter("%{time:2006-01-02T15:04:05.000} %{level} %{shortfunc}:%{message}")
+	format := logging.MustStringFormatter("%{time:2006-01-02T15:04:05.000} %{shortfunc}:%{level} %{message}")
 	fileLogger := logging.AddModuleLevel(logging.NewLogBackend(logFile, "", 0))
 	fileLogger.SetLevel(fileLevel, "")
 	if screen {
