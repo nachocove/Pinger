@@ -116,7 +116,7 @@ func (ex *ExchangeClient) validateClient(deviceInfo *DeviceInfo) error {
 			if DefaultPollingContext.config.Global.IgnorePushFailure == false {
 				return err
 			} else {
-				ex.logger.Warning("%s: Registering %s:%s error: %s", ex.getLogPrefix(), ex.pi.PushService, ex.pi.PushToken, err.Error())
+				ex.logger.Warning("%s: Registering %s:%s error (ignored): %s", ex.getLogPrefix(), ex.pi.PushService, ex.pi.PushToken, err.Error())
 			}
 		} else {
 			ex.logger.Debug("%s: endpoint created %s", ex.getLogPrefix(), deviceInfo.AWSEndpointArn)
@@ -131,7 +131,7 @@ func (ex *ExchangeClient) validateClient(deviceInfo *DeviceInfo) error {
 			if DefaultPollingContext.config.Global.IgnorePushFailure == false {
 				return err
 			} else {
-				ex.logger.Warning("%s: Validating %s:%s error: %s", ex.getLogPrefix(), ex.pi.PushService, ex.pi.PushToken, err.Error())
+				ex.logger.Warning("%s: Validating %s:%s error (ignored): %s", ex.getLogPrefix(), ex.pi.PushService, ex.pi.PushToken, err.Error())
 			}
 		} else {
 			ex.logger.Debug("%s: endpoint validated %s", ex.getLogPrefix(), deviceInfo.AWSEndpointArn)
