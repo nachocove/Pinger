@@ -82,12 +82,24 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 		}
 		t.logger.Debug("%s: Found Existing polling session", args.MailInfo.ClientId)
 		status, err := pi.status()
-		if status != MailClientStatusPinging || err != nil {
-			t.logger.Debug("%s: Not polling. Last error was %s", args.MailInfo.ClientId, err)
-			reply.Message = fmt.Sprintf("Previous Ping failed with error: %s", err.Error())
+		switch {
+		case status == MailClientStatusStopped:
+			t.logger.Debug("%s: Polling has stopped.", args.MailInfo.ClientId)
+
+		case status == MailClientStatusPinging:
+			t.logger.Debug("%s: Polling. Stopping it.", args.MailInfo.ClientId)
+
+		case status == MailClientStatusError:
+			if err != nil {
+				t.logger.Debug("%s: Not polling. Last error was %s", args.MailInfo.ClientId, err)
+				reply.Message = fmt.Sprintf("Previous Ping failed with error: %s", err.Error())
+			} else {
+				t.logger.Debug("%s: Not polling.", args.MailInfo.ClientId)
+				reply.Message = fmt.Sprintf("Not polling")
+			}
 			reply.Code = PollingReplyWarn
 		}
-		err = pi.stop(t.debug, t.logger)
+		err = pi.stop(t.debug)
 		if err != nil {
 			reply.Message = err.Error()
 			reply.Code = PollingReplyError
@@ -111,9 +123,9 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 		reply.Code = PollingReplyError
 		return nil
 	}
-	t.logger.Debug("created/updated device info %s", pi.ClientId)
+	t.logger.Debug("%s: created/updated device info", pi.ClientId)
 
-	stopToken, err := args.MailInfo.start(t.debug, false, t.logger)
+	stopToken, err := args.MailInfo.start(t.debug, false)
 	if err != nil {
 		reply.Message = err.Error()
 		reply.Code = PollingReplyError
@@ -125,7 +137,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 }
 
 func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse) error {
-	t.logger.Debug("Received request for %s", args.ClientId)
+	t.logger.Debug("%s: Received stopPoll request", args.ClientId)
 	pi, ok := t.pollMap[args.ClientId]
 	if ok == false {
 		// nothing on file.
@@ -134,7 +146,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 		return nil
 	} else {
 		if pi == nil {
-			return fmt.Errorf("Could not find poll item in map: %s", args.ClientId)
+			return fmt.Errorf("%s: Could not find poll item in map", args.ClientId)
 		}
 		err := updateLastContact(t.dbm, args.ClientId, t.logger)
 		if err != nil {
@@ -148,7 +160,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 			reply.Code = PollingReplyError
 			return nil
 		} else {
-			err := pi.stop(t.debug, t.logger)
+			err := pi.stop(t.debug)
 			if err != nil {
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
@@ -164,7 +176,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 }
 
 func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingResponse) error {
-	t.logger.Debug("Received request for %s", args.ClientId)
+	t.logger.Debug("%s: Received deferPoll request", args.ClientId)
 	pi, ok := t.pollMap[args.ClientId]
 	if ok == false {
 		// nothing on file.
@@ -173,7 +185,7 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 		return nil
 	} else {
 		if pi == nil {
-			return fmt.Errorf("Could not find poll item in map: %s", args.ClientId)
+			return fmt.Errorf("%s: Could not find poll item in map", args.ClientId)
 		}
 		err := updateLastContact(t.dbm, args.ClientId, t.logger)
 		if err != nil {

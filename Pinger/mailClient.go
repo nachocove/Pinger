@@ -28,6 +28,7 @@ type MailClientStatus int
 const (
 	MailClientStatusError   = iota
 	MailClientStatusPinging = iota
+	MailClientStatusStopped = iota
 )
 
 const (
@@ -66,7 +67,11 @@ type MailPingInformation struct {
 }
 
 func (pi *MailPingInformation) status() (MailClientStatus, error) {
-	return pi.mailClient.Status()
+	if pi.mailClient != nil {
+		return pi.mailClient.Status()
+	} else {
+		return MailClientStatusStopped, nil
+	}
 }
 func (pi *MailPingInformation) SelfDelete() {
 	pi.logger.Debug("%s@%s: Cleaning up MailPingInformation struct", pi.ClientId, pi.ClientContext)
@@ -138,17 +143,17 @@ func (pi *MailPingInformation) validateToken(token string) bool {
 	return pi.stopToken == token
 }
 
-func (pi *MailPingInformation) start(debug, doStats bool, logger *logging.Logger) (string, error) {
+func (pi *MailPingInformation) start(debug, doStats bool) (string, error) {
 	var client MailClient
 	var err error
 
-	logger.Debug("%s: Validating clientID", pi.ClientId)
+	pi.logger.Debug("%s: Validating clientID", pi.ClientId)
 	err = pi.validateClientId()
 	if err != nil {
 		return "", err
 	}
 
-	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, logger)
+	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, pi.logger)
 	if err != nil {
 		return "", err
 	}
@@ -159,20 +164,20 @@ func (pi *MailPingInformation) start(debug, doStats bool, logger *logging.Logger
 
 	switch {
 	case strings.EqualFold(pi.Protocol, MailClientActiveSync):
-		client, err = NewExchangeClient(pi, deviceInfo, debug, doStats, logger)
+		client, err = NewExchangeClient(pi, deviceInfo, debug, doStats, pi.logger)
 		if err != nil {
 			return "", err
 		}
 	default:
-		msg := fmt.Sprintf("Unsupported Mail Protocol %s", pi.Protocol)
-		logger.Error(msg)
+		msg := fmt.Sprintf("%s: Unsupported Mail Protocol %s", pi.ClientId, pi.Protocol)
+		pi.logger.Error(msg)
 		return "", errors.New(msg)
 	}
 
 	if client == nil {
-		return "", errors.New("Could not create new Mail Client Pinger")
+		return "", fmt.Errorf("%s: Could not create new Mail Client Pinger", pi.ClientId)
 	}
-	logger.Debug("%s: Starting polls", pi.ClientId)
+	pi.logger.Debug("%s: Starting polls", pi.ClientId)
 	err = client.LongPoll(nil) // MUST NOT BLOCK. Is expected to create a goroutine to do the long poll.
 	if err != nil {
 		return "", err
@@ -182,23 +187,23 @@ func (pi *MailPingInformation) start(debug, doStats bool, logger *logging.Logger
 	return pi.stopToken, nil
 }
 
-func (pi *MailPingInformation) stop(debug bool, logger *logging.Logger) error {
-	if pi.mailClient == nil {
-		logger.Debug("%s: Stopping polls", pi.ClientId)
+func (pi *MailPingInformation) stop(debug bool) error {
+	if pi.mailClient != nil {
+		pi.logger.Debug("%s: Stopping polls", pi.ClientId)
 		return pi.mailClient.Action(PingerStop)
 	}
 	return nil
 }
 
 func (pi *MailPingInformation) deferPoll(timeout int64, debug bool, logger *logging.Logger) error {
-	if pi.mailClient == nil {
-		panic("pi.mailClient = nil. Perhaps the mailclient has not been started?")
+	if pi.mailClient != nil {
+		logger.Debug("%s: Deferring polls", pi.ClientId)
+		if timeout > 0 {
+			pi.WaitBeforeUse = timeout
+		}
+		return pi.mailClient.Action(PingerDefer)
 	}
-	logger.Debug("%s: Deferring polls", pi.ClientId)
-	if timeout > 0 {
-		pi.WaitBeforeUse = timeout
-	}
-	return pi.mailClient.Action(PingerDefer)
+	return fmt.Errorf("Client has stopped. Can not defer")
 }
 
 func (pi *MailPingInformation) validateClientId() error {
