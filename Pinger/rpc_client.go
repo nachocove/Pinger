@@ -1,7 +1,6 @@
 package Pinger
 
 import (
-	"fmt"
 	"net/rpc"
 )
 
@@ -45,9 +44,6 @@ func stopPoll(rpcClient *rpc.Client, clientId, token string) (*PollingResponse, 
 	err := rpcClient.Call("BackendPolling.Stop", &StopPollArgs{ClientId: clientId, StopToken: token}, &reply)
 	if err != nil {
 		return nil, err
-	}
-	if reply.Code != PollingReplyOK {
-		return nil, fmt.Errorf("RPC server responded with %d:%s", reply.Code, reply.Message)
 	}
 	return &reply, nil
 }
