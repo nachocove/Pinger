@@ -28,11 +28,15 @@ type DeviceInfo struct {
 	LastContact        int64 `db:"last_contact"`
 	LastContactRequest int64 `db:"last_contact_request"`
 
-	ClientId       string `db:"client_id"` // us-east-1a-XXXXXXXX
-	ClientContext  string `db:"client_context"`
-	Platform       string `db:"device_platform"` // "ios", "android", etc..
-	PushToken      string `db:"push_token"`
-	PushService    string `db:"push_service"` // APNS, GCM, ...
+	ClientId        string `db:"client_id"` // us-east-1a-XXXXXXXX
+	ClientContext   string `db:"client_context"`
+	Platform        string `db:"device_platform"` // "ios", "android", etc..
+	PushToken       string `db:"push_token"`
+	PushService     string `db:"push_service"` // APNS, GCM, ...
+	OSVersion       string `db:"os_version"`
+	AppBuildVersion string `db:"build_version"`
+	AppBuildNumber  string `db:"build_number"`
+
 	AWSEndpointArn string `db:"aws_endpoint_arn"`
 	Enabled        bool   `db:"enabled"`
 	Pinger         string `db:"pinger"`
@@ -74,6 +78,15 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 	cMap = tMap.ColMap("PushService")
 	cMap.SetNotNull(true)
 
+	cMap = tMap.ColMap("OSVersion")
+	cMap.SetNotNull(false)
+
+	cMap = tMap.ColMap("AppBuildNumber")
+	cMap.SetNotNull(false)
+
+	cMap = tMap.ColMap("AppBuildVersion")
+	cMap.SetNotNull(false)
+
 	cMap = tMap.ColMap("Pinger")
 	cMap.SetNotNull(true)
 
@@ -97,15 +110,18 @@ func (di *DeviceInfo) validate() error {
 	}
 	return nil
 }
-func newDeviceInfo(clientID, clientContext, pushToken, pushService, platform string, logger *logging.Logger) (*DeviceInfo, error) {
+func newDeviceInfo(clientID, clientContext, pushToken, pushService, platform, osVersion, appBuildVersion, appBuildNumber string, logger *logging.Logger) (*DeviceInfo, error) {
 	di := &DeviceInfo{
-		ClientId:      clientID,
-		ClientContext: clientContext,
-		PushToken:     pushToken,
-		PushService:   pushService,
-		Platform:      platform,
-		Enabled:       false,
-		logger:        logger,
+		ClientId:        clientID,
+		ClientContext:   clientContext,
+		PushToken:       pushToken,
+		PushService:     pushService,
+		Platform:        platform,
+		OSVersion:       osVersion,
+		AppBuildNumber:  appBuildVersion,
+		AppBuildVersion: appBuildNumber,
+		Enabled:         false,
+		logger:          logger,
 	}
 	err := di.validate()
 	if err != nil {
@@ -121,6 +137,9 @@ func (di *DeviceInfo) cleanup() {
 	di.PushToken = ""
 	di.PushService = ""
 	di.Platform = ""
+	di.OSVersion = ""
+	di.AppBuildNumber = ""
+	di.AppBuildVersion = ""
 	di.dbm.Delete(di.Id)
 	di.Id = 0
 }
@@ -249,6 +268,9 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 			pi.PushToken,
 			pi.PushService,
 			pi.Platform,
+			pi.OSVersion,
+			pi.AppBuildVersion,
+			pi.AppBuildNumber,
 			logger)
 		if err != nil {
 			return nil, err
@@ -261,7 +283,7 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 			return nil, err
 		}
 	} else {
-		_, err := di.updateDeviceInfo(pi.ClientContext, pi.PushService, pi.PushToken, pi.Platform)
+		_, err := di.updateDeviceInfo(pi.ClientContext, pi.PushService, pi.PushToken, pi.Platform, pi.OSVersion, pi.AppBuildVersion, pi.AppBuildNumber)
 		if err != nil {
 			return nil, err
 		}
@@ -269,10 +291,22 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 	return di, nil
 }
 
-func (di *DeviceInfo) updateDeviceInfo(clientContext, pushService, pushToken, platform string) (bool, error) {
+func (di *DeviceInfo) updateDeviceInfo(clientContext, pushService, pushToken, platform, osVersion, appBuildVersion, appBuildNumber string) (bool, error) {
 	changed := false
 	if di.ClientContext != clientContext {
 		di.ClientContext = clientContext
+		changed = true
+	}
+	if di.OSVersion != osVersion {
+		di.OSVersion = osVersion
+		changed = true
+	}
+	if di.AppBuildVersion != appBuildVersion {
+		di.AppBuildVersion = appBuildVersion
+		changed = true
+	}
+	if di.AppBuildNumber != appBuildNumber {
+		di.AppBuildNumber = appBuildNumber
 		changed = true
 	}
 	if di.Platform != platform {

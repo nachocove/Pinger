@@ -44,6 +44,9 @@ type registerPostData struct {
 	PushToken              string // platform dependent push token
 	PushService            string // APNS, AWS, GCM, etc.
 	MaxPollTimeout         int64  // maximum time to poll. Default is 2 days.
+	OSVersion              string
+	AppBuildNumber         string
+	AppBuildVersion        string
 }
 
 // Validate validate the structure/information to make sure required information exists.
@@ -98,6 +101,9 @@ func (pd *registerPostData) AsMailInfo() *Pinger.MailPingInformation {
 	} else {
 		pi.MaxPollTimeout = pd.MaxPollTimeout
 	}
+	pi.OSVersion = pd.OSVersion
+	pi.AppBuildNumber = pd.AppBuildNumber
+	pi.AppBuildVersion = pd.AppBuildVersion
 	return &pi
 }
 

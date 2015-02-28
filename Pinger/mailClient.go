@@ -58,6 +58,9 @@ type MailPingInformation struct {
 	PushToken              string // platform dependent push token
 	PushService            string // APNS, AWS, GCM, etc.
 	MaxPollTimeout         int64  // max polling lifetime. Default 2 days.
+	OSVersion              string
+	AppBuildVersion        string
+	AppBuildNumber         string
 
 	logPrefix string
 }
