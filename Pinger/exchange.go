@@ -3,41 +3,26 @@ package Pinger
 import (
 	"bytes"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httputil"
-	"net/url"
-	"path"
-	"runtime"
-	"sync"
 	"time"
 
-	"github.com/nachocove/Pinger/Utils"
 	"github.com/op/go-logging"
 )
 
 // ExchangeClient A client with type exchange.
 type ExchangeClient struct {
-	command       chan PingerCommand
-	errCh         chan error
-	incoming      chan *http.Response
-	stopCh        chan int
-	transport     *http.Transport
-	request       *http.Request
-	client        *http.Client
-	lastError     error
-	waitBeforeUse int
-	debug         bool
-	logger        *logging.Logger
-	stats         *Utils.StatLogger
-	pi            *MailPingInformation
-	urlInfo       *url.URL
-	is_active     bool
-	deviceInfo    *DeviceInfo
-	mutex         *sync.Mutex
+	incoming   chan *http.Response
+	transport  *http.Transport
+	request    *http.Request
+	httpClient *http.Client
+	debug      bool
+	logger     *logging.Logger
+	is_active  bool
+	parent     *MailClientContext
 }
 
 // TODO Need to refactor mailClient.go and exchange.go. A lot of the functionality belongs
@@ -45,38 +30,24 @@ type ExchangeClient struct {
 // lot of the redundancy in the MailPingInformation and ExchangeClient structures
 
 // NewExchangeClient set up a new exchange client
-func NewExchangeClient(mailInfo *MailPingInformation, deviceInfo *DeviceInfo, debug, doStats bool, logger *logging.Logger) (*ExchangeClient, error) {
-	urlInfo, err := url.Parse(mailInfo.MailServerUrl)
-	if err != nil {
-		return nil, err
-	}
+func NewExchangeClient(parent *MailClientContext, debug bool, logger *logging.Logger) (*ExchangeClient, error) {
 	ex := &ExchangeClient{
-		urlInfo:    urlInfo,
-		pi:         mailInfo,
-		incoming:   make(chan *http.Response),
-		command:    make(chan PingerCommand, 10),
-		errCh:      make(chan error),
-		stopCh:     make(chan int),
-		debug:      debug,
-		stats:      nil,
-		logger:     logger,
-		is_active:  false,
-		mutex:      &sync.Mutex{},
-		deviceInfo: deviceInfo,
-	}
-	if doStats {
-		ex.stats = Utils.NewStatLogger(ex.stopCh, logger, false)
+		parent:    parent,
+		incoming:  make(chan *http.Response),
+		debug:     debug,
+		logger:    logger,
+		is_active: false,
 	}
 	return ex, nil
 }
 
 func (ex *ExchangeClient) newRequest() (*http.Request, error) {
-	requestBody := bytes.NewReader(ex.pi.HttpRequestData)
-	req, err := http.NewRequest("POST", ex.pi.MailServerUrl, requestBody)
+	requestBody := bytes.NewReader(ex.parent.pi.HttpRequestData)
+	req, err := http.NewRequest("POST", ex.parent.pi.MailServerUrl, requestBody)
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range ex.pi.HttpHeaders {
+	for k, v := range ex.parent.pi.HttpHeaders {
 		req.Header.Add(k, v)
 	}
 	if header := req.Header.Get("User-Agent"); header == "" {
@@ -89,20 +60,20 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
 
-	req.SetBasicAuth(ex.pi.MailServerCredentials.Username, ex.pi.MailServerCredentials.Password)
+	req.SetBasicAuth(ex.parent.pi.MailServerCredentials.Username, ex.parent.pi.MailServerCredentials.Password)
 	return req, nil
 }
 
 func (ex *ExchangeClient) getLogPrefix() string {
-	return ex.deviceInfo.getLogPrefix()
+	return ex.parent.di.getLogPrefix()
 }
 
 func (ex *ExchangeClient) doRequestResponse() {
 	var err error
-	ex.logger.Debug("%s: New HTTP Client with timeout %d msec %s", ex.getLogPrefix(), ex.pi.ResponseTimeout, ex.pi.MailServerUrl)
+	ex.logger.Debug("%s: New HTTP Client with timeout %d msec %s", ex.getLogPrefix(), ex.parent.pi.ResponseTimeout, ex.parent.pi.MailServerUrl)
 	ex.request, err = ex.newRequest()
 	if err != nil {
-		ex.sendError(err)
+		ex.parent.sendError(err)
 		return
 	}
 	if DefaultPollingContext.config.Global.DumpRequests {
@@ -113,9 +84,9 @@ func (ex *ExchangeClient) doRequestResponse() {
 			ex.logger.Debug("%s: sending request:\n%s", ex.getLogPrefix(), requestBytes)
 		}
 	}
-	response, err := ex.client.Do(ex.request)
+	response, err := ex.httpClient.Do(ex.request)
 	if err != nil {
-		ex.sendError(err)
+		ex.parent.sendError(err)
 		return
 	}
 	if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
@@ -129,84 +100,31 @@ func (ex *ExchangeClient) doRequestResponse() {
 			ex.logger.Debug("%s: response:\n%s", ex.getLogPrefix(), responseBytes)
 		}
 	}
-	if ex.incoming != nil {
-		ex.incoming <- response
-	} else {
-		response.Body.Close()
-	}
+	ex.incoming <- response
 }
 
-func (ex *ExchangeClient) startLongPoll() {
-	defer recoverCrash(ex.logger)
-	defer ex.pi.SelfDelete() // delete the 'bag'
-	ex.is_active = true
-	ex.mutex.Unlock()
-
-	ex.logger.Debug("%s: Starting deferTimer for %d msecs", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
-	deferTimer := time.NewTimer(time.Duration(ex.pi.WaitBeforeUse) * time.Millisecond)
-
-forLoop:
-	for {
-		select {
-		case <-deferTimer.C:
-			ex.logger.Debug("%s: DeferTimer expired. Starting Polling.", ex.getLogPrefix())
-			ex.mutex.Lock()
-			go ex.run() // will unlock mutex, when the stop channel is initialized. Prevents race-condition where we get a Stop/Defer just as the go routine is starting
-
-		case err := <-ex.errCh:
-			ex.lastError = err
-			ex.logger.Debug("%s: Stopping goroutines", ex.getLogPrefix())
-			ex.Action(PingerStop)
-
-		case cmd := <-ex.command:
-			switch {
-			case cmd == PingerStop:
-				ex.logger.Debug("%s: got 'stop' command", ex.getLogPrefix())
-				deferTimer.Stop()
-				close(ex.stopCh)
-				break forLoop
-
-			case cmd == PingerDefer:
-				ex.logger.Debug("%s: reStarting deferTimer for %d msecs", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
-				ex.Action(PingerStop)
-				deferTimer.Reset(time.Duration(ex.pi.WaitBeforeUse) * time.Millisecond)
-
-			default:
-				ex.logger.Error("%s: Unknown command %d", ex.getLogPrefix(), cmd)
-				continue
-
-			}
-		}
-	}
-}
-
-func (ex *ExchangeClient) run() {
+func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 	defer recoverCrash(ex.logger)
 	defer func() {
-		ex.Action(PingerStop)
+		close(exitCh) // closing this tell the parent we've exited.
 	}()
-	ex.mutex.Unlock()
 
 	cookies, err := cookiejar.New(nil)
 	if err != nil {
-		ex.sendError(err)
+		ex.parent.sendError(err)
 		return
 	}
 	ex.transport = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: ex.debug},
 	}
 
-	ex.client = &http.Client{
+	ex.httpClient = &http.Client{
 		Jar:       cookies,
 		Transport: ex.transport,
 	}
-	if ex.pi.ResponseTimeout > 0 {
-		ex.client.Timeout = time.Duration(ex.pi.ResponseTimeout) * time.Millisecond
+	if ex.parent.pi.ResponseTimeout > 0 {
+		ex.httpClient.Timeout = time.Duration(ex.parent.pi.ResponseTimeout) * time.Millisecond
 	}
-	ex.logger.Debug("%s: Starting maxPollTimer for %d msecs", ex.getLogPrefix(), ex.pi.WaitBeforeUse)
-	maxPollTimer := time.NewTimer(time.Duration(ex.pi.MaxPollTimeout) * time.Millisecond)
-	defer maxPollTimer.Stop()
-
 	for {
 		go ex.doRequestResponse()
 		ex.logger.Debug("%s: Waiting for response", ex.getLogPrefix())
@@ -214,38 +132,38 @@ func (ex *ExchangeClient) run() {
 		case response := <-ex.incoming:
 			responseBody, err := ioutil.ReadAll(response.Body)
 			if err != nil {
-				ex.sendError(err)
+				ex.parent.sendError(err)
 				response.Body.Close() // attempt to close. Ignore any errors.
 				return
 			}
 			err = response.Body.Close()
 			if err != nil {
-				ex.sendError(err)
+				ex.parent.sendError(err)
 				return
 			}
 			switch {
 			case response.StatusCode != 200:
 				ex.logger.Debug("%s: Non-200 response: %d", ex.getLogPrefix(), response.StatusCode)
 				// ask the client to re-register, since something is bad.
-				err = ex.deviceInfo.push(PingerNotificationRegister)
+				err = ex.parent.di.push(PingerNotificationRegister)
 				if err != nil {
 					// don't bother with this error. The real/main error is the http status. Just log it.
 					ex.logger.Error("%s: Push failed but ignored: %s", ex.getLogPrefix(), err.Error())
 				}
-				ex.sendError(fmt.Errorf("Http %d status response", response.StatusCode))
+				ex.parent.sendError(fmt.Errorf("Http %d status response", response.StatusCode))
 				return
 
-			case ex.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.pi.HttpNoChangeReply) == 0:
+			case ex.parent.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.parent.pi.HttpNoChangeReply) == 0:
 				// go back to polling
 				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", ex.getLogPrefix())
 
-			case ex.pi.HttpExpectedReply == nil || bytes.Compare(responseBody, ex.pi.HttpExpectedReply) == 0:
+			case ex.parent.pi.HttpExpectedReply == nil || bytes.Compare(responseBody, ex.parent.pi.HttpExpectedReply) == 0:
 				// there's new mail!
 				ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
-				err = ex.deviceInfo.push(PingerNotificationNewMail)
+				err = ex.parent.di.push(PingerNotificationNewMail)
 				if err != nil {
 					if DefaultPollingContext.config.Global.IgnorePushFailure == false {
-						ex.sendError(err)
+						ex.parent.sendError(err)
 						return
 					} else {
 						ex.logger.Warning("%s: Push failed but ignored: %s", ex.getLogPrefix(), err.Error())
@@ -254,12 +172,12 @@ func (ex *ExchangeClient) run() {
 				return
 
 			default:
-				ex.sendError(fmt.Errorf("%s: Unhandled response %v", ex.getLogPrefix(), response))
+				ex.parent.sendError(fmt.Errorf("%s: Unhandled response %v", ex.getLogPrefix(), response))
 				return
 
 			}
 
-		case <-ex.stopCh:
+		case <-ex.parent.stopCh: // parent will close this, at which point this will trigger.
 			ex.logger.Debug("%s: Stopping", ex.getLogPrefix())
 			if ex.request != nil {
 				ex.transport.CancelRequest(ex.request)
@@ -274,61 +192,13 @@ func (ex *ExchangeClient) run() {
 				}
 			}
 			return
-
-		case <-maxPollTimer.C:
-			ex.logger.Debug("maxPollTimer expired. Stopping everything.")
-			return
 		}
 	}
 
 }
 
-func (ex *ExchangeClient) sendError(err error) {
-	_, fn, line, _ := runtime.Caller(1)
-	ex.logger.Error("%s: %s/%s:%d %s", ex.getLogPrefix(), path.Base(path.Dir(fn)), path.Base(fn), line, err)
-	ex.errCh <- err
-}
-
-// MailClient Interface
-
-// LongPoll sets up the exchange client
-func (ex *ExchangeClient) LongPoll(wait *sync.WaitGroup) error {
-	if ex.stats != nil {
-		go ex.stats.TallyResponseTimes()
-	}
-	ex.mutex.Lock()
-	go ex.startLongPoll()
-	return nil
-}
-
-// Action sends a command to the go routine.
-func (ex *ExchangeClient) Action(action PingerCommand) error {
-	ex.mutex.Lock()
-	defer ex.mutex.Unlock()
-
-	if ex.is_active == false {
-		return errors.New("Not Polling")
-	}
-
-	ex.command <- action
-	return nil
-}
-
-// Status gets the status of the go routine
-func (ex *ExchangeClient) Status() (MailClientStatus, error) {
-	if ex.is_active {
-		return MailClientStatusPinging, nil
-	} else {
-		return MailClientStatusError, ex.lastError
-	}
-}
-
 // SelfDelete Used to zero out the structure and let garbage collection reap the empty stuff.
-func (ex *ExchangeClient) SelfDelete() {
-	ex.logger.Debug("%s: Cleaning up ExchangeClient struct", ex.getLogPrefix())
-	// do NOT free or delete ex.pi. We (this function) is called from the pi deletion.
-	if ex.deviceInfo != nil {
-		ex.deviceInfo.selfDelete()
-		ex.deviceInfo = nil // let garbage collector handle it.
-	}
+func (ex *ExchangeClient) Cleanup() {
+	ex.parent = nil
+	ex.transport.CloseIdleConnections()
 }

@@ -114,7 +114,7 @@ func newDeviceInfo(clientID, clientContext, pushToken, pushService, platform str
 	return di, nil
 }
 
-func (di *DeviceInfo) selfDelete() {
+func (di *DeviceInfo) cleanup() {
 	di.logger.Debug("%s: Cleaning up DeviceInfo", di.getLogPrefix())
 	di.ClientId = ""
 	di.ClientContext = ""
@@ -236,11 +236,11 @@ func updateLastContact(dbm *gorp.DbMap, clientId string, logger *logging.Logger)
 	return nil
 }
 
-func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.Logger) error {
+func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.Logger) (*DeviceInfo, error) {
 	var err error
 	di, err := getDeviceInfo(dbm, pi.ClientId, logger)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if di == nil {
 		di, err = newDeviceInfo(
@@ -251,22 +251,22 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 			pi.Platform,
 			logger)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if di == nil {
-			return errors.New("Could not create DeviceInfo")
+			return nil, fmt.Errorf("Could not create DeviceInfo")
 		}
 		err = di.insert(dbm)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		_, err := di.updateDeviceInfo(pi.ClientContext, pi.PushService, pi.PushToken, pi.Platform)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return di, nil
 }
 
 func (di *DeviceInfo) updateDeviceInfo(clientContext, pushService, pushToken, platform string) (bool, error) {

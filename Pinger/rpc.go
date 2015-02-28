@@ -16,7 +16,7 @@ import (
 	"runtime"
 )
 
-type pollMapType map[string]*MailPingInformation
+type pollMapType map[string]*MailClientContext
 
 type BackendPolling struct {
 	dbm         *gorp.DbMap
@@ -66,12 +66,20 @@ func (t *BackendPolling) ToggleDebug() {
 	t.loggerLevel = ToggleLogging(t.logger, t.loggerLevel)
 }
 
+func validateClientID(clientID string) error {
+	if clientID == "" {
+		return fmt.Errorf("Empty client ID is not valid")
+	}
+	return DefaultPollingContext.config.Aws.validateCognitoID(clientID)
+}
+
 func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingResponse) error {
 	t.logger.Debug("%s: Received StartPoll request", args.MailInfo.ClientId)
 	reply.Code = PollingReplyOK
-	pi, ok := t.pollMap[args.MailInfo.ClientId]
+	var client *MailClientContext
+	client, ok := t.pollMap[args.MailInfo.ClientId]
 	if ok == true {
-		if pi == nil {
+		if client == nil {
 			return fmt.Errorf("%s: Could not find poll session in map", args.MailInfo.ClientId)
 		}
 		err := updateLastContact(t.dbm, args.MailInfo.ClientId, t.logger)
@@ -81,7 +89,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 			return nil
 		}
 		t.logger.Debug("%s: Found Existing polling session", args.MailInfo.ClientId)
-		status, err := pi.status()
+		status, err := client.Status()
 		switch {
 		case status == MailClientStatusStopped:
 			t.logger.Debug("%s: Polling has stopped.", args.MailInfo.ClientId)
@@ -99,23 +107,24 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 			}
 			reply.Code = PollingReplyWarn
 		}
-		err = pi.stop(t.debug)
+		err = client.Action(PingerStop)
 		if err != nil {
 			reply.Message = err.Error()
 			reply.Code = PollingReplyError
 			return nil
 		}
-		pi = nil
+		client = nil
 	} else {
-		if pi != nil {
-			panic("Got a pi but ok is false?")
+		if client != nil {
+			panic("Got a client but ok is false?")
 		}
 	}
-	// nothing started. So start it.
-	pi = args.MailInfo
-	pi.logger = t.logger
+	err := validateClientID(args.MailInfo.ClientId)
+	if err != nil {
+		return err
+	}
 
-	err := newDeviceInfoPI(t.dbm, pi, t.logger)
+	di, err := newDeviceInfoPI(t.dbm, args.MailInfo, t.logger)
 	if err != nil {
 		message := fmt.Sprintf("Could not save deviceInfo: %s", err)
 		t.logger.Warning(message)
@@ -123,29 +132,32 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 		reply.Code = PollingReplyError
 		return nil
 	}
-	t.logger.Debug("%s: created/updated device info", pi.ClientId)
+	t.logger.Debug("%s: created/updated device info", args.MailInfo.ClientId)
 
-	stopToken, err := args.MailInfo.start(t.debug, false)
+	// nothing started. So start it.
+	client, err = NewMailClientContext(args.MailInfo, di, t.debug, false, t.logger)
 	if err != nil {
-		reply.Message = err.Error()
+		message := fmt.Sprintf("Could not create new client: %s", err)
+		t.logger.Warning(message)
+		reply.Message = message
 		reply.Code = PollingReplyError
 		return nil
 	}
-	t.pollMap[args.MailInfo.ClientId] = args.MailInfo
-	reply.Token = stopToken
+	t.pollMap[args.MailInfo.ClientId] = client
+	reply.Token = client.stopToken
 	return nil
 }
 
 func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("%s: Received stopPoll request", args.ClientId)
-	pi, ok := t.pollMap[args.ClientId]
+	client, ok := t.pollMap[args.ClientId]
 	if ok == false {
 		// nothing on file.
 		reply.Code = PollingReplyError
 		reply.Message = "Not Polling"
 		return nil
 	} else {
-		if pi == nil {
+		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.ClientId)
 		}
 		err := updateLastContact(t.dbm, args.ClientId, t.logger)
@@ -154,13 +166,13 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 			reply.Code = PollingReplyError
 			return nil
 		}
-		validToken := pi.validateToken(args.StopToken)
+		validToken := client.validateStopToken(args.StopToken)
 		if validToken == false {
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
 			return nil
 		} else {
-			err := pi.stop(t.debug)
+			err := client.stop()
 			if err != nil {
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
@@ -177,14 +189,14 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 
 func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("%s: Received deferPoll request", args.ClientId)
-	pi, ok := t.pollMap[args.ClientId]
+	client, ok := t.pollMap[args.ClientId]
 	if ok == false {
 		// nothing on file.
 		reply.Code = PollingReplyError
 		reply.Message = "Not Polling"
 		return nil
 	} else {
-		if pi == nil {
+		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.ClientId)
 		}
 		err := updateLastContact(t.dbm, args.ClientId, t.logger)
@@ -193,13 +205,13 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 			reply.Message = err.Error()
 			return nil
 		}
-		validToken := pi.validateToken(args.StopToken)
+		validToken := client.validateStopToken(args.StopToken)
 		if validToken == false {
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
 			return nil
 		} else {
-			err := pi.deferPoll(args.Timeout, t.debug, t.logger)
+			err := client.deferPoll(args.Timeout)
 			if err != nil {
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
