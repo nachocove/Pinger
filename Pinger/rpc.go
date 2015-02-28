@@ -168,12 +168,14 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 		}
 		validToken := client.validateStopToken(args.StopToken)
 		if validToken == false {
+			t.logger.Warning("%s: invalid token", args.ClientId)
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
 			return nil
 		} else {
 			err := client.stop()
 			if err != nil {
+				t.logger.Error("%s: Error stopping poll: %s", args.ClientId, err.Error())
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
 				return nil
@@ -207,12 +209,14 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 		}
 		validToken := client.validateStopToken(args.StopToken)
 		if validToken == false {
+			t.logger.Warning("%s: invalid token", args.ClientId)
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
 			return nil
 		} else {
 			err := client.deferPoll(args.Timeout)
 			if err != nil {
+				t.logger.Error("%s: Error deferring poll: %s", args.ClientId, err.Error())
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
 				return nil
