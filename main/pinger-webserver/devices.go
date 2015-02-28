@@ -23,16 +23,15 @@ func init() {
 // This is so that we can change the json interface without needing to touch
 // the underlying Pinger code.
 // That being said, there has to be a better way of doing this...
-type registerPostCredentials struct {
-	Username string
-	Password string
-}
 type registerPostData struct {
-	ClientId               string
-	ClientContext          string
-	Platform               string
-	MailServerUrl          string
-	MailServerCredentials  registerPostCredentials
+	ClientId              string
+	ClientContext         string
+	Platform              string
+	MailServerUrl         string
+	MailServerCredentials struct {
+		Username string
+		Password string
+	}
 	Protocol               string
 	HttpHeaders            map[string]string // optional
 	HttpRequestData        []byte
