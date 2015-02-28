@@ -13,6 +13,8 @@ all: install test
 test:
 	go test -v ./...
 
+vet:
+	go vet ./... 2>&1 | grep -v 'possible formatting directive in Error call'
 install:
 	go install ./...
 	sh scripts/webserver-capabilities.sh
