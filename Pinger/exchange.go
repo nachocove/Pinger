@@ -25,10 +25,6 @@ type ExchangeClient struct {
 	parent     *MailClientContext
 }
 
-// TODO Need to refactor mailClient.go and exchange.go. A lot of the functionality belongs
-// in the parent, and only very few things into this file. That would likely also remove a
-// lot of the redundancy in the MailPingInformation and ExchangeClient structures
-
 // NewExchangeClient set up a new exchange client
 func NewExchangeClient(parent *MailClientContext, debug bool, logger *logging.Logger) (*ExchangeClient, error) {
 	ex := &ExchangeClient{
