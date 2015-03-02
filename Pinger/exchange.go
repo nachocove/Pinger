@@ -196,5 +196,7 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 // SelfDelete Used to zero out the structure and let garbage collection reap the empty stuff.
 func (ex *ExchangeClient) Cleanup() {
 	ex.parent = nil
-	ex.transport.CloseIdleConnections()
+	if ex.transport != nil {
+		ex.transport.CloseIdleConnections()
+	}
 }
