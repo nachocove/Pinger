@@ -232,16 +232,19 @@ func (client *MailClientContext) start() {
 	maxPollTimer.Stop()
 	defer maxPollTimer.Stop()
 	exitCh := make(chan int)
+	clients := 0
 
 	for {
 		select {
 		case <-deferTimer.C:
-			client.logger.Debug("%s: DeferTimer expired. Starting Polling.", client.pi.getLogPrefix())
+			client.logger.Debug("%s: DeferTimer expired. Starting Polling (clients %d).", client.pi.getLogPrefix(), clients)
 			maxPollTimer.Reset(maxPollTime)
-			go client.mailClient.LongPoll(exitCh) // will unlock mutex, when the stop channel is initialized. Prevents race-condition where we get a Stop/Defer just as the go routine is starting
-
+			clients ++
+			go client.mailClient.LongPoll(exitCh)
+			
 		case <-exitCh:
-			client.logger.Debug("%s: LongPoll exited. Stopping.", client.pi.getLogPrefix())
+			clients --
+			client.logger.Debug("%s: LongPoll exited. Stopping (%d).", client.pi.getLogPrefix(), clients)
 			client.Action(PingerStop)
 
 		case err := <-client.errCh:
