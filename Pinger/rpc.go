@@ -160,12 +160,6 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.ClientId)
 		}
-		err := updateLastContact(t.dbm, args.ClientId, t.logger)
-		if err != nil {
-			reply.Message = err.Error()
-			reply.Code = PollingReplyError
-			return nil
-		}
 		validToken := client.validateStopToken(args.StopToken)
 		if validToken == false {
 			t.logger.Warning("%s: invalid token", args.ClientId)
@@ -173,7 +167,13 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 			reply.Code = PollingReplyError
 			return nil
 		} else {
-			err := client.stop()
+			err := updateLastContact(t.dbm, args.ClientId, t.logger)
+			if err != nil {
+				reply.Message = err.Error()
+				reply.Code = PollingReplyError
+				return nil
+			}
+			err = client.stop()
 			if err != nil {
 				t.logger.Error("%s: Error stopping poll: %s", args.ClientId, err.Error())
 				reply.Message = err.Error()
@@ -201,12 +201,6 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.ClientId)
 		}
-		err := updateLastContact(t.dbm, args.ClientId, t.logger)
-		if err != nil {
-			reply.Code = PollingReplyError
-			reply.Message = err.Error()
-			return nil
-		}
 		validToken := client.validateStopToken(args.StopToken)
 		if validToken == false {
 			t.logger.Warning("%s: invalid token", args.ClientId)
@@ -214,7 +208,13 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 			reply.Code = PollingReplyError
 			return nil
 		} else {
-			err := client.deferPoll(args.Timeout)
+			err := updateLastContact(t.dbm, args.ClientId, t.logger)
+			if err != nil {
+				reply.Code = PollingReplyError
+				reply.Message = err.Error()
+				return nil
+			}
+			err = client.deferPoll(args.Timeout)
 			if err != nil {
 				t.logger.Error("%s: Error deferring poll: %s", args.ClientId, err.Error())
 				reply.Message = err.Error()
