@@ -62,7 +62,10 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 }
 
 func (ex *ExchangeClient) getLogPrefix() string {
-	return ex.parent.di.getLogPrefix()
+	if ex.parent != nil && ex.parent.di != nil {
+		return ex.parent.di.getLogPrefix()
+	}
+	return ""
 }
 
 func (ex *ExchangeClient) doRequestResponse() {
