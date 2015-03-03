@@ -159,7 +159,7 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 
 			case ex.parent.pi.HttpExpectedReply == nil || bytes.Compare(responseBody, ex.parent.pi.HttpExpectedReply) == 0:
 				// there's new mail!
-				ex.logger.Debug("%s: reply is %s", base64.StdEncoding.EncodeToString(responseBody))
+				ex.logger.Debug("%s: reply is %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(responseBody))
 				ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
 				err = ex.parent.di.push(PingerNotificationNewMail)
 				if err != nil {
