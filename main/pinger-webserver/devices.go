@@ -203,7 +203,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 type deferPost struct {
 	ClientId  string
 	Timeout   int64
-	StopToken string
+	Token string
 }
 
 func deferPolling(w http.ResponseWriter, r *http.Request) {
@@ -237,7 +237,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 	//		return
 	//	}
-	reply, err := Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.Timeout, deferData.StopToken)
+	reply, err := Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.Timeout, deferData.Token)
 	if err != nil {
 		context.Logger.Error("Error deferring poll %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -276,7 +276,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 
 type stopPost struct {
 	ClientId  string
-	StopToken string
+	Token string
 }
 
 func stopPolling(w http.ResponseWriter, r *http.Request) {
@@ -310,7 +310,7 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 	//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 	//		return
 	//	}
-	reply, err := Pinger.StopPoll(context.RpcConnectString, stopData.ClientId, stopData.StopToken)
+	reply, err := Pinger.StopPoll(context.RpcConnectString, stopData.ClientId, stopData.Token)
 	if err != nil {
 		context.Logger.Error("Error stopping poll %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
