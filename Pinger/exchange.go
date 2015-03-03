@@ -45,6 +45,7 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 		return nil, err
 	}
 	for k, v := range ex.parent.pi.HttpHeaders {
+		ex.logger.Debug("%s: Adding header: %s=%s", ex.getLogPrefix(), k, v) 
 		req.Header.Add(k, v)
 	}
 	if header := req.Header.Get("User-Agent"); header == "" {
@@ -77,7 +78,7 @@ func (ex *ExchangeClient) doRequestResponse() {
 		return
 	}
 	if DefaultPollingContext.config.Global.DumpRequests {
-		requestBytes, err := httputil.DumpRequest(ex.request, true)
+		requestBytes, err := httputil.DumpRequestOut(ex.request, true)
 		if err != nil {
 			ex.logger.Error("%s: DumpRequest error; %v", ex.getLogPrefix(), err)
 		} else {
