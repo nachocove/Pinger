@@ -213,7 +213,6 @@ func UserSha256(username string) string {
 }
 
 func (client *MailClientContext) validateStopToken(token string) bool {
-	client.logger.Debug("Comparing token: should be '%s', is '%s'", client.stopToken, token)
 	return token != "" && strings.EqualFold(client.stopToken, token)
 }
 
