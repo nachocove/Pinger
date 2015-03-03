@@ -90,14 +90,15 @@ func (ex *ExchangeClient) doRequestResponse() {
 		return
 	}
 	if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
-		responseBytes, err := httputil.DumpResponse(response, true)
+		headerBytes, _ := httputil.DumpResponse(response, false)
+		responseBytes, _ := ioutil.ReadAll(response.Body)
 		cached_data := ioutil.NopCloser(bytes.NewReader(responseBytes))
 		response.Body.Close()
 		response.Body = cached_data
 		if err != nil {
 			ex.logger.Error("%s: Could not dump response %+v", ex.getLogPrefix(), response)
 		} else {
-			ex.logger.Debug("%s: response:\n%s", ex.getLogPrefix(), responseBytes)
+			ex.logger.Debug("%s: response:\n%s%s", ex.getLogPrefix(), headerBytes, responseBytes)
 		}
 	}
 	ex.incoming <- response
@@ -159,6 +160,11 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 
 			case ex.parent.pi.HttpExpectedReply == nil || bytes.Compare(responseBody, ex.parent.pi.HttpExpectedReply) == 0:
 				// there's new mail!
+				if bytes.HasPrefix(responseBody, []byte("HTTP/")) {
+					ex.logger.Error("Response body contains the entire response!")
+					ex.parent.sendError(fmt.Errorf("Response body contains the entire response"))
+					return
+				}
 				ex.logger.Debug("%s: reply is %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(responseBody))
 				ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
 				err = ex.parent.di.push(PingerNotificationNewMail)
