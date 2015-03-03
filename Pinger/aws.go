@@ -68,6 +68,52 @@ func (config *AWSConfiguration) registerEndpointArn(service, token, customerData
 	return *response.EndpointARN, nil
 }
 
+func (config *AWSConfiguration) getEndpointArn(endpointArn string) (map[string]string, error) {
+	options := sns.GetEndpointAttributesInput{
+		EndpointARN: aws.StringValue(&endpointArn),
+	}
+	snsSession, err := config.getSNSSession()
+	if err != nil {
+		return nil, err
+	}
+	response, err := snsSession.GetEndpointAttributes(&options)
+	if err != nil {
+		return nil, err
+	}
+	return response.Attributes, nil	
+}
+
+func (config *AWSConfiguration) setEndpointArn(endpointArn string, attributes map[string]string) error {
+	options := sns.SetEndpointAttributesInput{
+		EndpointARN: aws.StringValue(&endpointArn),
+		Attributes: attributes,
+	}
+	snsSession, err := config.getSNSSession()
+	if err != nil {
+		return err
+	}
+	err = snsSession.SetEndpointAttributes(&options)
+	if err != nil {
+		return err
+	}
+	return nil	
+}
+
+func (config *AWSConfiguration) deleteEndpointArn(endpointArn string) error {
+	options := sns.DeleteEndpointInput{
+		EndpointARN: aws.StringValue(&endpointArn),
+	}
+	snsSession, err := config.getSNSSession()
+	if err != nil {
+		return err
+	}
+	err = snsSession.DeleteEndpoint(&options)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (config *AWSConfiguration) validateEndpointArn(endpointArn string) (map[string]string, error) {
 	snsSession, err := config.getSNSSession()
 	if err != nil {

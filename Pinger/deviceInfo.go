@@ -457,9 +457,27 @@ func (di *DeviceInfo) registerAws() error {
 		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
 	}
 
-	arn, err := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, token, di.ClientId)
-	if err != nil {
-		return err
+	arn, registerErr := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, token, di.ClientId)
+	if registerErr != nil {
+		re, err := regexp.Compile("^.*Endpoint (?P<arn>arn:aws:sns:[^ ]+) already exists.*$")
+		if err != nil {
+			return err
+		}
+		if re.MatchString(registerErr.Error()) == true {
+			arn := re.ReplaceAllString(registerErr.Error(), fmt.Sprintf("${%s}", re.SubexpNames()[1]))
+			di.logger.Warning("%s: Previously registered as %s. Updating.", arn)
+			attributes, err := DefaultPollingContext.config.Aws.getEndpointArn(arn)
+			if err != nil {
+				return err
+			}
+			attributes["CustomUserData"] = di.ClientId
+			err = DefaultPollingContext.config.Aws.setEndpointArn(arn, attributes)
+			if err != nil {
+				return err
+			}
+		} else {
+			return registerErr
+		}
 	}
 	di.AWSEndpointArn = arn
 	di.Enabled = true
