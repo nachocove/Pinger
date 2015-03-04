@@ -48,7 +48,6 @@ func (ex *ExchangeClient) getLogPrefix() string {
 
 func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	var err error
-	ex.logger.Debug("%s: Cookies in jar: %+v", ex.getLogPrefix(), ex.cookieJar)
 	requestBody := bytes.NewReader(ex.parent.pi.HttpRequestData)
 	req, err := http.NewRequest("POST", ex.parent.pi.MailServerUrl, requestBody)
 	if err != nil {
@@ -62,8 +61,15 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		req.Header.Add("User-Agent", "NachoCovePingerv0.9")
 	}
 	if header := req.Header.Get("Accept"); header == "" {
-		req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+		req.Header.Add("Accept", "*/*")
 	}
+	if header := req.Header.Get("Accept-Language"); header == "" {
+		req.Header.Add("Accept-Language", "en-us")
+	}
+	if header := req.Header.Get("Connection"); header == "" {
+		req.Header.Add("Connection", "keep-alive")
+	}
+	
 	req.Proto = "HTTP/1.1"
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
