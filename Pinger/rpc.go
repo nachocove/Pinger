@@ -282,7 +282,7 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *logging.Lo
 	rpc.HandleHTTP()
 
 	go alertAllDevices()
-	
+
 	rpcConnectString := fmt.Sprintf("%s:%d", "localhost", RPCPort)
 	logger.Info("Starting RPC server on %s", rpcConnectString)
 	err = http.ListenAndServe(rpcConnectString, nil)

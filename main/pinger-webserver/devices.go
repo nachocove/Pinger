@@ -195,9 +195,9 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 }
 
 type deferPost struct {
-	ClientId  string
-	Timeout   int64
-	Token string
+	ClientId string
+	Timeout  int64
+	Token    string
 }
 
 func deferPolling(w http.ResponseWriter, r *http.Request) {
@@ -269,8 +269,8 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 }
 
 type stopPost struct {
-	ClientId  string
-	Token string
+	ClientId string
+	Token    string
 }
 
 func stopPolling(w http.ResponseWriter, r *http.Request) {

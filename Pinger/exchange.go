@@ -76,14 +76,14 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 			ex.logger.Debug("%s: sending request:\n%s", ex.getLogPrefix(), requestBytes)
 		}
 	}
-	
+
 	req.SetBasicAuth(ex.parent.pi.MailServerCredentials.Username, ex.parent.pi.MailServerCredentials.Password)
 	if err != nil {
 		errCh <- err
 		return
 	}
 	ex.request = req // save it so we can cancel it in another routine
-	
+
 	// Make the request and wait for response
 	response, err := ex.httpClient.Do(ex.request)
 	if err != nil {
@@ -109,7 +109,7 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 	defer recoverCrash(ex.logger)
 	defer func() {
-		exitCh<-1 // tell the parent we've exited.
+		exitCh <- 1 // tell the parent we've exited.
 	}()
 
 	ex.transport = &http.Transport{
@@ -139,7 +139,7 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 		case err := <-errCh:
 			ex.parent.sendError(err)
 			return
-			
+
 		case response := <-ex.incoming:
 			// the response body tends to be pretty short. Let's just read it all.
 			responseBody, err := ioutil.ReadAll(response.Body)
@@ -165,7 +165,7 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 						ex.logger.Error("%s: Push failed but ignored: %s", ex.getLogPrefix(), err.Error())
 					}
 					return
-					
+
 				default:
 					// just retry
 					ex.logger.Debug("%s: Response Status %s %d. Back to polling", ex.getLogPrefix(), response.Status, response.StatusCode)

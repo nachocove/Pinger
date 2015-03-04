@@ -80,13 +80,13 @@ func (config *AWSConfiguration) getEndpointAttributes(endpointArn string) (map[s
 	if err != nil {
 		return nil, err
 	}
-	return response.Attributes, nil	
+	return response.Attributes, nil
 }
 
 func (config *AWSConfiguration) setEndpointAttributes(endpointArn string, attributes map[string]string) error {
 	options := sns.SetEndpointAttributesInput{
 		EndpointARN: aws.StringValue(&endpointArn),
-		Attributes: attributes,
+		Attributes:  attributes,
 	}
 	snsSession, err := config.getSNSSession()
 	if err != nil {
@@ -96,7 +96,7 @@ func (config *AWSConfiguration) setEndpointAttributes(endpointArn string, attrib
 	if err != nil {
 		return err
 	}
-	return nil	
+	return nil
 }
 
 func (config *AWSConfiguration) deleteEndpointArn(endpointArn string) error {
