@@ -183,6 +183,8 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 					ex.parent.sendError(fmt.Errorf("Response body contains the entire response"))
 					return
 				}
+				
+				ex.logger.Debug("%s: request was %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(ex.parent.pi.HttpRequestData))
 				ex.logger.Debug("%s: reply is %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(responseBody))
 				ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
 				err = ex.parent.di.push(PingerNotificationNewMail)
