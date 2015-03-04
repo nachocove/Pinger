@@ -72,7 +72,6 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 	cMap.SetNotNull(true)
 
 	cMap = tMap.ColMap("PushToken")
-	cMap.SetUnique(true)
 	cMap.SetNotNull(true)
 
 	cMap = tMap.ColMap("PushService")
