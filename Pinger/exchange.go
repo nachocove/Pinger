@@ -137,8 +137,8 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 			s := time.Duration(sleepTime) * time.Second
 			ex.logger.Debug("%s: Sleeping %s before retry", ex.getLogPrefix(), s)
 			time.Sleep(s)
-			sleepTime = 0
 		}
+		sleepTime = 1 // default sleeptime on retry. Error cases can override it.
 		errCh := make(chan error)
 		go ex.doRequestResponse(errCh)
 		ex.logger.Debug("%s: Waiting for response", ex.getLogPrefix())
