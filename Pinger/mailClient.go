@@ -108,6 +108,7 @@ type MailClientContext struct {
 	logger     *logging.Logger
 	errCh      chan error
 	stopCh     chan int
+	exitCh     chan int
 	command    chan PingerCommand
 	lastError  error
 	stats      *Utils.StatLogger
@@ -120,6 +121,7 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		logger:  logger,
 		errCh:   make(chan error),
 		stopCh:  make(chan int),
+		exitCh:  make(chan int),
 		command: make(chan PingerCommand, 10),
 		stats:   nil,
 	}
@@ -232,22 +234,19 @@ func (client *MailClientContext) start() {
 	maxPollTimer := time.NewTimer(maxPollTime)
 	maxPollTimer.Stop()
 	defer maxPollTimer.Stop()
-	exitCh := make(chan int)
-	clients := 0
 
 	for {
 		select {
 		case <-deferTimer.C:
 			// defer timer has timed out. Now it's time to do something
-			client.logger.Debug("%s: DeferTimer expired. Starting Polling (clients %d).", client.pi.getLogPrefix(), clients)
+			client.logger.Debug("%s: DeferTimer expired. Starting Polling.", client.pi.getLogPrefix())
 			maxPollTimer.Reset(maxPollTime)
-			clients ++
-			go client.mailClient.LongPoll(exitCh)
-			
-		case <-exitCh:
+			// launch the longpoll and wait for it to exit
+			go client.mailClient.LongPoll(client.exitCh)
+
+		case <-client.exitCh:
 			// the mailClient.LongPoll has indicated that it has exited. Clean up.
-			clients --
-			client.logger.Debug("%s: LongPoll exited. Stopping (%d).", client.pi.getLogPrefix(), clients)
+			client.logger.Debug("%s: LongPoll exited. Stopping.", client.pi.getLogPrefix())
 			client.Action(PingerStop)
 
 		case err := <-client.errCh:

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"net/http/cookiejar"
 	"net/http/httputil"
 	"time"
@@ -58,11 +57,6 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		httpClient.Timeout = time.Duration(timeout) * time.Millisecond
 	}
 	ex.logger.Debug("%s: New HTTP Client with timeout %s %s", ex.getLogPrefix(), httpClient.Timeout, ex.parent.pi.MailServerUrl)
-	url, err := url.Parse(ex.parent.pi.MailServerUrl)
-	if err != nil {
-		errCh <- err
-		return
-	}
 	requestBody := bytes.NewReader(ex.parent.pi.HttpRequestData)
 	req, err := http.NewRequest("POST", ex.parent.pi.MailServerUrl, requestBody)
 	if err != nil {
@@ -81,10 +75,6 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	req.Proto = "HTTP/1.1"
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
-	cookies := ex.cookieJar.Cookies(url)
-	for i := range cookies {
-		req.AddCookie(cookies[i])
-	}
 
 	if DefaultPollingContext.config.Global.DumpRequests {
 		requestBytes, err := httputil.DumpRequestOut(req, true)
@@ -109,8 +99,6 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		return
 	}
 	ex.request = nil
-	// save the cookies for later
-	ex.cookieJar.SetCookies(url, response.Cookies())
 	if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
 		headerBytes, _ := httputil.DumpResponse(response, false)
 		responseBytes, _ := ioutil.ReadAll(response.Body)
@@ -129,7 +117,7 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 	defer recoverCrash(ex.logger)
 	defer func() {
-		close(exitCh) // closing this tell the parent we've exited.
+		exitCh<-1 // tell the parent we've exited.
 	}()
 
 	ex.transport = &http.Transport{
@@ -165,16 +153,21 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 			}
 			switch {
 			case response.StatusCode != 200:
-				ex.logger.Debug("%s: Non-200 response: %d", ex.getLogPrefix(), response.StatusCode)
-				// ask the client to re-register, since something is bad.
-				err = ex.parent.di.push(PingerNotificationRegister)
-				if err != nil {
-					// don't bother with this error. The real/main error is the http status. Just log it.
-					ex.logger.Error("%s: Push failed but ignored: %s", ex.getLogPrefix(), err.Error())
+				ex.logger.Warning("%s: Non-200 response: %s %d", ex.getLogPrefix(), response.Status, response.StatusCode)
+				switch {
+				case response.StatusCode == 401:
+					// ask the client to re-register, since nothing we could do would fix this
+					err = ex.parent.di.push(PingerNotificationRegister)
+					if err != nil {
+						// don't bother with this error. The real/main error is the http status. Just log it.
+						ex.logger.Error("%s: Push failed but ignored: %s", ex.getLogPrefix(), err.Error())
+					}
+					return
+					
+				default:
+					// just retry
+					ex.logger.Debug("%s: Response Status %s %d. Back to polling", ex.getLogPrefix(), response.Status, response.StatusCode)
 				}
-				ex.parent.sendError(fmt.Errorf("Http %d status response", response.StatusCode))
-				return
-
 			case ex.parent.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.parent.pi.HttpNoChangeReply) == 0:
 				// go back to polling
 				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", ex.getLogPrefix())
