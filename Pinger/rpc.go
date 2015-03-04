@@ -298,6 +298,7 @@ func alertAllDevices() error {
 		return err
 	}
 	for _, di := range devices {
+		DefaultPollingContext.logger.Info("%s: sending PingerNotificationRegister to device", di.getLogPrefix())
 		err = di.push(PingerNotificationRegister)
 		if err != nil {
 			DefaultPollingContext.logger.Warning("%s: Could not send push: %s", di.getLogPrefix(), err.Error())
