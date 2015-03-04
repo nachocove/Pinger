@@ -53,7 +53,9 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		Transport: ex.transport,
 	}
 	if ex.parent.pi.ResponseTimeout > 0 {
-		httpClient.Timeout = time.Duration(ex.parent.pi.ResponseTimeout) * time.Millisecond
+		timeout := ex.parent.pi.ResponseTimeout
+		timeout += int64(float64(timeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
+		httpClient.Timeout = time.Duration(timeout) * time.Millisecond
 	}
 	ex.logger.Debug("%s: New HTTP Client with timeout %s %s", ex.getLogPrefix(), httpClient.Timeout, ex.parent.pi.MailServerUrl)
 	url, err := url.Parse(ex.parent.pi.MailServerUrl)
@@ -99,6 +101,8 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		return
 	}
 	ex.request = req // save it so we can cancel it in another routine
+	
+	// Make the request and wait for response
 	response, err := httpClient.Do(ex.request)
 	if err != nil {
 		errCh <- err
