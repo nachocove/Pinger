@@ -57,18 +57,6 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	for k, v := range ex.parent.pi.HttpHeaders {
 		req.Header.Add(k, v)
 	}
-	if header := req.Header.Get("User-Agent"); header == "" {
-		req.Header.Add("User-Agent", "NachoCovePingerv0.9")
-	}
-	if header := req.Header.Get("Accept"); header == "" {
-		req.Header.Add("Accept", "*/*")
-	}
-	if header := req.Header.Get("Accept-Language"); header == "" {
-		req.Header.Add("Accept-Language", "en-us")
-	}
-	if header := req.Header.Get("Connection"); header == "" {
-		req.Header.Add("Connection", "keep-alive")
-	}
 	
 	req.Proto = "HTTP/1.1"
 	req.ProtoMajor = 1
