@@ -131,7 +131,14 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 		ex.httpClient.Timeout = time.Duration(timeout) * time.Millisecond
 	}
 	ex.logger.Debug("%s: New HTTP Client with timeout %s %s", ex.getLogPrefix(), ex.httpClient.Timeout, ex.parent.pi.MailServerUrl)
+	sleepTime := 0
 	for {
+		if sleepTime > 0 {
+			s := time.Duration(sleepTime) * time.Second
+			ex.logger.Debug("%s: Sleeping %s before retry", ex.getLogPrefix(), s)
+			time.Sleep(s)
+			sleepTime = 0
+		}
 		errCh := make(chan error)
 		go ex.doRequestResponse(errCh)
 		ex.logger.Debug("%s: Waiting for response", ex.getLogPrefix())
@@ -155,10 +162,10 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 			}
 			switch {
 			case response.StatusCode != 200:
-				ex.logger.Warning("%s: Non-200 response: %s %d", ex.getLogPrefix(), response.Status, response.StatusCode)
 				switch {
 				case response.StatusCode == 401:
 					// ask the client to re-register, since nothing we could do would fix this
+					ex.logger.Warning("%s: 401 response. Telling client to re-register", ex.getLogPrefix())
 					err = ex.parent.di.push(PingerNotificationRegister)
 					if err != nil {
 						// don't bother with this error. The real/main error is the http status. Just log it.
@@ -168,9 +175,8 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 
 				default:
 					// just retry
-					sleepTime := time.Duration(10) * time.Second
-					ex.logger.Debug("%s: Response Status %s %d. Back to polling after %s", ex.getLogPrefix(), response.Status, response.StatusCode, sleepTime)
-					time.Sleep(sleepTime)
+					sleepTime = 10
+					ex.logger.Warning("%s: Response Status %s. Back to polling", ex.getLogPrefix(), response.Status)
 				}
 			case ex.parent.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.parent.pi.HttpNoChangeReply) == 0:
 				// go back to polling
