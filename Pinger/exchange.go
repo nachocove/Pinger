@@ -168,7 +168,9 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 
 				default:
 					// just retry
-					ex.logger.Debug("%s: Response Status %s %d. Back to polling", ex.getLogPrefix(), response.Status, response.StatusCode)
+					sleepTime := time.Duration(10) * time.Second
+					ex.logger.Debug("%s: Response Status %s %d. Back to polling after %s", ex.getLogPrefix(), response.Status, response.StatusCode, sleepTime)
+					time.Sleep(sleepTime)
 				}
 			case ex.parent.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.parent.pi.HttpNoChangeReply) == 0:
 				// go back to polling
