@@ -281,11 +281,27 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *logging.Lo
 	rpc.Register(pollingAPI)
 	rpc.HandleHTTP()
 
+	go alertAllDevices()
+	
 	rpcConnectString := fmt.Sprintf("%s:%d", "localhost", RPCPort)
 	logger.Info("Starting RPC server on %s", rpcConnectString)
 	err = http.ListenAndServe(rpcConnectString, nil)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func alertAllDevices() error {
+	devices, err := getAllMyDeviceInfo(DefaultPollingContext.dbm, DefaultPollingContext.logger)
+	if err != nil {
+		return err
+	}
+	for _, di := range devices {
+		err = di.push(PingerNotificationRegister)
+		if err != nil {
+			DefaultPollingContext.logger.Warning("%s: Could not send push: %s", di.getLogPrefix(), err.Error())
+		}
 	}
 	return nil
 }
