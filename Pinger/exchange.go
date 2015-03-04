@@ -24,6 +24,7 @@ type ExchangeClient struct {
 	is_active  bool
 	parent     *MailClientContext
 	cookieJar  *cookiejar.Jar
+	httpClient *http.Client
 }
 
 // NewExchangeClient set up a new exchange client
@@ -47,16 +48,7 @@ func (ex *ExchangeClient) getLogPrefix() string {
 
 func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	var err error
-	httpClient := &http.Client{
-		Jar:       ex.cookieJar,
-		Transport: ex.transport,
-	}
-	if ex.parent.pi.ResponseTimeout > 0 {
-		timeout := ex.parent.pi.ResponseTimeout
-		timeout += int64(float64(timeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
-		httpClient.Timeout = time.Duration(timeout) * time.Millisecond
-	}
-	ex.logger.Debug("%s: New HTTP Client with timeout %s %s", ex.getLogPrefix(), httpClient.Timeout, ex.parent.pi.MailServerUrl)
+	ex.logger.Debug("%s: Cookies in jar: %+v", ex.getLogPrefix(), ex.cookieJar)
 	requestBody := bytes.NewReader(ex.parent.pi.HttpRequestData)
 	req, err := http.NewRequest("POST", ex.parent.pi.MailServerUrl, requestBody)
 	if err != nil {
@@ -93,7 +85,7 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	ex.request = req // save it so we can cancel it in another routine
 	
 	// Make the request and wait for response
-	response, err := httpClient.Do(ex.request)
+	response, err := ex.httpClient.Do(ex.request)
 	if err != nil {
 		errCh <- err
 		return
@@ -129,6 +121,16 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 		return
 	}
 	ex.cookieJar = cookieJar
+	ex.httpClient = &http.Client{
+		Jar:       ex.cookieJar,
+		Transport: ex.transport,
+	}
+	if ex.parent.pi.ResponseTimeout > 0 {
+		timeout := ex.parent.pi.ResponseTimeout
+		timeout += int64(float64(timeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
+		ex.httpClient.Timeout = time.Duration(timeout) * time.Millisecond
+	}
+	ex.logger.Debug("%s: New HTTP Client with timeout %s %s", ex.getLogPrefix(), ex.httpClient.Timeout, ex.parent.pi.MailServerUrl)
 	for {
 		errCh := make(chan error)
 		go ex.doRequestResponse(errCh)
