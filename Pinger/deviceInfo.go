@@ -464,7 +464,7 @@ func (di *DeviceInfo) registerAws() error {
 		}
 		if re.MatchString(registerErr.Error()) == true {
 			arn := re.ReplaceAllString(registerErr.Error(), fmt.Sprintf("${%s}", re.SubexpNames()[1]))
-			di.logger.Warning("%s: Previously registered as %s. Updating.", arn)
+			di.logger.Warning("%s: Previously registered as %s. Updating.", di.getLogPrefix(), arn)
 			attributes, err := DefaultPollingContext.config.Aws.getEndpointAttributes(arn)
 			if err != nil {
 				return err
