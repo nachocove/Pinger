@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httputil"
 	"strings"
 
 	"github.com/nachocove/Pinger/Pinger"
@@ -120,17 +119,12 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	//		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	//		return
 	//	}
-	requestData, err := httputil.DumpRequest(r, true)
-	if context.Config.Global.DumpRequests && err == nil {
-		context.Logger.Debug("Received request\n%s", string(requestData))
-	}
-
 	encodingStr := r.Header.Get("Content-Type")
 	postInfo := registerPostData{}
 	switch {
 	case encodingStr == "application/json" || encodingStr == "text/json":
 		decoder := json.NewDecoder(r.Body)
-		err = decoder.Decode(&postInfo)
+		err := decoder.Decode(&postInfo)
 		if err != nil {
 			context.Logger.Error("Could not parse json %s", err)
 			http.Error(w, "Could not parse json", http.StatusBadRequest)

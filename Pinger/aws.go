@@ -68,7 +68,7 @@ func (config *AWSConfiguration) registerEndpointArn(service, token, customerData
 	return *response.EndpointARN, nil
 }
 
-func (config *AWSConfiguration) getEndpointArn(endpointArn string) (map[string]string, error) {
+func (config *AWSConfiguration) getEndpointAttributes(endpointArn string) (map[string]string, error) {
 	options := sns.GetEndpointAttributesInput{
 		EndpointARN: aws.StringValue(&endpointArn),
 	}
@@ -83,7 +83,7 @@ func (config *AWSConfiguration) getEndpointArn(endpointArn string) (map[string]s
 	return response.Attributes, nil	
 }
 
-func (config *AWSConfiguration) setEndpointArn(endpointArn string, attributes map[string]string) error {
+func (config *AWSConfiguration) setEndpointAttributes(endpointArn string, attributes map[string]string) error {
 	options := sns.SetEndpointAttributesInput{
 		EndpointARN: aws.StringValue(&endpointArn),
 		Attributes: attributes,

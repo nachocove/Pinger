@@ -466,12 +466,12 @@ func (di *DeviceInfo) registerAws() error {
 		if re.MatchString(registerErr.Error()) == true {
 			arn := re.ReplaceAllString(registerErr.Error(), fmt.Sprintf("${%s}", re.SubexpNames()[1]))
 			di.logger.Warning("%s: Previously registered as %s. Updating.", arn)
-			attributes, err := DefaultPollingContext.config.Aws.getEndpointArn(arn)
+			attributes, err := DefaultPollingContext.config.Aws.getEndpointAttributes(arn)
 			if err != nil {
 				return err
 			}
 			attributes["CustomUserData"] = di.ClientId
-			err = DefaultPollingContext.config.Aws.setEndpointArn(arn, attributes)
+			err = DefaultPollingContext.config.Aws.setEndpointAttributes(arn, attributes)
 			if err != nil {
 				return err
 			}
@@ -496,18 +496,30 @@ func (di *DeviceInfo) validateAws() error {
 	if err != nil {
 		return err
 	}
+	need_update := false
 	enabled, ok := attributes["Enabled"]
 	if !ok || enabled != "true" {
 		if enabled != "true" {
 			// Only disable this if we get an actual indication thereof
 			di.Enabled = false
-			di.update()
+			need_update = true
 		}
 		return errors.New("Endpoint is not enabled")
 	}
 	if di.Enabled == false {
 		// re-enable the endpoint
 		di.Enabled = true
+		need_update = true
+	}
+	if di.PushToken != attributes["Token"] {
+		// need to update the token with aws
+		attributes["Token"] = di.PushToken
+		err := DefaultPollingContext.config.Aws.setEndpointAttributes(di.AWSEndpointArn, attributes)
+		if err != nil {
+			return err
+		}
+	}
+	if need_update {
 		di.update()
 	}
 	return nil

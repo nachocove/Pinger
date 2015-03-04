@@ -254,7 +254,7 @@ func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) erro
 var DefaultPollingContext *BackendPolling
 
 func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger) (*BackendPolling, error) {
-	dbm, err := initDB(&config.Db, true, debug, logger)
+	dbm, err := initDB(&config.Db, true, false, logger)
 	if err != nil {
 		return nil, err
 	}

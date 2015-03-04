@@ -220,14 +220,15 @@ func (client *MailClientContext) start() {
 	defer recoverCrash(client.logger)
 	defer client.cleanup()
 
-	client.logger.Debug("%s: Starting deferTimer for %d msecs", client.pi.getLogPrefix(), client.pi.WaitBeforeUse)
-	deferTimer := time.NewTimer(time.Duration(client.pi.WaitBeforeUse) * time.Millisecond)
+	deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
+	client.logger.Debug("%s: Starting deferTimer for %s", client.pi.getLogPrefix(), deferTime)
+	deferTimer := time.NewTimer(deferTime)
 	defer deferTimer.Stop()
 	if client.stats != nil {
 		go client.stats.TallyResponseTimes()
 	}
-	client.logger.Debug("%s: Setting maxPollTimer for %d msecs", client.pi.getLogPrefix(), client.pi.WaitBeforeUse)
 	maxPollTime := time.Duration(client.pi.MaxPollTimeout) * time.Millisecond
+	client.logger.Debug("%s: Setting maxPollTimer for %s", client.pi.getLogPrefix(), maxPollTime)
 	maxPollTimer := time.NewTimer(maxPollTime)
 	maxPollTimer.Stop()
 	defer maxPollTimer.Stop()
@@ -237,20 +238,22 @@ func (client *MailClientContext) start() {
 	for {
 		select {
 		case <-deferTimer.C:
+			// defer timer has timed out. Now it's time to do something
 			client.logger.Debug("%s: DeferTimer expired. Starting Polling (clients %d).", client.pi.getLogPrefix(), clients)
 			maxPollTimer.Reset(maxPollTime)
 			clients ++
 			go client.mailClient.LongPoll(exitCh)
 			
 		case <-exitCh:
+			// the mailClient.LongPoll has indicated that it has exited. Clean up.
 			clients --
 			client.logger.Debug("%s: LongPoll exited. Stopping (%d).", client.pi.getLogPrefix(), clients)
 			client.Action(PingerStop)
 
 		case err := <-client.errCh:
+			// the mailClient.LongPoll has thrown an error. note it.
 			client.logger.Debug("%s: Error thrown. Stopping.", client.pi.getLogPrefix())
 			client.lastError = err
-			client.Action(PingerStop)
 
 		case cmd := <-client.command:
 			switch {
@@ -260,9 +263,10 @@ func (client *MailClientContext) start() {
 				return
 
 			case cmd == PingerDefer:
-				client.logger.Debug("%s: reStarting deferTimer for %d msecs", client.pi.getLogPrefix(), client.pi.WaitBeforeUse)
+				deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
+				client.logger.Debug("%s: reStarting deferTimer for %s", client.pi.getLogPrefix(), deferTime)
 				client.Action(PingerStop)
-				deferTimer.Reset(time.Duration(client.pi.WaitBeforeUse) * time.Millisecond)
+				deferTimer.Reset(deferTime)
 				maxPollTimer.Stop()
 
 			default:

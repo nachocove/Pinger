@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"net/http/cookiejar"
 	"net/http/httputil"
 	"time"
@@ -19,11 +20,11 @@ type ExchangeClient struct {
 	incoming   chan *http.Response
 	transport  *http.Transport
 	request    *http.Request
-	httpClient *http.Client
 	debug      bool
 	logger     *logging.Logger
 	is_active  bool
 	parent     *MailClientContext
+	cookieJar  *cookiejar.Jar
 }
 
 // NewExchangeClient set up a new exchange client
@@ -38,14 +39,35 @@ func NewExchangeClient(parent *MailClientContext, debug bool, logger *logging.Lo
 	return ex, nil
 }
 
-func (ex *ExchangeClient) newRequest() (*http.Request, error) {
+func (ex *ExchangeClient) getLogPrefix() string {
+	if ex.parent != nil && ex.parent.di != nil {
+		return ex.parent.di.getLogPrefix()
+	}
+	return ""
+}
+
+func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
+	var err error
+	httpClient := &http.Client{
+		Jar:       ex.cookieJar,
+		Transport: ex.transport,
+	}
+	if ex.parent.pi.ResponseTimeout > 0 {
+		httpClient.Timeout = time.Duration(ex.parent.pi.ResponseTimeout) * time.Millisecond
+	}
+	ex.logger.Debug("%s: New HTTP Client with timeout %s %s", ex.getLogPrefix(), httpClient.Timeout, ex.parent.pi.MailServerUrl)
+	url, err := url.Parse(ex.parent.pi.MailServerUrl)
+	if err != nil {
+		errCh <- err
+		return
+	}
 	requestBody := bytes.NewReader(ex.parent.pi.HttpRequestData)
 	req, err := http.NewRequest("POST", ex.parent.pi.MailServerUrl, requestBody)
 	if err != nil {
-		return nil, err
+		errCh <- err
+		return
 	}
 	for k, v := range ex.parent.pi.HttpHeaders {
-		ex.logger.Debug("%s: Adding header: %s=%s", ex.getLogPrefix(), k, v) 
 		req.Header.Add(k, v)
 	}
 	if header := req.Header.Get("User-Agent"); header == "" {
@@ -57,39 +79,34 @@ func (ex *ExchangeClient) newRequest() (*http.Request, error) {
 	req.Proto = "HTTP/1.1"
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
-
-	req.SetBasicAuth(ex.parent.pi.MailServerCredentials.Username, ex.parent.pi.MailServerCredentials.Password)
-	return req, nil
-}
-
-func (ex *ExchangeClient) getLogPrefix() string {
-	if ex.parent != nil && ex.parent.di != nil {
-		return ex.parent.di.getLogPrefix()
+	cookies := ex.cookieJar.Cookies(url)
+	for i := range cookies {
+		req.AddCookie(cookies[i])
 	}
-	return ""
-}
 
-func (ex *ExchangeClient) doRequestResponse() {
-	var err error
-	ex.logger.Debug("%s: New HTTP Client with timeout %d msec %s", ex.getLogPrefix(), ex.parent.pi.ResponseTimeout, ex.parent.pi.MailServerUrl)
-	ex.request, err = ex.newRequest()
-	if err != nil {
-		ex.parent.sendError(err)
-		return
-	}
 	if DefaultPollingContext.config.Global.DumpRequests {
-		requestBytes, err := httputil.DumpRequestOut(ex.request, true)
+		requestBytes, err := httputil.DumpRequestOut(req, true)
 		if err != nil {
 			ex.logger.Error("%s: DumpRequest error; %v", ex.getLogPrefix(), err)
 		} else {
 			ex.logger.Debug("%s: sending request:\n%s", ex.getLogPrefix(), requestBytes)
 		}
 	}
-	response, err := ex.httpClient.Do(ex.request)
+	
+	req.SetBasicAuth(ex.parent.pi.MailServerCredentials.Username, ex.parent.pi.MailServerCredentials.Password)
 	if err != nil {
-		ex.parent.sendError(err)
+		errCh <- err
 		return
 	}
+	ex.request = req // save it so we can cancel it in another routine
+	response, err := httpClient.Do(ex.request)
+	if err != nil {
+		errCh <- err
+		return
+	}
+	ex.request = nil
+	// save the cookies for later
+	ex.cookieJar.SetCookies(url, response.Cookies())
 	if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
 		headerBytes, _ := httputil.DumpResponse(response, false)
 		responseBytes, _ := ioutil.ReadAll(response.Body)
@@ -111,27 +128,26 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 		close(exitCh) // closing this tell the parent we've exited.
 	}()
 
-	cookies, err := cookiejar.New(nil)
+	ex.transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: ex.debug},
+	}
+	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
 		ex.parent.sendError(err)
 		return
 	}
-	ex.transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: ex.debug},
-	}
-
-	ex.httpClient = &http.Client{
-		Jar:       cookies,
-		Transport: ex.transport,
-	}
-	if ex.parent.pi.ResponseTimeout > 0 {
-		ex.httpClient.Timeout = time.Duration(ex.parent.pi.ResponseTimeout) * time.Millisecond
-	}
+	ex.cookieJar = cookieJar
 	for {
-		go ex.doRequestResponse()
+		errCh := make(chan error)
+		go ex.doRequestResponse(errCh)
 		ex.logger.Debug("%s: Waiting for response", ex.getLogPrefix())
 		select {
+		case err := <-errCh:
+			ex.parent.sendError(err)
+			return
+			
 		case response := <-ex.incoming:
+			// the response body tends to be pretty short. Let's just read it all.
 			responseBody, err := ioutil.ReadAll(response.Body)
 			if err != nil {
 				ex.parent.sendError(err)

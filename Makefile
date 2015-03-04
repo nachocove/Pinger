@@ -1,6 +1,7 @@
 .PHONY:docker nachobase pinger all test install curl-register curl-defer
 
 PINGER_HOST ?= localhost:8443
+PINGER_EXAMPLE ?= janvD2
 PINGER_VERSION ?= 1
 pinger:
 	go build ./...
@@ -26,10 +27,10 @@ nachobase:
 	(cd nachobase ; docker build -t nachocove/nachobase:v1 .)
 
 curl-register:
-	curl -c /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/janvD2.json https://$(PINGER_HOST)/$(PINGER_VERSION)/register
+	curl -c /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/$(PINGER_EXAMPLE).json https://$(PINGER_HOST)/$(PINGER_VERSION)/register
 
 curl-defer:
-	curl -b /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/janvD2-defer.json https://$(PINGER_HOST)/$(PINGER_VERSION)/defer
+	curl -b /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/$(PINGER_EXAMPLE)-defer.json https://$(PINGER_HOST)/$(PINGER_VERSION)/defer
 
 curl-stop:
-	curl -b /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/janvD2-stop.json https://$(PINGER_HOST)/$(PINGER_VERSION)/stop
+	curl -b /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/$(PINGER_EXAMPLE)-stop.json https://$(PINGER_HOST)/$(PINGER_VERSION)/stop
