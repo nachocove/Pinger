@@ -16,12 +16,13 @@ import (
 )
 
 type MailClient interface {
-	LongPoll(chan int)
+	LongPoll(stopCh, exitCh chan int)
 	Cleanup()
 }
 
 const (
 	MailClientActiveSync = "ActiveSync"
+	MailClientIMAP       = "IMAP"
 )
 
 type MailClientStatus int
@@ -107,8 +108,8 @@ type MailClientContext struct {
 	stopToken  string
 	logger     *logging.Logger
 	errCh      chan error
-	stopCh     chan int
-	exitCh     chan int
+	stopAllCh  chan int // closed when client is exiting, so that any sub-routine can exit
+	exitCh     chan int // used by MailClient{} to signal it has exited
 	command    chan PingerCommand
 	lastError  error
 	stats      *Utils.StatLogger
@@ -118,12 +119,12 @@ type MailClientContext struct {
 
 func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStats bool, logger *logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
-		logger:  logger,
-		errCh:   make(chan error),
-		stopCh:  make(chan int),
-		exitCh:  make(chan int),
-		command: make(chan PingerCommand, 10),
-		stats:   nil,
+		logger:    logger,
+		errCh:     make(chan error),
+		stopAllCh: make(chan int),
+		exitCh:    make(chan int),
+		command:   make(chan PingerCommand, 10),
+		stats:     nil,
 	}
 	logger.Debug("%s: Validating clientID", pi.ClientId)
 	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, client.logger)
@@ -137,7 +138,7 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 	client.di = deviceInfo
 	client.pi = pi
 	if doStats {
-		client.stats = Utils.NewStatLogger(client.stopCh, logger, false)
+		client.stats = Utils.NewStatLogger(client.stopAllCh, logger, false)
 	}
 	var mailclient MailClient
 
@@ -147,6 +148,11 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		if err != nil {
 			return nil, err
 		}
+		//	case strings.EqualFold(client.pi.Protocol, MailClientIMAP):
+		//		mailclient, err = NewIMAPClient(client, debug, client.logger)
+		//		if err != nil {
+		//			return nil, err
+		//		}
 	default:
 		msg := fmt.Sprintf("%s: Unsupported Mail Protocol %s", client.pi.ClientId, client.pi.Protocol)
 		client.logger.Error(msg)
@@ -232,17 +238,20 @@ func (client *MailClientContext) start() {
 	maxPollTime := time.Duration(client.pi.MaxPollTimeout) * time.Millisecond
 	client.logger.Debug("%s: Setting maxPollTimer for %s", client.pi.getLogPrefix(), maxPollTime)
 	maxPollTimer := time.NewTimer(maxPollTime)
-	maxPollTimer.Stop()
 	defer maxPollTimer.Stop()
-
+	longPollStopCh := make(chan int)
 	for {
 		select {
+		case <-maxPollTimer.C:
+			client.logger.Debug("maxPollTimer expired. Stopping everything.")
+			return
+			
 		case <-deferTimer.C:
 			// defer timer has timed out. Now it's time to do something
 			client.logger.Debug("%s: DeferTimer expired. Starting Polling.", client.pi.getLogPrefix())
 			maxPollTimer.Reset(maxPollTime)
 			// launch the longpoll and wait for it to exit
-			go client.mailClient.LongPoll(client.exitCh)
+			go client.mailClient.LongPoll(longPollStopCh, client.exitCh)
 
 		case <-client.exitCh:
 			// the mailClient.LongPoll has indicated that it has exited. Clean up.
@@ -257,14 +266,15 @@ func (client *MailClientContext) start() {
 		case cmd := <-client.command:
 			switch {
 			case cmd == PingerStop:
-				close(client.stopCh) // tell all goroutines listening on this channel that they can stop now.
+				close(client.stopAllCh) // tell all goroutines listening on this channel that they can stop now.
 				client.logger.Debug("%s: got 'PingerStop' command", client.pi.getLogPrefix())
 				return
 
 			case cmd == PingerDefer:
+				longPollStopCh<-1
 				deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
 				client.logger.Debug("%s: reStarting deferTimer for %s", client.pi.getLogPrefix(), deferTime)
-				client.Action(PingerStop)
+				deferTimer.Stop()
 				deferTimer.Reset(deferTime)
 				maxPollTimer.Stop()
 
@@ -273,9 +283,6 @@ func (client *MailClientContext) start() {
 				continue
 
 			}
-		case <-maxPollTimer.C:
-			client.logger.Debug("maxPollTimer expired. Stopping everything.")
-			return
 		}
 	}
 }

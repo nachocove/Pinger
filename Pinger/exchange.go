@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httputil"
+	"net/url"
+	"os"
 	"time"
 
 	"github.com/op/go-logging"
@@ -21,43 +23,54 @@ type ExchangeClient struct {
 	request    *http.Request
 	debug      bool
 	logger     *logging.Logger
-	is_active  bool
 	parent     *MailClientContext
-	cookieJar  *cookiejar.Jar
 	httpClient *http.Client
 }
 
 // NewExchangeClient set up a new exchange client
 func NewExchangeClient(parent *MailClientContext, debug bool, logger *logging.Logger) (*ExchangeClient, error) {
 	ex := &ExchangeClient{
-		parent:    parent,
-		incoming:  make(chan *http.Response),
-		debug:     debug,
-		logger:    logger,
-		is_active: false,
+		parent:   parent,
+		incoming: make(chan *http.Response),
+		debug:    debug,
+		logger:   logger,
 	}
 	return ex, nil
 }
 
-func (ex *ExchangeClient) getLogPrefix() string {
+func (ex *ExchangeClient) getLogPrefix() (prefix string) {
 	if ex.parent != nil && ex.parent.di != nil {
-		return ex.parent.di.getLogPrefix()
+		prefix = ex.parent.di.getLogPrefix()
 	}
-	return ""
+	return
 }
 
 func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	var err error
 	requestBody := bytes.NewReader(ex.parent.pi.HttpRequestData)
+	ex.logger.Debug("%s: request WBXML %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(ex.parent.pi.HttpRequestData))
 	req, err := http.NewRequest("POST", ex.parent.pi.MailServerUrl, requestBody)
 	if err != nil {
 		errCh <- err
 		return
 	}
 	for k, v := range ex.parent.pi.HttpHeaders {
+		if k == "Accept-Encoding" {
+			// ignore this. It could mess us up.
+			continue
+		}
 		req.Header.Add(k, v)
 	}
-	
+	if header := req.Header.Get("Accept"); header == "" {
+		req.Header.Add("Accept", "*/*")
+	}
+	if header := req.Header.Get("Accept-Language"); header == "" {
+		req.Header.Add("Accept-Language", "en-us")
+	}
+	if header := req.Header.Get("Connection"); header == "" {
+		req.Header.Add("Connection", "keep-alive")
+	}
+
 	req.Proto = "HTTP/1.1"
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
@@ -71,26 +84,37 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		}
 	}
 
-	req.SetBasicAuth(ex.parent.pi.MailServerCredentials.Username, ex.parent.pi.MailServerCredentials.Password)
-	if err != nil {
-		errCh <- err
-		return
+	if ex.parent.pi.MailServerCredentials.Username != "" && ex.parent.pi.MailServerCredentials.Password != "" {
+		req.SetBasicAuth(ex.parent.pi.MailServerCredentials.Username, ex.parent.pi.MailServerCredentials.Password)
+		if err != nil {
+			errCh <- err
+			return
+		}
 	}
 	ex.request = req // save it so we can cancel it in another routine
 
-	// Make the request and wait for response
+	// Make the request and wait for response; this could take a while
 	response, err := ex.httpClient.Do(ex.request)
 	if err != nil {
 		errCh <- err
 		return
 	}
-	ex.request = nil
+	ex.request = nil // unsave it. We're done with it.
+
+	// read all data and close the connection. We do this just for 'cleanliness'. If we forget,
+	// then keepalives won't work (not that we need them).
+	responseBytes, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		errCh <- err
+		return
+	}
+	cached_data := ioutil.NopCloser(bytes.NewReader(responseBytes))
+	response.Body.Close()
+	response.Body = cached_data
+	ex.logger.Debug("%s: reply WBXML %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(responseBytes))
+
 	if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
 		headerBytes, _ := httputil.DumpResponse(response, false)
-		responseBytes, _ := ioutil.ReadAll(response.Body)
-		cached_data := ioutil.NopCloser(bytes.NewReader(responseBytes))
-		response.Body.Close()
-		response.Body = cached_data
 		if err != nil {
 			ex.logger.Error("%s: Could not dump response %+v", ex.getLogPrefix(), response)
 		} else {
@@ -100,32 +124,53 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	ex.incoming <- response
 }
 
-func (ex *ExchangeClient) LongPoll(exitCh chan int) {
+func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	defer recoverCrash(ex.logger)
+	askedToStop := false
 	defer func() {
-		exitCh <- 1 // tell the parent we've exited.
+		if ex.request != nil {
+			ex.transport.CancelRequest(ex.request)
+		}
+		ex.transport.CloseIdleConnections()
+		if askedToStop == false {
+			ex.logger.Debug("%s: Stopping", ex.getLogPrefix())
+			exitCh <- 1 // tell the parent we've exited.
+		}
 	}()
 
+	reqTimeout := ex.parent.pi.ResponseTimeout
+	reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 	ex.transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: ex.debug},
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: ex.debug},
+		ResponseHeaderTimeout: time.Duration(reqTimeout) * time.Millisecond,
 	}
-	cookieJar, err := cookiejar.New(nil)
-	if err != nil {
-		ex.parent.sendError(err)
-		return
+
+	// check for the proxy setting. Useful for mitmproxy testing
+	proxy := os.Getenv("PINGER_PROXY")
+	if proxy != "" {
+		proxyUrl, err := url.Parse(proxy)
+		if err != nil {
+			ex.parent.sendError(err)
+			return
+		}
+		ex.transport.Proxy = http.ProxyURL(proxyUrl)
 	}
-	ex.cookieJar = cookieJar
+
 	ex.httpClient = &http.Client{
-		Jar:       ex.cookieJar,
 		Transport: ex.transport,
 	}
-	if ex.parent.pi.ResponseTimeout > 0 {
-		timeout := ex.parent.pi.ResponseTimeout
-		timeout += int64(float64(timeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
-		ex.httpClient.Timeout = time.Duration(timeout) * time.Millisecond
+	useCookieJar := false
+	if useCookieJar {
+		cookieJar, err := cookiejar.New(nil)
+		if err != nil {
+			ex.parent.sendError(err)
+			return
+		}
+		ex.httpClient.Jar = cookieJar
 	}
-	ex.logger.Debug("%s: New HTTP Client with timeout %s %s", ex.getLogPrefix(), ex.httpClient.Timeout, ex.parent.pi.MailServerUrl)
+	ex.logger.Debug("%s: New HTTP Client with timeout %s %s", ex.getLogPrefix(), ex.transport.ResponseHeaderTimeout, ex.parent.pi.MailServerUrl)
 	sleepTime := 0
+
 	for {
 		if sleepTime > 0 {
 			s := time.Duration(sleepTime) * time.Second
@@ -169,7 +214,7 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 
 				default:
 					// just retry
-					sleepTime = 10
+					sleepTime = 30 // wait 30 seconds. No need to rush it, since it may not work anyway
 					ex.logger.Warning("%s: Response Status %s. Back to polling", ex.getLogPrefix(), response.Status)
 				}
 			case ex.parent.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.parent.pi.HttpNoChangeReply) == 0:
@@ -178,16 +223,8 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 
 			case ex.parent.pi.HttpExpectedReply == nil || bytes.Compare(responseBody, ex.parent.pi.HttpExpectedReply) == 0:
 				// there's new mail!
-				if bytes.HasPrefix(responseBody, []byte("HTTP/")) {
-					ex.logger.Error("Response body contains the entire response!")
-					ex.parent.sendError(fmt.Errorf("Response body contains the entire response"))
-					return
-				}
-				
-				ex.logger.Debug("%s: request was %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(ex.parent.pi.HttpRequestData))
-				ex.logger.Debug("%s: reply is %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(responseBody))
 				ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
-				err = ex.parent.di.push(PingerNotificationNewMail)
+				err = ex.parent.di.push(PingerNotificationNewMail) // You've got mail!
 				if err != nil {
 					if DefaultPollingContext.config.Global.IgnorePushFailure == false {
 						ex.parent.sendError(err)
@@ -204,24 +241,14 @@ func (ex *ExchangeClient) LongPoll(exitCh chan int) {
 
 			}
 
-		case <-ex.parent.stopCh: // parent will close this, at which point this will trigger.
-			ex.logger.Debug("%s: Stopping", ex.getLogPrefix())
-			if ex.request != nil {
-				ex.transport.CancelRequest(ex.request)
-			}
-			resp, ok := <-ex.incoming // wait for it to cancel
-			if ok {
-				responseBytes, err := httputil.DumpResponse(resp, true)
-				if err != nil {
-					ex.logger.Error("Could not dump response: %s", err.Error())
-				} else {
-					ex.logger.Debug("%s: lagging response:\n%s", ex.getLogPrefix(), responseBytes)
-				}
-			}
+		case <-ex.parent.stopAllCh: // parent will close this, at which point this will trigger.
+			return
+
+		case <-stopCh:
+			askedToStop = true
 			return
 		}
 	}
-
 }
 
 // SelfDelete Used to zero out the structure and let garbage collection reap the empty stuff.
