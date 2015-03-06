@@ -86,10 +86,6 @@ func (pi *MailPingInformation) cleanup() {
 	pi.OSVersion = ""
 	pi.AppBuildNumber = ""
 	pi.AppBuildVersion = ""
-	
-	// tell Garbage collection to run. Might not free/remove all instances we free'd above,
-	// but it's worth the effort.
-	go runtime.GC()
 }
 
 // Validate validate the structure/information to make sure required information exists.
@@ -212,6 +208,10 @@ func (client *MailClientContext) cleanup() {
 		client.mailClient = nil
 	}
 	client.stopToken = ""
+	
+	// tell Garbage collection to run. Might not free/remove all instances we free'd above,
+	// but it's worth the effort.
+	go runtime.GC()
 }
 
 func (pi *MailPingInformation) String() string {
