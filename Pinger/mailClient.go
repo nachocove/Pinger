@@ -3,7 +3,6 @@ package Pinger
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/nachocove/Pinger/Utils"
@@ -58,7 +57,7 @@ type MailPingInformation struct {
 	WaitBeforeUse          int64  // in milliseconds
 	PushToken              string // platform dependent push token
 	PushService            string // APNS, AWS, GCM, etc.
-	MaxPollTimeout         int64  // max polling lifetime. Default 2 days.
+	MaxPollTimeout         int64  // max polling lifetime in milliseconds. Default 2 days.
 	OSVersion              string
 	AppBuildVersion        string
 	AppBuildNumber         string
@@ -84,16 +83,34 @@ func (pi *MailPingInformation) cleanup() {
 	pi.CommandAcknowledgement = nil
 	pi.PushToken = ""
 	pi.PushService = ""
+	pi.OSVersion = ""
+	pi.AppBuildNumber = ""
+	pi.AppBuildVersion = ""
+	
+	// tell Garbage collection to run. Might not free/remove all instances we free'd above,
+	// but it's worth the effort.
+	go runtime.GC()
 }
 
 // Validate validate the structure/information to make sure required information exists.
 func (pi *MailPingInformation) Validate() bool {
-	return (pi.ClientId != "" &&
-		pi.MailServerUrl != "" &&
-		pi.MailServerCredentials.Username != "" &&
-		pi.MailServerCredentials.Password != "" &&
-		len(pi.HttpRequestData) > 0 &&
-		len(pi.HttpExpectedReply) > 0)
+	if pi.ClientId == "" ||	pi.MailServerUrl == "" {
+		return false
+	}
+	switch {
+	case pi.Protocol == MailClientActiveSync:
+		if len(pi.HttpRequestData) <= 0 || len(pi.HttpHeaders) <= 0 {
+			return false
+		}
+	case pi.Protocol == MailClientIMAP:
+		// not yet supported 
+		return false
+		
+	default:
+		// unknown protocols are never supported
+		return false
+	}
+	return true
 }
 
 func (pi *MailPingInformation) getLogPrefix() string {
@@ -198,16 +215,10 @@ func (client *MailClientContext) cleanup() {
 }
 
 func (pi *MailPingInformation) String() string {
-	mailcopy := *pi
-	mailcopy.MailServerCredentials.Password = "REDACTED"
-	jsonstring, err := json.Marshal(mailcopy)
-	if err != nil {
-		panic("Could not encode struct")
-	}
-	if pi.MailServerCredentials.Password == "REDACTED" {
-		panic("This should not have happened")
-	}
-	return string(jsonstring)
+	// let's try to be safe and not print this at all. There's a number of fields we don't 
+	// want to be printed (Password is one, but also an HttpHeader might give away user info!),
+	// So let's just not.
+	return "<MailPingInformation; redacted completely>" 
 }
 
 func UserSha256(username string) string {
