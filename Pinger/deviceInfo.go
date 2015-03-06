@@ -36,10 +36,9 @@ type DeviceInfo struct {
 	OSVersion       string `db:"os_version"`
 	AppBuildVersion string `db:"build_version"`
 	AppBuildNumber  string `db:"build_number"`
-
-	AWSEndpointArn string `db:"aws_endpoint_arn"`
-	Enabled        bool   `db:"enabled"`
-	Pinger         string `db:"pinger"`
+	AWSEndpointArn  string `db:"aws_endpoint_arn"`
+	Enabled         bool   `db:"enabled"`
+	Pinger          string `db:"pinger"`
 
 	dbm       *gorp.DbMap     `db:"-"`
 	logger    *logging.Logger `db:"-"`
@@ -443,11 +442,11 @@ func (di *DeviceInfo) registerAws() error {
 	if di.AWSEndpointArn != "" {
 		panic("No need to call register again. Call validate")
 	}
-	var token string
+	var pushToken string
 	var err error
 	switch {
 	case di.PushService == PushServiceAPNS:
-		token, err = decodeAPNSPushToken(di.PushToken)
+		pushToken, err = decodeAPNSPushToken(di.PushToken)
 		if err != nil {
 			return err
 		}
@@ -456,7 +455,7 @@ func (di *DeviceInfo) registerAws() error {
 		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
 	}
 
-	arn, registerErr := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, token, di.ClientId)
+	arn, registerErr := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, pushToken, di.ClientId)
 	if registerErr != nil {
 		re, err := regexp.Compile("^.*Endpoint (?P<arn>arn:aws:sns:[^ ]+) already exists.*$")
 		if err != nil {
