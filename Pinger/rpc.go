@@ -284,7 +284,7 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *logging.Lo
 	go alertAllDevices()
 
 	rpcConnectString := fmt.Sprintf("%s:%d", "localhost", RPCPort)
-	logger.Info("Starting RPC server on %s", rpcConnectString)
+	logger.Info("Starting RPC server on %s (pinger id %s)", rpcConnectString, pingerHostId)
 	err = http.ListenAndServe(rpcConnectString, nil)
 	if err != nil {
 		return err
