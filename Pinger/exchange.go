@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
-	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httputil"
@@ -41,6 +41,16 @@ func NewExchangeClient(parent *MailClientContext, debug bool, logger *logging.Lo
 func (ex *ExchangeClient) getLogPrefix() (prefix string) {
 	if ex.parent != nil && ex.parent.di != nil {
 		prefix = "ActiveSync:" + ex.parent.di.getLogPrefix()
+	}
+	return
+}
+
+func (ex *ExchangeClient) maxResponseSize() (size int) {
+	if ex.parent.pi.HttpExpectedReply != nil {
+		size = len(ex.parent.pi.HttpExpectedReply)
+	}
+	if ex.parent.pi.HttpNoChangeReply != nil && len(ex.parent.pi.HttpNoChangeReply) > size {
+		size = len(ex.parent.pi.HttpNoChangeReply)
 	}
 	return
 }
@@ -101,16 +111,37 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	}
 	ex.request = nil // unsave it. We're done with it.
 
-	// read all data and close the connection. We do this just for 'cleanliness'. If we forget,
-	// then keepalives won't work (not that we need them).
-	responseBytes, err := ioutil.ReadAll(response.Body)
+	// read at most ex.maxResponseSize() bytes. We do this so that an attacker can't
+	// flood us with an infinte amount of data. Note we also do not (and SHOULD not)
+	// pay any attention to the Content-Length header. An attacker could screw us up
+	// with a wrong one.
+	var responseBytes []byte
+	var toRead int
+	if response.StatusCode != 200 {
+		toRead = 1024 // read any odd responses up to 1k, so we can adequately debug-log them.
+	} else {
+		toRead = ex.maxResponseSize()
+	}
+	responseBytes = make([]byte, toRead)
+	// TODO Do I need to loop here to make sure I get the number of bytes I expect?
+	n, err := response.Body.Read(responseBytes)
 	if err != nil {
 		errCh <- err
 		return
 	}
-	cached_data := ioutil.NopCloser(bytes.NewReader(responseBytes))
+	if n < toRead && n != len(ex.parent.pi.HttpExpectedReply) && n != len(ex.parent.pi.HttpNoChangeReply) {
+		ex.logger.Warning("%s: Read less than expected: %d < %d", ex.getLogPrefix(), n, toRead)
+	}
+
+	// Then close the connection. We do this just for 'cleanliness'. If we forget,
+	// then keepalives won't work (not that we need them).
 	response.Body.Close()
+
+	// Now put the 'body' back onto the response for later processing (because we return a response object,
+	// and the LongPoll loop wants to read it and the headers.
+	cached_data := ioutil.NopCloser(bytes.NewReader(responseBytes))
 	response.Body = cached_data
+
 	ex.logger.Debug("%s: reply WBXML %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(responseBytes))
 
 	if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
@@ -122,6 +153,15 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		}
 	}
 	ex.incoming <- response
+}
+
+func (ex *ExchangeClient) exponentialBackoff(sleepTime int) int {
+	// return sleepTime*2, or 600, whichever is less, i.e. cap the exponential backoff at 600 seconds
+	if sleepTime <= 0 {
+		sleepTime = 1
+	}
+	n := math.Min(float64(sleepTime*2), 600)
+	return int(n)
 }
 
 func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
@@ -177,7 +217,6 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 			ex.logger.Debug("%s: Sleeping %s before retry", ex.getLogPrefix(), s)
 			time.Sleep(s)
 		}
-		sleepTime = 1 // default sleeptime on retry. Error cases can override it.
 		errCh := make(chan error)
 		go ex.doRequestResponse(errCh)
 		ex.logger.Debug("%s: Waiting for response", ex.getLogPrefix())
@@ -214,15 +253,19 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 
 				default:
 					// just retry
-					sleepTime = 30 // wait 30 seconds. No need to rush it, since it may not work anyway
+					sleepTime = ex.exponentialBackoff(sleepTime)
 					ex.logger.Warning("%s: Response Status %s. Back to polling", ex.getLogPrefix(), response.Status)
 				}
 			case ex.parent.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.parent.pi.HttpNoChangeReply) == 0:
 				// go back to polling
 				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", ex.getLogPrefix())
+				sleepTime = 0 // good reply. Reset any exponential backoff stuff.
 
 			case ex.parent.pi.HttpExpectedReply == nil || bytes.Compare(responseBody, ex.parent.pi.HttpExpectedReply) == 0:
 				// there's new mail!
+				if ex.parent.pi.HttpExpectedReply != nil {
+					ex.logger.Debug("%s: Reply matched HttpExpectedReply", ex.getLogPrefix())
+				}
 				ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
 				err = ex.parent.di.push(PingerNotificationNewMail) // You've got mail!
 				if err != nil {
@@ -236,9 +279,8 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				return
 
 			default:
-				ex.parent.sendError(fmt.Errorf("%s: Unhandled response %v", ex.getLogPrefix(), response))
-				return
-
+				ex.logger.Warning("%s: Unhandled response. Just keep polling: Headers:%+v Body:%s", ex.getLogPrefix(), response.Header, base64.StdEncoding.EncodeToString(responseBody))
+				sleepTime = ex.exponentialBackoff(sleepTime)
 			}
 
 		case <-ex.parent.stopAllCh: // parent will close this, at which point this will trigger.
