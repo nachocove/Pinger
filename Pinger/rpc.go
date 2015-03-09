@@ -75,6 +75,7 @@ func validateClientID(clientID string) error {
 
 func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingResponse) error {
 	t.logger.Debug("%s: Received StartPoll request", args.MailInfo.ClientId)
+	t.logger.Debug("PollingMap: %+v", t.pollMap)
 	reply.Code = PollingReplyOK
 	var client *MailClientContext
 	client, ok := t.pollMap[args.MailInfo.ClientId]
@@ -150,6 +151,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 
 func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("%s: Received stopPoll request", args.ClientId)
+	t.logger.Debug("PollingMap: %+v", t.pollMap)
 	client, ok := t.pollMap[args.ClientId]
 	if ok == false {
 		// nothing on file.
@@ -191,6 +193,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 
 func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("%s: Received deferPoll request", args.ClientId)
+	t.logger.Debug("PollingMap: %+v", t.pollMap)
 	client, ok := t.pollMap[args.ClientId]
 	if ok == false {
 		// nothing on file.
