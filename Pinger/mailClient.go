@@ -249,9 +249,9 @@ func (client *MailClientContext) start() {
 	maxPollTime := time.Duration(client.pi.MaxPollTimeout) * time.Millisecond
 	client.logger.Debug("%s: Setting maxPollTimer for %s", client.pi.getLogPrefix(), maxPollTime)
 	maxPollTimer := time.NewTimer(maxPollTime)
-	defer maxPollTimer.Stop()
 	longPollStopCh := make(chan int)
 	for {
+		client.logger.Debug("%s: top of for loop", client.pi.getLogPrefix())
 		select {
 		case <-maxPollTimer.C:
 			client.logger.Debug("maxPollTimer expired. Stopping everything.")
