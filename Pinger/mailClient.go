@@ -249,7 +249,7 @@ func (client *MailClientContext) start() {
 	maxPollTime := time.Duration(client.pi.MaxPollTimeout) * time.Millisecond
 	client.logger.Debug("%s: Setting maxPollTimer for %s", client.pi.getLogPrefix(), maxPollTime)
 	maxPollTimer := time.NewTimer(maxPollTime)
-	longPollStopCh := make(chan int)
+	var longPollStopCh chan int
 	for {
 		client.logger.Debug("%s: top of for loop", client.pi.getLogPrefix())
 		select {
@@ -262,6 +262,7 @@ func (client *MailClientContext) start() {
 			client.logger.Debug("%s: DeferTimer expired. Starting Polling.", client.pi.getLogPrefix())
 			maxPollTimer.Reset(maxPollTime)
 			// launch the longpoll and wait for it to exit
+			longPollStopCh = make(chan int)
 			go client.mailClient.LongPoll(longPollStopCh, client.exitCh)
 
 		case <-client.exitCh:
@@ -282,7 +283,10 @@ func (client *MailClientContext) start() {
 				return
 
 			case cmd == PingerDefer:
-				longPollStopCh<-1
+				if longPollStopCh != nil {
+					longPollStopCh<-1
+					longPollStopCh = nil
+				}
 				deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
 				client.logger.Debug("%s: reStarting deferTimer for %s", client.pi.getLogPrefix(), deferTime)
 				deferTimer.Stop()
