@@ -29,6 +29,6 @@ func TestRpcStart(t *testing.T) {
 	}
 	reply := StartPollingResponse{}
 
-	poll.Start(&args, &reply)
-	assert.Equal(reply.Code, PollingReplyError, fmt.Sprintf("Did not get error from poll.Start. DeviceInfo save should have failed"))
+	err = poll.Start(&args, &reply)
+	assert.NotNil(err, fmt.Sprintf("Did not get error from poll.Start. DeviceInfo save should have failed"))
 }

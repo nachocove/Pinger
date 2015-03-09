@@ -14,6 +14,7 @@ func TestAPNSToken(t *testing.T) {
 	token, err := decodeAPNSPushToken(pushb64)
 	assert.NotEmpty(token)
 	assert.NoError(err)
+	assert.Equal(64, len(token))
 
 	token, err = decodeAPNSPushToken(pushraw)
 	assert.NotEmpty(token)
