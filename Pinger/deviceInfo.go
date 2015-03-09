@@ -520,9 +520,25 @@ func (di *DeviceInfo) validateAws() error {
 		di.Enabled = true
 		need_update = true
 	}
-	if di.PushToken != attributes["Token"] {
+	
+	var pushToken string
+	switch {
+	case di.PushService == PushServiceAPNS:
+		pushToken, err = decodeAPNSPushToken(di.PushToken)
+		if err != nil {
+			return err
+		}
+		if len(pushToken) != 64 {
+			return fmt.Errorf("APNS token length wrong. %d ('%s')", len(pushToken), string(pushToken))
+		}
+
+	default:
+		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
+	}
+
+	if pushToken != attributes["Token"] {
 		// need to update the token with aws
-		attributes["Token"] = di.PushToken
+		attributes["Token"] = pushToken
 		err := DefaultPollingContext.config.Aws.setEndpointAttributes(di.AWSEndpointArn, attributes)
 		if err != nil {
 			return err
