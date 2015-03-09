@@ -108,7 +108,12 @@ func (di *DeviceInfo) validate() error {
 	}
 	return nil
 }
-func newDeviceInfo(clientID, clientContext, pushToken, pushService, platform, osVersion, appBuildVersion, appBuildNumber string, logger *logging.Logger) (*DeviceInfo, error) {
+func newDeviceInfo(
+	clientID, clientContext,
+	pushToken, pushService,
+	platform, osVersion,
+	appBuildVersion, appBuildNumber string,
+	logger *logging.Logger) (*DeviceInfo, error) {
 	di := &DeviceInfo{
 		ClientId:        clientID,
 		ClientContext:   clientContext,
@@ -116,8 +121,8 @@ func newDeviceInfo(clientID, clientContext, pushToken, pushService, platform, os
 		PushService:     pushService,
 		Platform:        platform,
 		OSVersion:       osVersion,
-		AppBuildNumber:  appBuildVersion,
-		AppBuildVersion: appBuildNumber,
+		AppBuildVersion: appBuildVersion,
+		AppBuildNumber:  appBuildNumber,
 		Enabled:         false,
 		logger:          logger,
 	}
@@ -289,7 +294,10 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 	return di, nil
 }
 
-func (di *DeviceInfo) updateDeviceInfo(clientContext, pushService, pushToken, platform, osVersion, appBuildVersion, appBuildNumber string) (bool, error) {
+func (di *DeviceInfo) updateDeviceInfo(clientContext,
+	pushService, pushToken,
+	platform, osVersion,
+	appBuildVersion, appBuildNumber string) (bool, error) {
 	changed := false
 	if di.ClientContext != clientContext {
 		di.ClientContext = clientContext
@@ -449,6 +457,9 @@ func (di *DeviceInfo) registerAws() error {
 		pushToken, err = decodeAPNSPushToken(di.PushToken)
 		if err != nil {
 			return err
+		}
+		if len(pushToken) != 64 {
+			return fmt.Errorf("APNS token length wrong. %d ('%s')", len(pushToken), string(pushToken))
 		}
 
 	default:
