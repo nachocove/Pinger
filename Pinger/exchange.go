@@ -40,7 +40,7 @@ func NewExchangeClient(parent *MailClientContext, debug bool, logger *logging.Lo
 
 func (ex *ExchangeClient) getLogPrefix() (prefix string) {
 	if ex.parent != nil && ex.parent.di != nil {
-		prefix = ex.parent.di.getLogPrefix()
+		prefix = "ActiveSync:" + ex.parent.di.getLogPrefix()
 	}
 	return
 }
