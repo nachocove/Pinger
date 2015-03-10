@@ -10,6 +10,15 @@ import (
 
 var dbmap *gorp.DbMap
 var logger *logging.Logger
+var testClientID = "clientID"
+var testClientContext = "clientContext"
+var testDeviceId = "NCHOXfherekgrgr"
+var testPushToken = "pushToken"
+var testPushService = "pushService"
+var testPlatform = "ios"
+var testOSVersion = "8.1"
+var testAppVersion = "0.9"
+var testAppnumber = "(dev) Foo"
 
 func TestMain(m *testing.M) {
 	var err error
@@ -29,16 +38,6 @@ func TestDeviceInfoValidate(t *testing.T) {
 	var err error
 
 	assert := assert.New(t)
-
-	testClientID := "clientID"
-	testClientContext := "clientContext"
-	testDeviceId := "NCHOXfherekgrgr"
-	testPushToken := "pushToken"
-	testPushService := "pushService"
-	testPlatform := "ios"
-	testOSVersion := "8.1"
-	testAppVersion := "0.9"
-	testAppnumber := "(dev) Foo"
 
 	di, err := newDeviceInfo(
 		testClientID,
@@ -89,16 +88,6 @@ func TestDeviceInfoCleanup(t *testing.T) {
 
 	assert := assert.New(t)
 
-	testClientID := "clientID"
-	testClientContext := "clientContext"
-	testDeviceId := "NCHOXfherekgrgr"
-	testPushToken := "pushToken"
-	testPushService := "pushService"
-	testPlatform := "ios"
-	testOSVersion := "8.1"
-	testAppVersion := "0.9"
-	testAppnumber := "(dev) Foo"
-
 	di, err := newDeviceInfo(
 		testClientID,
 		testClientContext,
@@ -130,16 +119,6 @@ func TestDeviceInfoCreate(t *testing.T) {
 	var err error
 
 	assert := assert.New(t)
-
-	testClientID := "clientID"
-	testClientContext := "clientContext"
-	testDeviceId := "NCHOXfherekgrgr"
-	testPushToken := "pushToken"
-	testPushService := "pushService"
-	testPlatform := "ios"
-	testOSVersion := "8.1"
-	testAppVersion := "0.9"
-	testAppnumber := "(dev) Foo"
 
 	deviceList, err := getAllMyDeviceInfo(dbmap, logger)
 	assert.Equal(len(deviceList), 0)
@@ -226,7 +205,7 @@ func TestDeviceInfoUpdate(t *testing.T) {
 	deviceList, err := getAllMyDeviceInfo(dbmap, logger)
 	assert.NoError(err)
 	assert.Equal(1, len(deviceList))
-	di := deviceList[0]
+	di := &deviceList[0]
 	assert.NotNil(di.dbm)
 
 	di.AWSEndpointArn = "some endpoint"
@@ -247,6 +226,17 @@ func TestDeviceInfoUpdate(t *testing.T) {
 	assert.True(changed)
 	assert.Equal(newToken, di.PushToken)
 	assert.Empty(di.AWSEndpointArn)
+	
+	assert.True(di.LastContact > 0)
+	lastContext := di.LastContact
+	err = updateLastContact(dbmap, di.ClientId, di.ClientContext, di.DeviceId, logger)
+	assert.NoError(err)
+	
+	di, err = getDeviceInfo(dbmap, di.ClientId, di.ClientContext, di.DeviceId, logger)
+	assert.NoError(err)
+	assert.NotNil(di)
+		
+	assert.True(di.LastContact > lastContext)	
 	di.cleanup()
 }
 
@@ -254,16 +244,6 @@ func TestDeviceInfoDelete(t *testing.T) {
 	var err error
 
 	assert := assert.New(t)
-
-	testClientID := "clientID"
-	testClientContext := "clientContext"
-	testDeviceId := "NCHOXfherekgrgr"
-	testPushToken := "pushToken"
-	testPushService := "pushService"
-	testPlatform := "ios"
-	testOSVersion := "8.1"
-	testAppVersion := "0.9"
-	testAppnumber := "(dev) Foo"
 
 	di, err := newDeviceInfo(
 		testClientID,
@@ -293,10 +273,12 @@ func TestDevicePushMessageCreate(t *testing.T) {
 	di := DeviceInfo{Platform: "ios", PushService: PushServiceAPNS, ClientContext: "FOO"}
 	var days_28 int64 = 2419200
 
+	assert.Equal(di.LastContactRequest, 0)
 	message, err := di.pushMessage(PingerNotificationRegister, days_28)
 	assert.NoError(err)
 	assert.NotEmpty(message)
 	assert.Equal(
 		"{\"APNS\":\"{\\\"aps\\\":{\\\"content-available\\\":1},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"APNS_SANDBOX\":\"{\\\"aps\\\":{\\\"content-available\\\":1},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"collapse_key\\\":\\\"10e23d6b0b515fbff01dff49948afebea929a763\\\",\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}},\\\"delay_while_idle\\\":false,\\\"time_to_live\\\":2419200}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
 		message)
+	assert.True(di.LastContactRequest > 0)
 }
