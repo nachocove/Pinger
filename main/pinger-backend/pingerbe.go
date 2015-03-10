@@ -70,7 +70,7 @@ func main() {
 			screenLevel = logging.INFO
 		}
 	}
-	logger, err = config.Global.InitLogging(screenLogging, screenLevel)
+	logger, err = config.Global.InitLogging(screenLogging, screenLevel, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Init Logging: %s", err)
 		os.Exit(1)

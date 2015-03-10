@@ -171,7 +171,7 @@ func GetConfigAndRun() {
 		screenLogging = true
 		screenLevel = logging.DEBUG
 	}
-	logger, err := config.Global.InitLogging(screenLogging, screenLevel)
+	logger, err := config.Global.InitLogging(screenLogging, screenLevel, debug)
 	if err != nil {
 		log.Fatalf("Error InitLogging: %v\n", err)
 		os.Exit(1)

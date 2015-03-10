@@ -22,7 +22,7 @@ func exists(path string) bool {
 
 var LoggerName string
 
-func InitLogging(loggerName string, logFileName string, fileLevel logging.Level, screen bool, screenLevel logging.Level) (*logging.Logger, error) {
+func InitLogging(loggerName string, logFileName string, fileLevel logging.Level, screen bool, screenLevel logging.Level, debug bool) (*logging.Logger, error) {
 	if LoggerName != "" {
 		panic("Can not init logging multiple times")
 	}
@@ -31,7 +31,13 @@ func InitLogging(loggerName string, logFileName string, fileLevel logging.Level,
 		return nil, err
 	}
 
-	format := logging.MustStringFormatter("%{time:2006-01-02T15:04:05.000} %{shortfunc}:%{level} %{message}")
+	var formatStr string
+	if debug {
+		formatStr = "%{time:2006-01-02T15:04:05.000} %{shortfile}:%{shortfunc}:%{level} %{message}"
+	} else {
+		formatStr = "%{time:2006-01-02T15:04:05.000} %{shortfunc}:%{level} %{message}"		
+	}
+	format := logging.MustStringFormatter(formatStr)		
 	fileLogger := logging.AddModuleLevel(logging.NewLogBackend(logFile, "", 0))
 	fileLogger.SetLevel(fileLevel, "")
 	if screen {

@@ -119,7 +119,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "LevelNameToLevel: %v\n", err)
 		os.Exit(1)
 	}
-	logger, err = Pinger.InitLogging("testClient", logFileName, fileLevel, screenLogging, screenLevel)
+	logger, err = Pinger.InitLogging("testClient", logFileName, fileLevel, screenLogging, screenLevel, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "InitLogging: %v\n", err)
 		os.Exit(1)
