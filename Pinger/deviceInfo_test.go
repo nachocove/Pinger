@@ -146,6 +146,20 @@ func TestDeviceInfoCreate(t *testing.T) {
 
 	di, err := newDeviceInfo(
 		testClientID,
+		"",
+		testDeviceId,
+		testPushToken,
+		testPushService,
+		testPlatform,
+		testOSVersion,
+		testAppVersion,
+		testAppnumber,
+		logger)
+	assert.Error(err, "ClientContext can not be empty")
+	assert.Nil(di)
+
+	di, err = newDeviceInfo(
+		testClientID,
 		testClientContext,
 		testDeviceId,
 		testPushToken,
