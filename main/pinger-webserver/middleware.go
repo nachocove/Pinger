@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"net/http/httputil"
 
 	"github.com/gorilla/context"
 )
@@ -25,7 +26,15 @@ func GetContext(r *http.Request) *Context {
 	if !ok {
 		log.Fatal("No string template in context")
 	}
-
+	if context.Config.Global.DumpRequests {
+		responseBytes, err := httputil.DumpRequest(r, true)
+		if err != nil {
+			context.Logger.Error("Could not dump request %+v", r)
+		} else {
+			context.Logger.Warning("Request:\n%s", responseBytes)
+		}
+	}
+	
 	return context
 }
 
