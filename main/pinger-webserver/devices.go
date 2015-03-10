@@ -25,6 +25,7 @@ func init() {
 type registerPostData struct {
 	ClientId              string
 	ClientContext         string
+	DeviceId              string
 	Platform              string
 	MailServerUrl         string
 	MailServerCredentials struct {
@@ -56,6 +57,14 @@ func (pd *registerPostData) Validate() (bool, []string) {
 		MissingFields = append(MissingFields, "ClientId")
 		ok = false
 	}
+	if pd.ClientContext == "" {
+		MissingFields = append(MissingFields, "ClientContext")
+		ok = false
+	}
+	if pd.DeviceId == "" {
+		MissingFields = append(MissingFields, "DeviceId")
+		ok = false
+	}
 	if pd.MailServerUrl == "" {
 		MissingFields = append(MissingFields, "MailServerUrl")
 		ok = false
@@ -80,6 +89,7 @@ func (pd *registerPostData) AsMailInfo() *Pinger.MailPingInformation {
 	pi := Pinger.MailPingInformation{}
 	pi.ClientId = pd.ClientId
 	pi.ClientContext = pd.ClientContext
+	pi.DeviceId = pd.DeviceId
 	pi.Platform = pd.Platform
 	pi.MailServerUrl = pd.MailServerUrl
 	pi.MailServerCredentials.Username = pd.MailServerCredentials.Username
@@ -136,7 +146,6 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
 		return
 	}
-
 	ok, missingFields := postInfo.Validate()
 	if ok == false {
 		context.Logger.Warning("Missing non-optional data: %s", strings.Join(missingFields, ","))
@@ -195,9 +204,11 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 }
 
 type deferPost struct {
-	ClientId string
-	Timeout  int64
-	Token    string
+	ClientId      string
+	ClientContext string
+	DeviceId      string
+	Timeout       int64
+	Token         string
 }
 
 func deferPolling(w http.ResponseWriter, r *http.Request) {
@@ -269,8 +280,10 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 }
 
 type stopPost struct {
-	ClientId string
-	Token    string
+	ClientId      string
+	ClientContext string
+	DeviceId      string
+	Token         string
 }
 
 func stopPolling(w http.ResponseWriter, r *http.Request) {

@@ -40,6 +40,7 @@ const (
 type MailPingInformation struct {
 	ClientId              string
 	ClientContext         string
+	DeviceId              string
 	Platform              string
 	MailServerUrl         string
 	MailServerCredentials struct {
@@ -68,6 +69,7 @@ type MailPingInformation struct {
 func (pi *MailPingInformation) cleanup() {
 	pi.ClientId = ""
 	pi.ClientContext = ""
+	pi.DeviceId = ""
 	pi.Platform = ""
 	pi.MailServerUrl = ""
 	pi.MailServerCredentials.Password = ""
@@ -140,7 +142,7 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		stats:     nil,
 	}
 	logger.Debug("%s: Validating clientID", pi.ClientId)
-	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, client.logger)
+	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, pi.ClientContext, pi.DeviceId, client.logger)
 	if err != nil {
 		return nil, err
 	}

@@ -22,23 +22,23 @@ const (
 )
 
 type DeviceInfo struct {
-	Id                 int64 `db:"id"`
-	Created            int64 `db:"created"`
-	Updated            int64 `db:"updated"`
-	LastContact        int64 `db:"last_contact"`
-	LastContactRequest int64 `db:"last_contact_request"`
-
-	ClientId        string `db:"client_id"` // us-east-1a-XXXXXXXX
-	ClientContext   string `db:"client_context"`
-	Platform        string `db:"device_platform"` // "ios", "android", etc..
-	PushToken       string `db:"push_token"`
-	PushService     string `db:"push_service"` // APNS, GCM, ...
-	OSVersion       string `db:"os_version"`
-	AppBuildVersion string `db:"build_version"`
-	AppBuildNumber  string `db:"build_number"`
-	AWSEndpointArn  string `db:"aws_endpoint_arn"`
-	Enabled         bool   `db:"enabled"`
-	Pinger          string `db:"pinger"`
+	Id                 int64  `db:"id"`
+	Created            int64  `db:"created"`
+	Updated            int64  `db:"updated"`
+	LastContact        int64  `db:"last_contact"`
+	LastContactRequest int64  `db:"last_contact_request"`
+	ClientId           string `db:"client_id"` // us-east-1a-XXXXXXXX
+	ClientContext      string `db:"client_context"`
+	DeviceId           string `db:"device_id"`  // NCHO348348384384.....
+	Platform           string `db:"device_platform"` // "ios", "android", etc..
+	PushToken          string `db:"push_token"`
+	PushService        string `db:"push_service"` // APNS, GCM, ...
+	OSVersion          string `db:"os_version"`
+	AppBuildVersion    string `db:"build_version"`
+	AppBuildNumber     string `db:"build_number"`
+	AWSEndpointArn     string `db:"aws_endpoint_arn"`
+	Enabled            bool   `db:"enabled"`
+	Pinger             string `db:"pinger"`
 
 	dbm       *gorp.DbMap     `db:"-"`
 	logger    *logging.Logger `db:"-"`
@@ -46,7 +46,7 @@ type DeviceInfo struct {
 }
 
 const (
-	DeviceTableName string = "DeviceInfo"
+	DeviceTableName string = "device_info"
 )
 
 func addDeviceInfoTable(dbmap *gorp.DbMap) error {
@@ -64,8 +64,16 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 	cMap.SetNotNull(true)
 
 	cMap = tMap.ColMap("ClientId")
-	cMap.SetUnique(true)
 	cMap.SetNotNull(true)
+	clientCol := cMap	
+
+	cMap = tMap.ColMap("ClientContext")
+	cMap.SetNotNull(true)
+	contextCol := cMap
+
+	cMap = tMap.ColMap("DeviceId")
+	cMap.SetNotNull(true)
+	deviceCol := cMap
 
 	cMap = tMap.ColMap("Platform")
 	cMap.SetNotNull(true)
@@ -88,12 +96,19 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 	cMap = tMap.ColMap("Pinger")
 	cMap.SetNotNull(true)
 
+	tMap = tMap.SetUniqueTogether(clientCol.ColumnName, contextCol.ColumnName, deviceCol.ColumnName)
 	return nil
 }
 
 func (di *DeviceInfo) validate() error {
 	if di.ClientId == "" {
 		return errors.New("ClientID can not be empty")
+	}
+	if di.ClientContext == "" {
+		return errors.New("ClientContext can not be empty")
+	}
+	if di.DeviceId == "" {
+		return errors.New("DeviceId can not be empty")
 	}
 	if di.Platform == "" {
 		return errors.New("Platform can not be empty")
@@ -109,7 +124,7 @@ func (di *DeviceInfo) validate() error {
 	return nil
 }
 func newDeviceInfo(
-	clientID, clientContext,
+	clientID, clientContext, deviceId,
 	pushToken, pushService,
 	platform, osVersion,
 	appBuildVersion, appBuildNumber string,
@@ -117,6 +132,7 @@ func newDeviceInfo(
 	di := &DeviceInfo{
 		ClientId:        clientID,
 		ClientContext:   clientContext,
+		DeviceId:        deviceId,
 		PushToken:       pushToken,
 		PushService:     pushService,
 		Platform:        platform,
@@ -137,6 +153,7 @@ func (di *DeviceInfo) cleanup() {
 	di.logger.Debug("%s: Cleaning up DeviceInfo", di.getLogPrefix())
 	di.ClientId = ""
 	di.ClientContext = ""
+	di.DeviceId = ""
 	di.PushToken = ""
 	di.PushService = ""
 	di.Platform = ""
@@ -166,11 +183,19 @@ func init() {
 	}
 }
 
-func getDeviceInfo(dbm *gorp.DbMap, clientId string, logger *logging.Logger) (*DeviceInfo, error) {
+func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *logging.Logger) (*DeviceInfo, error) {
 	s := reflect.TypeOf(DeviceInfo{})
 	clientIdField, ok := s.FieldByName("ClientId")
 	if ok == false {
 		return nil, errors.New("Could not get ClientId Field information")
+	}
+	contextField, ok := s.FieldByName("ClientContext")
+	if ok == false {
+		return nil, errors.New("Could not get ClientContext Field information")
+	}
+	deviceidField, ok := s.FieldByName("DeviceId")
+	if ok == false {
+		return nil, errors.New("Could not get DeviceId Field information")
 	}
 	pingerField, ok := s.FieldByName("Pinger")
 	if ok == false {
@@ -180,9 +205,9 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId string, logger *logging.Logger) (*D
 	var err error
 	_, err = dbm.Select(
 		&devices,
-		fmt.Sprintf("select * from %s where %s=? and %s=?", s.Name(),
-			clientIdField.Tag.Get("db"), pingerField.Tag.Get("db")),
-		clientId, pingerHostId)
+		fmt.Sprintf("select * from %s where %s=? and %s=? and %s=? and %s=?", DeviceTableName,
+			clientIdField.Tag.Get("db"), contextField.Tag.Get("db"), deviceidField.Tag.Get("db"), pingerField.Tag.Get("db")),
+		clientId, clientContext, deviceId, pingerHostId)
 	if err != nil {
 		return nil, err
 	}
@@ -245,8 +270,8 @@ func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
 	return di.validate()
 }
 
-func updateLastContact(dbm *gorp.DbMap, clientId string, logger *logging.Logger) error {
-	di, err := getDeviceInfo(dbm, clientId, logger)
+func updateLastContact(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *logging.Logger) error {
+	di, err := getDeviceInfo(dbm, clientId, clientContext, deviceId, logger)
 	if err != nil {
 		return err
 	}
@@ -260,7 +285,7 @@ func updateLastContact(dbm *gorp.DbMap, clientId string, logger *logging.Logger)
 
 func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.Logger) (*DeviceInfo, error) {
 	var err error
-	di, err := getDeviceInfo(dbm, pi.ClientId, logger)
+	di, err := getDeviceInfo(dbm, pi.ClientId, pi.ClientContext, pi.DeviceId, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -268,6 +293,7 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 		di, err = newDeviceInfo(
 			pi.ClientId,
 			pi.ClientContext,
+			pi.DeviceId,
 			pi.PushToken,
 			pi.PushService,
 			pi.Platform,
@@ -286,7 +312,7 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 			return nil, err
 		}
 	} else {
-		_, err := di.updateDeviceInfo(pi.ClientContext, pi.PushService, pi.PushToken, pi.Platform, pi.OSVersion, pi.AppBuildVersion, pi.AppBuildNumber)
+		_, err := di.updateDeviceInfo(pi.ClientContext, pi.DeviceId, pi.PushService, pi.PushToken, pi.Platform, pi.OSVersion, pi.AppBuildVersion, pi.AppBuildNumber)
 		if err != nil {
 			return nil, err
 		}
@@ -294,13 +320,18 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 	return di, nil
 }
 
-func (di *DeviceInfo) updateDeviceInfo(clientContext,
+func (di *DeviceInfo) updateDeviceInfo(
+	clientContext, deviceId,
 	pushService, pushToken,
 	platform, osVersion,
 	appBuildVersion, appBuildNumber string) (bool, error) {
 	changed := false
 	if di.ClientContext != clientContext {
 		di.ClientContext = clientContext
+		changed = true
+	}
+	if di.DeviceId != deviceId {
+		di.DeviceId = deviceId
 		changed = true
 	}
 	if di.OSVersion != osVersion {
@@ -520,7 +551,7 @@ func (di *DeviceInfo) validateAws() error {
 		di.Enabled = true
 		need_update = true
 	}
-	
+
 	var pushToken string
 	switch {
 	case di.PushService == PushServiceAPNS:

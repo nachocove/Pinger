@@ -32,14 +32,18 @@ type StartPollArgs struct {
 }
 
 type StopPollArgs struct {
-	ClientId  string
-	StopToken string
+	ClientId      string
+	ClientContext string
+	DeviceId      string
+	StopToken     string
 }
 
 type DeferPollArgs struct {
-	ClientId  string
-	Timeout   int64
-	StopToken string
+	ClientId      string
+	ClientContext string
+	DeviceId      string
+	Timeout       int64
+	StopToken     string
 }
 
 type PollingResponse struct {
@@ -73,17 +77,22 @@ func validateClientID(clientID string) error {
 	return DefaultPollingContext.config.Aws.validateCognitoID(clientID)
 }
 
+func (t *BackendPolling) pollMapKey(clientId, clientContext, deviceId string) string {
+	return fmt.Sprintf("%s--%s--%s", clientId, clientContext, deviceId)
+}
+
 func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingResponse) error {
 	t.logger.Debug("%s: Received StartPoll request", args.MailInfo.ClientId)
 	t.logger.Debug("PollingMap: %+v", t.pollMap)
+	pollMapKey := t.pollMapKey(args.MailInfo.ClientId, args.MailInfo.ClientContext, args.MailInfo.DeviceId)
 	reply.Code = PollingReplyOK
 	var client *MailClientContext
-	client, ok := t.pollMap[args.MailInfo.ClientId]
+	client, ok := t.pollMap[pollMapKey]
 	if ok == true {
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll session in map", args.MailInfo.ClientId)
 		}
-		err := updateLastContact(t.dbm, args.MailInfo.ClientId, t.logger)
+		err := updateLastContact(t.dbm, args.MailInfo.ClientId, args.MailInfo.ClientContext, args.MailInfo.DeviceId, t.logger)
 		if err != nil {
 			reply.Message = err.Error()
 			reply.Code = PollingReplyError
@@ -144,7 +153,7 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 		reply.Code = PollingReplyError
 		return nil
 	}
-	t.pollMap[args.MailInfo.ClientId] = client
+	t.pollMap[pollMapKey] = client
 	reply.Token = client.stopToken
 	return nil
 }
@@ -152,7 +161,8 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("%s: Received stopPoll request", args.ClientId)
 	t.logger.Debug("PollingMap: %+v", t.pollMap)
-	client, ok := t.pollMap[args.ClientId]
+	pollMapKey := t.pollMapKey(args.ClientId, args.ClientContext, args.DeviceId)
+	client, ok := t.pollMap[pollMapKey]
 	if ok == false {
 		// nothing on file.
 		reply.Code = PollingReplyError
@@ -169,7 +179,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 			reply.Code = PollingReplyError
 			return nil
 		} else {
-			err := updateLastContact(t.dbm, args.ClientId, t.logger)
+			err := updateLastContact(t.dbm, args.ClientId, args.ClientContext, args.DeviceId, t.logger)
 			if err != nil {
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
@@ -194,7 +204,8 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("%s: Received deferPoll request", args.ClientId)
 	t.logger.Debug("PollingMap: %+v", t.pollMap)
-	client, ok := t.pollMap[args.ClientId]
+	pollMapKey := t.pollMapKey(args.ClientId, args.ClientContext, args.DeviceId)
+	client, ok := t.pollMap[pollMapKey]
 	if ok == false {
 		// nothing on file.
 		reply.Code = PollingReplyError
@@ -211,7 +222,7 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 			reply.Code = PollingReplyError
 			return nil
 		} else {
-			err := updateLastContact(t.dbm, args.ClientId, t.logger)
+			err := updateLastContact(t.dbm, args.ClientId, args.ClientContext, args.DeviceId, t.logger)
 			if err != nil {
 				reply.Code = PollingReplyError
 				reply.Message = err.Error()
