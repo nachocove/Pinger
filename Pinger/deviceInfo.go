@@ -239,7 +239,7 @@ func getAllMyDeviceInfo(dbm *gorp.DbMap, logger *logging.Logger) ([]DeviceInfo, 
 	var err error
 	_, err = dbm.Select(
 		&devices,
-		fmt.Sprintf("select * from %s where %s=?", s.Name(), pingerField.Tag.Get("db")),
+		fmt.Sprintf("select * from %s where %s=?", DeviceTableName, pingerField.Tag.Get("db")),
 		pingerHostId)
 	if err != nil {
 		return nil, err
