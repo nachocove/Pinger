@@ -9,7 +9,7 @@ import (
 )
 
 var dbmap *gorp.DbMap
-var logger *logging.Logger
+var logger *logging.Logger = logging.MustGetLogger("unittest")
 var testClientID = "clientID"
 var testClientContext = "clientContext"
 var testDeviceId = "NCHOXfherekgrgr"
@@ -22,7 +22,6 @@ var testAppnumber = "(dev) Foo"
 
 func TestMain(m *testing.M) {
 	var err error
-	logger = logging.MustGetLogger("unittest")
 	testDbFilename := "unittest.db"
 	os.Remove(testDbFilename)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: testDbFilename}
@@ -273,12 +272,10 @@ func TestDevicePushMessageCreate(t *testing.T) {
 	di := DeviceInfo{Platform: "ios", PushService: PushServiceAPNS, ClientContext: "FOO"}
 	var days_28 int64 = 2419200
 
-	assert.Equal(di.LastContactRequest, 0)
 	message, err := di.pushMessage(PingerNotificationRegister, days_28)
 	assert.NoError(err)
 	assert.NotEmpty(message)
 	assert.Equal(
 		"{\"APNS\":\"{\\\"aps\\\":{\\\"content-available\\\":1},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"APNS_SANDBOX\":\"{\\\"aps\\\":{\\\"content-available\\\":1},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"collapse_key\\\":\\\"10e23d6b0b515fbff01dff49948afebea929a763\\\",\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}},\\\"delay_while_idle\\\":false,\\\"time_to_live\\\":2419200}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
 		message)
-	assert.True(di.LastContactRequest > 0)
 }
