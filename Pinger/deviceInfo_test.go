@@ -32,6 +32,7 @@ func TestDeviceInfoCreate(t *testing.T) {
 
 	testClientID := "clientID"
 	testClientContext := "clientContext"
+	testDeviceId := "NCHOXfherekgrgr"
 	testPushToken := "pushToken"
 	testPushService := "pushService"
 	testPlatform := "ios"
@@ -45,6 +46,7 @@ func TestDeviceInfoCreate(t *testing.T) {
 	di, err := newDeviceInfo(
 		testClientID,
 		testClientContext,
+		testDeviceId,
 		testPushToken,
 		testPushService,
 		testPlatform,
@@ -57,6 +59,7 @@ func TestDeviceInfoCreate(t *testing.T) {
 
 	assert.Equal(testClientID, di.ClientId)
 	assert.Equal(testClientContext, di.ClientContext)
+	assert.Equal(testDeviceId, di.DeviceId)
 	assert.Equal(testPushToken, di.PushToken)
 	assert.Equal(testPushService, di.PushService)
 	assert.Equal(testPlatform, di.Platform)
@@ -75,7 +78,7 @@ func TestDeviceInfoCreate(t *testing.T) {
 	deviceList, err = getAllMyDeviceInfo(dbmap, logger)
 	assert.Equal(0, len(deviceList))
 
-	diInDb, err := getDeviceInfo(dbmap, testClientID, logger)
+	diInDb, err := getDeviceInfo(dbmap, testClientID, testClientContext, testDeviceId, logger)
 	assert.NoError(err)
 	assert.Nil(diInDb)
 
@@ -91,7 +94,7 @@ func TestDeviceInfoCreate(t *testing.T) {
 
 	assert.Equal(pingerHostId, di.Pinger)
 
-	diInDb, err = getDeviceInfo(dbmap, testClientID, logger)
+	diInDb, err = getDeviceInfo(dbmap, testClientID, testClientContext, testDeviceId, logger)
 	assert.NoError(err)
 	assert.NotNil(diInDb)
 	assert.Equal(di.Id, diInDb.Id)
@@ -115,14 +118,14 @@ func TestDeviceInfoUpdate(t *testing.T) {
 	assert.NoError(err)
 	assert.NotEmpty(di.AWSEndpointArn)
 
-	changed, err := di.updateDeviceInfo(di.ClientContext, di.PushService, di.PushToken,
+	changed, err := di.updateDeviceInfo(di.ClientContext, di.DeviceId, di.PushService, di.PushToken,
 		di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
 	assert.NoError(err)
 	assert.False(changed)
 	assert.NotEmpty(di.AWSEndpointArn)
 
 	newToken := "some updated token"
-	changed, err = di.updateDeviceInfo(di.ClientContext, di.PushService, newToken,
+	changed, err = di.updateDeviceInfo(di.ClientContext, di.DeviceId, di.PushService, newToken,
 		di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
 	assert.NoError(err)
 	assert.True(changed)
