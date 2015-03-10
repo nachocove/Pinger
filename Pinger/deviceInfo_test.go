@@ -25,6 +25,107 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestDeviceInfoValidate(t *testing.T) {
+	var err error
+
+	assert := assert.New(t)
+
+	testClientID := "clientID"
+	testClientContext := "clientContext"
+	testDeviceId := "NCHOXfherekgrgr"
+	testPushToken := "pushToken"
+	testPushService := "pushService"
+	testPlatform := "ios"
+	testOSVersion := "8.1"
+	testAppVersion := "0.9"
+	testAppnumber := "(dev) Foo"
+
+	di, err := newDeviceInfo(
+		testClientID,
+		testClientContext,
+		testDeviceId,
+		testPushToken,
+		testPushService,
+		testPlatform,
+		testOSVersion,
+		testAppVersion,
+		testAppnumber,
+		logger)
+	assert.NoError(err)
+	assert.NotNil(di)
+	
+	err = di.validate()
+	assert.NoError(err)
+	
+	di.ClientId = ""
+	err = di.validate()
+	assert.EqualError(err, "ClientID can not be empty")
+	di.ClientId = testClientID
+	
+	di.ClientContext = ""
+	err = di.validate()
+	assert.EqualError(err, "ClientContext can not be empty")
+	di.ClientContext = testClientContext
+
+	di.DeviceId = ""
+	err = di.validate()
+	assert.EqualError(err, "DeviceId can not be empty")
+	di.DeviceId = testDeviceId
+
+	di.Platform = ""
+	err = di.validate()
+	assert.EqualError(err, "Platform can not be empty")
+	
+	di.Platform = "foo"
+	err = di.validate()
+	assert.EqualError(err, "Platform foo is not known")
+	di.Platform = testPlatform
+	
+	di.cleanup()
+}
+
+func TestDeviceInfoCleanup(t *testing.T) {
+	var err error
+
+	assert := assert.New(t)
+
+	testClientID := "clientID"
+	testClientContext := "clientContext"
+	testDeviceId := "NCHOXfherekgrgr"
+	testPushToken := "pushToken"
+	testPushService := "pushService"
+	testPlatform := "ios"
+	testOSVersion := "8.1"
+	testAppVersion := "0.9"
+	testAppnumber := "(dev) Foo"
+
+	di, err := newDeviceInfo(
+		testClientID,
+		testClientContext,
+		testDeviceId,
+		testPushToken,
+		testPushService,
+		testPlatform,
+		testOSVersion,
+		testAppVersion,
+		testAppnumber,
+		logger)
+	assert.NoError(err)
+	assert.NotNil(di)
+	
+	di.cleanup()
+	assert.Equal("", di.ClientId)
+	assert.Equal("", di.ClientContext)
+	assert.Equal("", di.DeviceId)
+	assert.Equal("", di.PushToken)
+	assert.Equal("", di.PushService)
+	assert.Equal("", di.Platform)
+	assert.Equal("", di.OSVersion)
+	assert.Equal("", di.AppBuildNumber)
+	assert.Equal("", di.AppBuildVersion)
+	assert.Equal(0, di.Id)
+}
+
 func TestDeviceInfoCreate(t *testing.T) {
 	var err error
 
@@ -102,6 +203,7 @@ func TestDeviceInfoCreate(t *testing.T) {
 	deviceList, err = getAllMyDeviceInfo(dbmap, logger)
 	assert.NoError(err)
 	assert.Equal(1, len(deviceList))
+	di.cleanup()
 }
 
 func TestDeviceInfoUpdate(t *testing.T) {
@@ -131,6 +233,45 @@ func TestDeviceInfoUpdate(t *testing.T) {
 	assert.True(changed)
 	assert.Equal(newToken, di.PushToken)
 	assert.Empty(di.AWSEndpointArn)
+	di.cleanup()
+}
+
+func TestDeviceInfoDelete(t *testing.T) {
+	var err error
+
+	assert := assert.New(t)
+
+	testClientID := "clientID"
+	testClientContext := "clientContext"
+	testDeviceId := "NCHOXfherekgrgr"
+	testPushToken := "pushToken"
+	testPushService := "pushService"
+	testPlatform := "ios"
+	testOSVersion := "8.1"
+	testAppVersion := "0.9"
+	testAppnumber := "(dev) Foo"
+
+	di, err := newDeviceInfo(
+		testClientID,
+		testClientContext,
+		testDeviceId,
+		testPushToken,
+		testPushService,
+		testPlatform,
+		testOSVersion,
+		testAppVersion,
+		testAppnumber,
+		logger)
+	assert.NoError(err)
+	assert.NotNil(di)
+
+	di.cleanup()
+	
+	di = nil
+	
+	di, err = getDeviceInfo(dbmap, testClientID, testClientContext, testDeviceId, logger)
+	assert.NoError(err)
+	assert.NotNil(di)
 }
 
 func TestDevicePushMessageCreate(t *testing.T) {
