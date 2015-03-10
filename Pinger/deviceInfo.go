@@ -165,7 +165,11 @@ func (di *DeviceInfo) cleanup() {
 }
 
 var pingerHostId string
-
+var deviceInfoReflection reflect.Type
+var clientIdField reflect.StructField
+var contextField reflect.StructField
+var deviceidField reflect.StructField
+var pingerField reflect.StructField
 func init() {
 	interfaces, _ := net.Interfaces()
 	for _, inter := range interfaces {
@@ -181,26 +185,27 @@ func init() {
 		pingerHostId = hex.EncodeToString(md)
 		break
 	}
+	var ok bool
+	deviceInfoReflection = reflect.TypeOf(DeviceInfo{})
+	clientIdField, ok = deviceInfoReflection.FieldByName("ClientId")
+	if ok == false {
+		panic("Could not get ClientId Field information")
+	}
+	contextField, ok = deviceInfoReflection.FieldByName("ClientContext")
+	if ok == false {
+		panic("Could not get ClientContext Field information")
+	}
+	deviceidField, ok = deviceInfoReflection.FieldByName("DeviceId")
+	if ok == false {
+		panic("Could not get DeviceId Field information")
+	}
+	pingerField, ok = deviceInfoReflection.FieldByName("Pinger")
+	if ok == false {
+		panic("Could not get Pinger Field information")
+	}
 }
 
 func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *logging.Logger) (*DeviceInfo, error) {
-	s := reflect.TypeOf(DeviceInfo{})
-	clientIdField, ok := s.FieldByName("ClientId")
-	if ok == false {
-		return nil, errors.New("Could not get ClientId Field information")
-	}
-	contextField, ok := s.FieldByName("ClientContext")
-	if ok == false {
-		return nil, errors.New("Could not get ClientContext Field information")
-	}
-	deviceidField, ok := s.FieldByName("DeviceId")
-	if ok == false {
-		return nil, errors.New("Could not get DeviceId Field information")
-	}
-	pingerField, ok := s.FieldByName("Pinger")
-	if ok == false {
-		return nil, errors.New("Could not get Pinger Field information")
-	}
 	var devices []DeviceInfo
 	var err error
 	_, err = dbm.Select(
@@ -230,11 +235,6 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, lo
 }
 
 func getAllMyDeviceInfo(dbm *gorp.DbMap, logger *logging.Logger) ([]DeviceInfo, error) {
-	s := reflect.TypeOf(DeviceInfo{})
-	pingerField, ok := s.FieldByName("Pinger")
-	if ok == false {
-		return nil, errors.New("Could not get Pinger Field information")
-	}
 	var devices []DeviceInfo
 	var err error
 	_, err = dbm.Select(
