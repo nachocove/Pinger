@@ -83,7 +83,6 @@ func (t *BackendPolling) pollMapKey(clientId, clientContext, deviceId string) st
 
 func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingResponse) error {
 	t.logger.Debug("%s: Received StartPoll request", args.MailInfo.ClientId)
-	t.logger.Debug("PollingMap: %+v", t.pollMap)
 	pollMapKey := t.pollMapKey(args.MailInfo.ClientId, args.MailInfo.ClientContext, args.MailInfo.DeviceId)
 	reply.Code = PollingReplyOK
 	var client *MailClientContext
@@ -160,11 +159,11 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 
 func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("%s: Received stopPoll request", args.ClientId)
-	t.logger.Debug("PollingMap: %+v", t.pollMap)
 	pollMapKey := t.pollMapKey(args.ClientId, args.ClientContext, args.DeviceId)
 	client, ok := t.pollMap[pollMapKey]
 	if ok == false {
 		// nothing on file.
+		t.logger.Warning("%s: No active sessions found for key %s", args.ClientId, pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "Not Polling"
 		return nil
@@ -181,6 +180,7 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 		} else {
 			err := updateLastContact(t.dbm, args.ClientId, args.ClientContext, args.DeviceId, t.logger)
 			if err != nil {
+				t.logger.Error("%s: Could not update last contact %s", args.ClientId, err.Error())
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
 				return nil
@@ -203,11 +203,11 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 
 func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("%s: Received deferPoll request", args.ClientId)
-	t.logger.Debug("PollingMap: %+v", t.pollMap)
 	pollMapKey := t.pollMapKey(args.ClientId, args.ClientContext, args.DeviceId)
 	client, ok := t.pollMap[pollMapKey]
 	if ok == false {
 		// nothing on file.
+		t.logger.Warning("%s: No active sessions found for key %s", args.ClientId, pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "Not Polling"
 		return nil
@@ -224,6 +224,7 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 		} else {
 			err := updateLastContact(t.dbm, args.ClientId, args.ClientContext, args.DeviceId, t.logger)
 			if err != nil {
+				t.logger.Error("%s: Could not update last contact %s", args.ClientId, err.Error())
 				reply.Code = PollingReplyError
 				reply.Message = err.Error()
 				return nil
