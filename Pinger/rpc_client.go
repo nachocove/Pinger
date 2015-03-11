@@ -41,7 +41,13 @@ func stopPoll(rpcClient *rpc.Client, clientId, clientContext, deviceId, token st
 		panic("Can not call stopPoll without rpcClient set")
 	}
 	var reply PollingResponse
-	err := rpcClient.Call("BackendPolling.Stop", &StopPollArgs{ClientId: clientId, StopToken: token}, &reply)
+	args := StopPollArgs{
+		ClientId: clientId,
+		ClientContext: clientContext,
+		DeviceId: deviceId,
+		StopToken: token,
+	}
+	err := rpcClient.Call("BackendPolling.Stop", &args, &reply)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +67,14 @@ func deferPoll(rpcClient *rpc.Client, clientId, clientContext, deviceId string, 
 		panic("Can not call deferPoll without rpcClient set")
 	}
 	var reply PollingResponse
-	err := rpcClient.Call("BackendPolling.Defer", &DeferPollArgs{ClientId: clientId, Timeout: timeout, StopToken: token}, &reply)
+	args := DeferPollArgs{
+		ClientId: clientId,
+		ClientContext: clientContext,
+		DeviceId: deviceId,
+		Timeout: timeout,
+		StopToken: token,
+	}
+	err := rpcClient.Call("BackendPolling.Defer", &args, &reply)
 	if err != nil {
 		return nil, err
 	}
