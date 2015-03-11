@@ -242,7 +242,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 	//		return
 	//	}
-	reply, err := Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.Timeout, deferData.Token)
+	reply, err := Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout, deferData.Token)
 	if err != nil {
 		context.Logger.Error("Error deferring poll %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -317,7 +317,7 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 	//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 	//		return
 	//	}
-	reply, err := Pinger.StopPoll(context.RpcConnectString, stopData.ClientId, stopData.Token)
+	reply, err := Pinger.StopPoll(context.RpcConnectString, stopData.ClientId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
 	if err != nil {
 		context.Logger.Error("Error stopping poll %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

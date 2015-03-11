@@ -28,15 +28,15 @@ func startPoll(rpcClient *rpc.Client, pi *MailPingInformation) (*StartPollingRes
 	return &reply, nil
 }
 
-func StopPoll(rpcserver, clientId, token string) (*PollingResponse, error) {
+func StopPoll(rpcserver, clientId, clientContext, deviceId, token string) (*PollingResponse, error) {
 	client, err := getRpcClient(rpcserver)
 	if err != nil {
 		return nil, err
 	}
-	return stopPoll(client, clientId, token)
+	return stopPoll(client, clientId, clientContext, deviceId, token)
 }
 
-func stopPoll(rpcClient *rpc.Client, clientId, token string) (*PollingResponse, error) {
+func stopPoll(rpcClient *rpc.Client, clientId, clientContext, deviceId, token string) (*PollingResponse, error) {
 	if rpcClient == nil {
 		panic("Can not call stopPoll without rpcClient set")
 	}
@@ -48,15 +48,15 @@ func stopPoll(rpcClient *rpc.Client, clientId, token string) (*PollingResponse, 
 	return &reply, nil
 }
 
-func DeferPoll(rpcserver, clientId string, timeout int64, token string) (*PollingResponse, error) {
+func DeferPoll(rpcserver, clientId, clientContext, deviceId string, timeout int64, token string) (*PollingResponse, error) {
 	client, err := getRpcClient(rpcserver)
 	if err != nil {
 		return nil, err
 	}
-	return deferPoll(client, clientId, timeout, token)
+	return deferPoll(client, clientId, clientContext, deviceId, timeout, token)
 }
 
-func deferPoll(rpcClient *rpc.Client, clientId string, timeout int64, token string) (*PollingResponse, error) {
+func deferPoll(rpcClient *rpc.Client, clientId, clientContext, deviceId string, timeout int64, token string) (*PollingResponse, error) {
 	if rpcClient == nil {
 		panic("Can not call deferPoll without rpcClient set")
 	}
