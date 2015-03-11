@@ -418,7 +418,7 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 
 	APNSMap := map[string]interface{}{}
 	APNSMap["pinger"] = pingerMap["pinger"]
-	APNSMap["aps"] = map[string]interface{}{"content-available": 1}
+	APNSMap["aps"] = map[string]interface{}{"content-available": 1, "sound": "silent.wav"}
 	b, err := json.Marshal(APNSMap)
 	if err != nil {
 		return "", err
