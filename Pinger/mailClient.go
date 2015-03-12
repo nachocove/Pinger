@@ -92,7 +92,7 @@ func (pi *MailPingInformation) cleanup() {
 
 // Validate validate the structure/information to make sure required information exists.
 func (pi *MailPingInformation) Validate() bool {
-	if pi.ClientId == "" ||	pi.MailServerUrl == "" {
+	if pi.ClientId == "" || pi.MailServerUrl == "" {
 		return false
 	}
 	switch {
@@ -101,9 +101,9 @@ func (pi *MailPingInformation) Validate() bool {
 			return false
 		}
 	case pi.Protocol == MailClientIMAP:
-		// not yet supported 
+		// not yet supported
 		return false
-		
+
 	default:
 		// unknown protocols are never supported
 		return false
@@ -113,7 +113,7 @@ func (pi *MailPingInformation) Validate() bool {
 
 func (pi *MailPingInformation) getLogPrefix() string {
 	if pi.logPrefix == "" {
-		pi.logPrefix = fmt.Sprintf("%s@%s", pi.ClientId, pi.ClientContext)
+		pi.logPrefix = fmt.Sprintf("%s:%s:%s", pi.DeviceId, pi.ClientId, pi.ClientContext)
 	}
 	return pi.logPrefix
 }
@@ -141,7 +141,7 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		command:   make(chan PingerCommand, 10),
 		stats:     nil,
 	}
-	logger.Debug("%s: Validating clientID", pi.ClientId)
+	logger.Debug("%s: Validating clientID", pi.getLogPrefix())
 	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, pi.ClientContext, pi.DeviceId, client.logger)
 	if err != nil {
 		return nil, err
@@ -169,15 +169,15 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		//			return nil, err
 		//		}
 	default:
-		msg := fmt.Sprintf("%s: Unsupported Mail Protocol %s", client.pi.ClientId, client.pi.Protocol)
+		msg := fmt.Sprintf("%s: Unsupported Mail Protocol %s", pi.getLogPrefix(), client.pi.Protocol)
 		client.logger.Error(msg)
 		return nil, errors.New(msg)
 	}
 
 	if mailclient == nil {
-		return nil, fmt.Errorf("%s: Could not create new Mail Client Pinger", client.pi.ClientId)
+		return nil, fmt.Errorf("%s: Could not create new Mail Client Pinger", pi.getLogPrefix())
 	}
-	client.logger.Debug("%s: Starting polls", client.pi.ClientId)
+	client.logger.Debug("%s: Starting polls", pi.getLogPrefix())
 	uuid.SwitchFormat(uuid.Clean)
 	client.stopToken = uuid.NewV4().String()
 	client.mailClient = mailclient
@@ -210,17 +210,17 @@ func (client *MailClientContext) cleanup() {
 		client.mailClient = nil
 	}
 	client.stopToken = ""
-	
+
 	// tell Garbage collection to run. Might not free/remove all instances we free'd above,
 	// but it's worth the effort.
 	go runtime.GC()
 }
 
 func (pi *MailPingInformation) String() string {
-	// let's try to be safe and not print this at all. There's a number of fields we don't 
+	// let's try to be safe and not print this at all. There's a number of fields we don't
 	// want to be printed (Password is one, but also an HttpHeader might give away user info!),
 	// So let's just not.
-	return "<MailPingInformation; redacted completely>" 
+	return "<MailPingInformation; redacted completely>"
 }
 
 func UserSha256(username string) string {
@@ -255,9 +255,9 @@ func (client *MailClientContext) start() {
 	for {
 		select {
 		case <-maxPollTimer.C:
-			client.logger.Debug("maxPollTimer expired. Stopping everything.")
+			client.logger.Debug("%s: maxPollTimer expired. Stopping everything.", client.pi.getLogPrefix())
 			return
-			
+
 		case <-deferTimer.C:
 			// defer timer has timed out. Now it's time to do something
 			client.logger.Debug("%s: DeferTimer expired. Starting Polling.", client.pi.getLogPrefix())
@@ -285,7 +285,7 @@ func (client *MailClientContext) start() {
 
 			case cmd == PingerDefer:
 				if longPollStopCh != nil {
-					longPollStopCh<-1
+					longPollStopCh <- 1
 					longPollStopCh = nil
 				}
 				deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond

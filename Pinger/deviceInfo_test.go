@@ -51,15 +51,15 @@ func TestDeviceInfoValidate(t *testing.T) {
 		logger)
 	assert.NoError(err)
 	assert.NotNil(di)
-	
+
 	err = di.validate()
 	assert.NoError(err)
-	
+
 	di.ClientId = ""
 	err = di.validate()
 	assert.EqualError(err, "ClientID can not be empty")
 	di.ClientId = testClientID
-	
+
 	di.ClientContext = ""
 	err = di.validate()
 	assert.EqualError(err, "ClientContext can not be empty")
@@ -73,12 +73,12 @@ func TestDeviceInfoValidate(t *testing.T) {
 	di.Platform = ""
 	err = di.validate()
 	assert.EqualError(err, "Platform can not be empty")
-	
+
 	di.Platform = "foo"
 	err = di.validate()
 	assert.EqualError(err, "Platform foo is not known")
 	di.Platform = testPlatform
-	
+
 	di.cleanup()
 }
 
@@ -100,7 +100,7 @@ func TestDeviceInfoCleanup(t *testing.T) {
 		logger)
 	assert.NoError(err)
 	assert.NotNil(di)
-	
+
 	di.cleanup()
 	assert.Equal("", di.ClientId)
 	assert.Equal("", di.ClientContext)
@@ -225,17 +225,17 @@ func TestDeviceInfoUpdate(t *testing.T) {
 	assert.True(changed)
 	assert.Equal(newToken, di.PushToken)
 	assert.Empty(di.AWSEndpointArn)
-	
+
 	assert.True(di.LastContact > 0)
 	lastContext := di.LastContact
 	err = updateLastContact(dbmap, di.ClientId, di.ClientContext, di.DeviceId, logger)
 	assert.NoError(err)
-	
+
 	di, err = getDeviceInfo(dbmap, di.ClientId, di.ClientContext, di.DeviceId, logger)
 	assert.NoError(err)
 	assert.NotNil(di)
-		
-	assert.True(di.LastContact > lastContext)	
+
+	assert.True(di.LastContact > lastContext)
 	di.cleanup()
 }
 
@@ -259,9 +259,9 @@ func TestDeviceInfoDelete(t *testing.T) {
 	assert.NotNil(di)
 
 	di.cleanup()
-	
+
 	di = nil
-	
+
 	di, err = getDeviceInfo(dbmap, testClientID, testClientContext, testDeviceId, logger)
 	assert.NoError(err)
 	assert.NotNil(di)

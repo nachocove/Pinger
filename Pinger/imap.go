@@ -23,7 +23,7 @@ type IMAPClient struct {
 
 func (imap *IMAPClient) getLogPrefix() (prefix string) {
 	if imap.parent != nil && imap.parent.di != nil {
-		prefix = "IMAP:" + imap.parent.di.getLogPrefix()
+		prefix = imap.parent.di.getLogPrefix() + "/IMAP"
 	}
 	return
 }
@@ -80,7 +80,7 @@ func (imap *IMAPClient) doImapAuth() error {
 	if err != nil {
 		return err
 	}
-	if bytes.HasPrefix(response, []byte(fmt.Sprintf("%s OK AUTHENTICATE"))) == false {
+	if bytes.HasPrefix(response, []byte(fmt.Sprintf("%s OK AUTHENTICATE", imap.parent.pi.ClientContext))) == false {
 		return fmt.Errorf("Auth failed: %s", response)
 	}
 	return nil

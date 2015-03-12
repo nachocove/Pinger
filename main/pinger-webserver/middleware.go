@@ -34,7 +34,7 @@ func GetContext(r *http.Request) *Context {
 			context.Logger.Warning("Request:\n%s", responseBytes)
 		}
 	}
-	
+
 	return context
 }
 

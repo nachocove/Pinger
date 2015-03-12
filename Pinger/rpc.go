@@ -31,11 +31,24 @@ type StartPollArgs struct {
 	MailInfo *MailPingInformation
 }
 
+func (sa *StartPollArgs) getLogPrefix() string {
+	return sa.MailInfo.getLogPrefix()
+}
+
 type StopPollArgs struct {
 	ClientId      string
 	ClientContext string
 	DeviceId      string
 	StopToken     string
+
+	logPrefix string
+}
+
+func (sp *StopPollArgs) getLogPrefix() string {
+	if sp.logPrefix == "" {
+		sp.logPrefix = fmt.Sprintf("%s:%s:%s", sp.DeviceId, sp.ClientId, sp.ClientContext)
+	}
+	return sp.logPrefix
 }
 
 type DeferPollArgs struct {
@@ -44,6 +57,15 @@ type DeferPollArgs struct {
 	DeviceId      string
 	Timeout       int64
 	StopToken     string
+
+	logPrefix string
+}
+
+func (dp *DeferPollArgs) getLogPrefix() string {
+	if dp.logPrefix == "" {
+		dp.logPrefix = fmt.Sprintf("%s:%s:%s", dp.DeviceId, dp.ClientId, dp.ClientContext)
+	}
+	return dp.logPrefix
 }
 
 type PollingResponse struct {
@@ -82,14 +104,14 @@ func (t *BackendPolling) pollMapKey(clientId, clientContext, deviceId string) st
 }
 
 func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingResponse) error {
-	t.logger.Debug("%s: Received StartPoll request", args.MailInfo.ClientId)
+	t.logger.Debug("%s: Received StartPoll request", args.getLogPrefix())
 	pollMapKey := t.pollMapKey(args.MailInfo.ClientId, args.MailInfo.ClientContext, args.MailInfo.DeviceId)
 	reply.Code = PollingReplyOK
 	var client *MailClientContext
 	client, ok := t.pollMap[pollMapKey]
 	if ok == true {
 		if client == nil {
-			return fmt.Errorf("%s: Could not find poll session in map", args.MailInfo.ClientId)
+			return fmt.Errorf("%s: Could not find poll session in map", args.getLogPrefix())
 		}
 		err := updateLastContact(t.dbm, args.MailInfo.ClientId, args.MailInfo.ClientContext, args.MailInfo.DeviceId, t.logger)
 		if err != nil {
@@ -97,21 +119,21 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 			reply.Code = PollingReplyError
 			return nil
 		}
-		t.logger.Debug("%s: Found Existing polling session", args.MailInfo.ClientId)
+		t.logger.Debug("%s: Found Existing polling session", args.getLogPrefix())
 		status, err := client.Status()
 		switch {
 		case status == MailClientStatusStopped:
-			t.logger.Debug("%s: Polling has stopped.", args.MailInfo.ClientId)
+			t.logger.Debug("%s: Polling has stopped.", args.getLogPrefix())
 
 		case status == MailClientStatusPinging:
-			t.logger.Debug("%s: Polling. Stopping it.", args.MailInfo.ClientId)
+			t.logger.Debug("%s: Polling. Stopping it.", args.getLogPrefix())
 
 		case status == MailClientStatusError:
 			if err != nil {
-				t.logger.Debug("%s: Not polling. Last error was %s", args.MailInfo.ClientId, err)
+				t.logger.Debug("%s: Not polling. Last error was %s", args.getLogPrefix(), err)
 				reply.Message = fmt.Sprintf("Previous Ping failed with error: %s", err.Error())
 			} else {
-				t.logger.Debug("%s: Not polling.", args.MailInfo.ClientId)
+				t.logger.Debug("%s: Not polling.", args.getLogPrefix())
 				reply.Message = fmt.Sprintf("Not polling")
 			}
 			reply.Code = PollingReplyWarn
@@ -141,12 +163,12 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 		reply.Code = PollingReplyError
 		return nil
 	}
-	t.logger.Debug("%s: created/updated device info", args.MailInfo.ClientId)
+	t.logger.Debug("%s: created/updated device info", args.getLogPrefix())
 
 	// nothing started. So start it.
 	client, err = NewMailClientContext(args.MailInfo, di, t.debug, false, t.logger)
 	if err != nil {
-		message := fmt.Sprintf("Could not create new client: %s", err)
+		message := fmt.Sprintf("%s: Could not create new client: %s", args.getLogPrefix(), err)
 		t.logger.Warning(message)
 		reply.Message = message
 		reply.Code = PollingReplyError
@@ -158,36 +180,36 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 }
 
 func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse) error {
-	t.logger.Debug("%s: Received stopPoll request", args.ClientId)
+	t.logger.Debug("%s: Received stopPoll request", args.getLogPrefix())
 	pollMapKey := t.pollMapKey(args.ClientId, args.ClientContext, args.DeviceId)
 	client, ok := t.pollMap[pollMapKey]
 	if ok == false {
 		// nothing on file.
-		t.logger.Warning("%s: No active sessions found for key %s", args.ClientId, pollMapKey)
+		t.logger.Warning("%s: No active sessions found for key %s", args.getLogPrefix(), pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "Not Polling"
 		return nil
 	} else {
 		if client == nil {
-			return fmt.Errorf("%s: Could not find poll item in map", args.ClientId)
+			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
 		}
 		validToken := client.validateStopToken(args.StopToken)
 		if validToken == false {
-			t.logger.Warning("%s: invalid token", args.ClientId)
+			t.logger.Warning("%s: invalid token", args.getLogPrefix())
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
 			return nil
 		} else {
 			err := updateLastContact(t.dbm, args.ClientId, args.ClientContext, args.DeviceId, t.logger)
 			if err != nil {
-				t.logger.Error("%s: Could not update last contact %s", args.ClientId, err.Error())
+				t.logger.Error("%s: Could not update last contact %s", args.getLogPrefix(), err.Error())
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
 				return nil
 			}
 			err = client.stop()
 			if err != nil {
-				t.logger.Error("%s: Error stopping poll: %s", args.ClientId, err.Error())
+				t.logger.Error("%s:: Error stopping poll: %s", args.getLogPrefix(), err.Error())
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
 				return nil
@@ -202,36 +224,36 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 }
 
 func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingResponse) error {
-	t.logger.Debug("%s: Received deferPoll request", args.ClientId)
+	t.logger.Debug("%s: Received deferPoll request", args.getLogPrefix())
 	pollMapKey := t.pollMapKey(args.ClientId, args.ClientContext, args.DeviceId)
 	client, ok := t.pollMap[pollMapKey]
 	if ok == false {
 		// nothing on file.
-		t.logger.Warning("%s: No active sessions found for key %s", args.ClientId, pollMapKey)
+		t.logger.Warning("%s: No active sessions found for key %s", args.getLogPrefix(), pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "Not Polling"
 		return nil
 	} else {
 		if client == nil {
-			return fmt.Errorf("%s: Could not find poll item in map", args.ClientId)
+			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
 		}
 		validToken := client.validateStopToken(args.StopToken)
 		if validToken == false {
-			t.logger.Warning("%s: invalid token", args.ClientId)
+			t.logger.Warning("%s: invalid token", args.getLogPrefix())
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
 			return nil
 		} else {
 			err := updateLastContact(t.dbm, args.ClientId, args.ClientContext, args.DeviceId, t.logger)
 			if err != nil {
-				t.logger.Error("%s: Could not update last contact %s", args.ClientId, err.Error())
+				t.logger.Error("%s: Could not update last contact %s", args.getLogPrefix(), err.Error())
 				reply.Code = PollingReplyError
 				reply.Message = err.Error()
 				return nil
 			}
 			err = client.deferPoll(args.Timeout)
 			if err != nil {
-				t.logger.Error("%s: Error deferring poll: %s", args.ClientId, err.Error())
+				t.logger.Error("%s: Error deferring poll: %s", args.getLogPrefix(), err.Error())
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
 				return nil

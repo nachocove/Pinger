@@ -42,10 +42,10 @@ func stopPoll(rpcClient *rpc.Client, clientId, clientContext, deviceId, token st
 	}
 	var reply PollingResponse
 	args := StopPollArgs{
-		ClientId: clientId,
+		ClientId:      clientId,
 		ClientContext: clientContext,
-		DeviceId: deviceId,
-		StopToken: token,
+		DeviceId:      deviceId,
+		StopToken:     token,
 	}
 	err := rpcClient.Call("BackendPolling.Stop", &args, &reply)
 	if err != nil {
@@ -68,11 +68,11 @@ func deferPoll(rpcClient *rpc.Client, clientId, clientContext, deviceId string, 
 	}
 	var reply PollingResponse
 	args := DeferPollArgs{
-		ClientId: clientId,
+		ClientId:      clientId,
 		ClientContext: clientContext,
-		DeviceId: deviceId,
-		Timeout: timeout,
-		StopToken: token,
+		DeviceId:      deviceId,
+		Timeout:       timeout,
+		StopToken:     token,
 	}
 	err := rpcClient.Call("BackendPolling.Defer", &args, &reply)
 	if err != nil {

@@ -29,7 +29,7 @@ type DeviceInfo struct {
 	LastContactRequest int64  `db:"last_contact_request"`
 	ClientId           string `db:"client_id"` // us-east-1a-XXXXXXXX
 	ClientContext      string `db:"client_context"`
-	DeviceId           string `db:"device_id"`  // NCHO348348384384.....
+	DeviceId           string `db:"device_id"`       // NCHO348348384384.....
 	Platform           string `db:"device_platform"` // "ios", "android", etc..
 	PushToken          string `db:"push_token"`
 	PushService        string `db:"push_service"` // APNS, GCM, ...
@@ -65,7 +65,7 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 
 	cMap = tMap.ColMap("ClientId")
 	cMap.SetNotNull(true)
-	clientCol := cMap	
+	clientCol := cMap
 
 	cMap = tMap.ColMap("ClientContext")
 	cMap.SetNotNull(true)
@@ -170,6 +170,7 @@ var clientIdField reflect.StructField
 var contextField reflect.StructField
 var deviceidField reflect.StructField
 var pingerField reflect.StructField
+
 func init() {
 	interfaces, _ := net.Interfaces()
 	for _, inter := range interfaces {
@@ -468,7 +469,7 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 	if err != nil {
 		return err
 	}
-	di.logger.Debug("%s: Sending push message to AWS: %s", di.ClientId, pushMessage)
+	di.logger.Debug("%s: Sending push message to AWS: %s", di.getLogPrefix(), pushMessage)
 	err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, pushMessage)
 	if err == nil {
 		di.LastContactRequest = time.Now().UnixNano()
@@ -616,7 +617,7 @@ func (di *DeviceInfo) validateClient() error {
 
 func (di *DeviceInfo) getLogPrefix() string {
 	if di.logPrefix == "" {
-		di.logPrefix = fmt.Sprintf("%s@%s", di.ClientId, di.ClientContext)
+		di.logPrefix = fmt.Sprintf("%s:%s:%s", di.DeviceId, di.ClientId, di.ClientContext)
 	}
 	return di.logPrefix
 }

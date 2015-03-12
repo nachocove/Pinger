@@ -47,6 +47,15 @@ type registerPostData struct {
 	OSVersion              string
 	AppBuildNumber         string
 	AppBuildVersion        string
+
+	logPrefix string
+}
+
+func (pd *registerPostData) getLogPrefix() string {
+	if pd.logPrefix == "" {
+		pd.logPrefix = fmt.Sprintf("%s:%s:%s", pd.DeviceId, pd.ClientId, pd.ClientContext)
+	}
+	return pd.logPrefix
 }
 
 // Validate validate the structure/information to make sure required information exists.
@@ -148,7 +157,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	ok, missingFields := postInfo.Validate()
 	if ok == false {
-		context.Logger.Warning("Missing non-optional data: %s", strings.Join(missingFields, ","))
+		context.Logger.Warning("%s: Missing non-optional data: %s", postInfo.getLogPrefix(), strings.Join(missingFields, ","))
 		responseError(w, MissingRequiredData, strings.Join(missingFields, ","))
 		return
 	}
@@ -157,11 +166,11 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 	reply, err := Pinger.StartPoll(context.RpcConnectString, postInfo.AsMailInfo())
 	if err != nil {
-		context.Logger.Warning("Could not re/start polling for device %s: %s", postInfo.ClientId, err)
+		context.Logger.Warning("%s: Could not re/start polling for device %s: %s", postInfo.getLogPrefix(), err)
 		responseError(w, RPCServerError, "")
 		return
 	}
-	context.Logger.Debug("Re/Started Polling for %s", postInfo.ClientId)
+	context.Logger.Debug("%s: Re/Started Polling", postInfo.getLogPrefix())
 
 	//	err = session.Save(r, w)
 	//	if err != nil {
@@ -187,14 +196,14 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		responseData["Message"] = reply.Message
 
 	default:
-		context.Logger.Error("Unknown PollingReply Code %d", reply.Code)
+		context.Logger.Error("%s: Unknown PollingReply Code %d", postInfo.getLogPrefix(), reply.Code)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
-		context.Logger.Warning("Could not json encode reply: %v", responseData)
+		context.Logger.Warning("%s: Could not json encode reply: %v", postInfo.getLogPrefix(), responseData)
 		responseError(w, JSONEncodeError, "")
 		return
 	}
@@ -209,6 +218,15 @@ type deferPost struct {
 	DeviceId      string
 	Timeout       int64
 	Token         string
+
+	logPrefix string
+}
+
+func (dp *deferPost) getLogPrefix() string {
+	if dp.logPrefix == "" {
+		dp.logPrefix = fmt.Sprintf("%s:%s:%s", dp.DeviceId, dp.ClientId, dp.ClientContext)
+	}
+	return dp.logPrefix
 }
 
 func deferPolling(w http.ResponseWriter, r *http.Request) {
@@ -244,7 +262,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	//	}
 	reply, err := Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout, deferData.Token)
 	if err != nil {
-		context.Logger.Error("Error deferring poll %s", err)
+		context.Logger.Error("%s: Error deferring poll %s", deferData.getLogPrefix(), err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -263,14 +281,14 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		responseData["Message"] = reply.Message
 
 	default:
-		context.Logger.Error("Unknown PollingReply Code %d", reply.Code)
+		context.Logger.Error("%s: Unknown PollingReply Code %d", deferData.getLogPrefix(), reply.Code)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
-		context.Logger.Warning("Could not json encode reply: %v", responseData)
+		context.Logger.Warning("%s: Could not json encode reply: %v", deferData.getLogPrefix(), responseData)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -284,6 +302,15 @@ type stopPost struct {
 	ClientContext string
 	DeviceId      string
 	Token         string
+
+	logPrefix string
+}
+
+func (sp *stopPost) getLogPrefix() string {
+	if sp.logPrefix == "" {
+		sp.logPrefix = fmt.Sprintf("%s:%s:%s", sp.DeviceId, sp.ClientId, sp.ClientContext)
+	}
+	return sp.logPrefix
 }
 
 func stopPolling(w http.ResponseWriter, r *http.Request) {
@@ -319,7 +346,7 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 	//	}
 	reply, err := Pinger.StopPoll(context.RpcConnectString, stopData.ClientId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
 	if err != nil {
-		context.Logger.Error("Error stopping poll %s", err)
+		context.Logger.Error("%s: Error stopping poll %s", stopData.getLogPrefix(), err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -338,14 +365,14 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 		responseData["Message"] = reply.Message
 
 	default:
-		context.Logger.Error("Unknown PollingReply Code %d", reply.Code)
+		context.Logger.Error("%s: Unknown PollingReply Code %d", stopData.getLogPrefix(), reply.Code)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	responseJson, err := json.Marshal(responseData)
 	if err != nil {
-		context.Logger.Warning("Could not json encode reply: %v", responseData)
+		context.Logger.Warning("%s: Could not json encode reply: %v", stopData.getLogPrefix(), responseData)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
