@@ -49,9 +49,9 @@ type MailPingInformation struct {
 	}
 	Protocol               string
 	HttpHeaders            map[string]string // optional
-	HttpRequestData        []byte
-	HttpExpectedReply      []byte
-	HttpNoChangeReply      []byte
+	RequestData            []byte
+	ExpectedReply          []byte
+	NoChangeReply          []byte
 	CommandTerminator      []byte // used by imap
 	CommandAcknowledgement []byte // used by imap
 	ResponseTimeout        int64  // in milliseconds
@@ -78,9 +78,9 @@ func (pi *MailPingInformation) cleanup() {
 	for k := range pi.HttpHeaders {
 		delete(pi.HttpHeaders, k)
 	}
-	pi.HttpRequestData = nil
-	pi.HttpExpectedReply = nil
-	pi.HttpNoChangeReply = nil
+	pi.RequestData = nil
+	pi.ExpectedReply = nil
+	pi.NoChangeReply = nil
 	pi.CommandTerminator = nil
 	pi.CommandAcknowledgement = nil
 	pi.PushToken = ""
@@ -97,7 +97,7 @@ func (pi *MailPingInformation) Validate() bool {
 	}
 	switch {
 	case pi.Protocol == MailClientActiveSync:
-		if len(pi.HttpRequestData) <= 0 || len(pi.HttpHeaders) <= 0 {
+		if len(pi.RequestData) <= 0 || len(pi.HttpHeaders) <= 0 {
 			return false
 		}
 	case pi.Protocol == MailClientIMAP:

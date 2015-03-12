@@ -186,7 +186,7 @@ func (imap *IMAPClient) LongPoll(stopCh, exitCh chan int) {
 		requestTimer := time.NewTimer(time.Duration(reqTimeout) * time.Millisecond)
 		errCh := make(chan error)
 		responseCh := make(chan []byte)
-		go imap.doRequestResponse(imap.parent.pi.HttpRequestData, responseCh, errCh)
+		go imap.doRequestResponse(imap.parent.pi.RequestData, responseCh, errCh)
 		select {
 		case <-requestTimer.C:
 			// request timed out. Start over.
@@ -205,10 +205,10 @@ func (imap *IMAPClient) LongPoll(stopCh, exitCh chan int) {
 		case response := <-responseCh:
 			requestTimer.Stop()
 			switch {
-			case imap.parent.pi.HttpNoChangeReply != nil && bytes.Compare(response, imap.parent.pi.HttpNoChangeReply) == 0:
+			case imap.parent.pi.NoChangeReply != nil && bytes.Compare(response, imap.parent.pi.NoChangeReply) == 0:
 				// go back to polling
 
-			case imap.parent.pi.HttpExpectedReply == nil || bytes.Compare(response, imap.parent.pi.HttpExpectedReply) == 0:
+			case imap.parent.pi.ExpectedReply == nil || bytes.Compare(response, imap.parent.pi.ExpectedReply) == 0:
 				// got mail! Send push.
 			}
 

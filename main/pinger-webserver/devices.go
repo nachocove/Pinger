@@ -34,9 +34,9 @@ type registerPostData struct {
 	}
 	Protocol               string
 	HttpHeaders            map[string]string // optional
-	HttpRequestData        []byte
-	HttpExpectedReply      []byte
-	HttpNoChangeReply      []byte
+	RequestData            []byte
+	ExpectedReply          []byte
+	NoChangeReply          []byte
 	CommandTerminator      []byte // used by imap
 	CommandAcknowledgement []byte // used by imap
 	ResponseTimeout        int64  // in milliseconds
@@ -78,12 +78,12 @@ func (pd *registerPostData) Validate() (bool, []string) {
 		MissingFields = append(MissingFields, "MailServerUrl")
 		ok = false
 	}
-	if len(pd.HttpRequestData) <= 0 {
-		MissingFields = append(MissingFields, "HttpRequestData")
+	if len(pd.RequestData) <= 0 {
+		MissingFields = append(MissingFields, "RequestData")
 		ok = false
 	}
-	if len(pd.HttpNoChangeReply) <= 0 {
-		MissingFields = append(MissingFields, "HttpNoChangeReply")
+	if len(pd.NoChangeReply) <= 0 {
+		MissingFields = append(MissingFields, "NoChangeReply")
 		ok = false
 	}
 	if pd.ClientContext == "" {
@@ -105,9 +105,9 @@ func (pd *registerPostData) AsMailInfo() *Pinger.MailPingInformation {
 	pi.MailServerCredentials.Password = pd.MailServerCredentials.Password
 	pi.Protocol = pd.Protocol
 	pi.HttpHeaders = pd.HttpHeaders
-	pi.HttpRequestData = pd.HttpRequestData
-	pi.HttpExpectedReply = pd.HttpExpectedReply
-	pi.HttpNoChangeReply = pd.HttpNoChangeReply
+	pi.RequestData = pd.RequestData
+	pi.ExpectedReply = pd.ExpectedReply
+	pi.NoChangeReply = pd.NoChangeReply
 	pi.CommandTerminator = pd.CommandTerminator
 	pi.CommandAcknowledgement = pd.CommandAcknowledgement
 	pi.ResponseTimeout = pd.ResponseTimeout

@@ -46,19 +46,19 @@ func (ex *ExchangeClient) getLogPrefix() (prefix string) {
 }
 
 func (ex *ExchangeClient) maxResponseSize() (size int) {
-	if ex.parent.pi.HttpExpectedReply != nil {
-		size = len(ex.parent.pi.HttpExpectedReply)
+	if ex.parent.pi.ExpectedReply != nil {
+		size = len(ex.parent.pi.ExpectedReply)
 	}
-	if ex.parent.pi.HttpNoChangeReply != nil && len(ex.parent.pi.HttpNoChangeReply) > size {
-		size = len(ex.parent.pi.HttpNoChangeReply)
+	if ex.parent.pi.NoChangeReply != nil && len(ex.parent.pi.NoChangeReply) > size {
+		size = len(ex.parent.pi.NoChangeReply)
 	}
 	return
 }
 
 func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	var err error
-	requestBody := bytes.NewReader(ex.parent.pi.HttpRequestData)
-	ex.logger.Debug("%s: request WBXML %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(ex.parent.pi.HttpRequestData))
+	requestBody := bytes.NewReader(ex.parent.pi.RequestData)
+	ex.logger.Debug("%s: request WBXML %s", ex.getLogPrefix(), base64.StdEncoding.EncodeToString(ex.parent.pi.RequestData))
 	req, err := http.NewRequest("POST", ex.parent.pi.MailServerUrl, requestBody)
 	if err != nil {
 		errCh <- err
@@ -129,7 +129,7 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		errCh <- err
 		return
 	}
-	if n < toRead && n != len(ex.parent.pi.HttpExpectedReply) && n != len(ex.parent.pi.HttpNoChangeReply) {
+	if n < toRead && n != len(ex.parent.pi.ExpectedReply) && n != len(ex.parent.pi.NoChangeReply) {
 		ex.logger.Warning("%s: Read less than expected: %d < %d", ex.getLogPrefix(), n, toRead)
 	}
 
@@ -256,15 +256,15 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 					sleepTime = ex.exponentialBackoff(sleepTime)
 					ex.logger.Warning("%s: Response Status %s. Back to polling", ex.getLogPrefix(), response.Status)
 				}
-			case ex.parent.pi.HttpNoChangeReply != nil && bytes.Compare(responseBody, ex.parent.pi.HttpNoChangeReply) == 0:
+			case ex.parent.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.parent.pi.NoChangeReply) == 0:
 				// go back to polling
-				ex.logger.Debug("%s: Reply matched HttpNoChangeReply. Back to polling", ex.getLogPrefix())
+				ex.logger.Debug("%s: Reply matched NoChangeReply. Back to polling", ex.getLogPrefix())
 				sleepTime = 0 // good reply. Reset any exponential backoff stuff.
 
-			case ex.parent.pi.HttpExpectedReply == nil || bytes.Compare(responseBody, ex.parent.pi.HttpExpectedReply) == 0:
+			case ex.parent.pi.ExpectedReply == nil || bytes.Compare(responseBody, ex.parent.pi.ExpectedReply) == 0:
 				// there's new mail!
-				if ex.parent.pi.HttpExpectedReply != nil {
-					ex.logger.Debug("%s: Reply matched HttpExpectedReply", ex.getLogPrefix())
+				if ex.parent.pi.ExpectedReply != nil {
+					ex.logger.Debug("%s: Reply matched ExpectedReply", ex.getLogPrefix())
 				}
 				ex.logger.Debug("%s: Sending push message for new mail", ex.getLogPrefix())
 				err = ex.parent.di.push(PingerNotificationNewMail) // You've got mail!
