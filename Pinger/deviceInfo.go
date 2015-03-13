@@ -310,7 +310,7 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 		}
 		err = di.insert(dbm)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 	} else {
 		_, err := di.updateDeviceInfo(pi.ClientContext, pi.DeviceId, pi.PushService, pi.PushToken, pi.Platform, pi.OSVersion, pi.AppBuildVersion, pi.AppBuildNumber)
@@ -381,7 +381,11 @@ func (di *DeviceInfo) update() (int64, error) {
 	if di.dbm == nil {
 		panic("Can not update device info without having fetched it")
 	}
-	return di.dbm.Update(di)
+	n, err := di.dbm.Update(di)
+	if err != nil {
+		panic(err)
+	}
+	return n, nil
 }
 
 func (di *DeviceInfo) insert(dbm *gorp.DbMap) error {
@@ -391,7 +395,11 @@ func (di *DeviceInfo) insert(dbm *gorp.DbMap) error {
 	if dbm == nil {
 		panic("Can not insert device info without db information")
 	}
-	return dbm.Insert(di)
+	err := dbm.Insert(di)
+	if err != nil {
+		panic(err)
+	}
+	return nil
 }
 
 type PingerNotification string
