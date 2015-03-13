@@ -11,7 +11,11 @@ func TestStats(t *testing.T) {
 	logger, err := logging.GetLogger("Unittests")
 	assert.NotNil(logger)
 	assert.Nil(err)
-	statLogger := NewStatLogger(logger, false)
+	stopCh := make(chan int)
+	statLogger := NewStatLogger(stopCh, logger, false)
+	defer func() {
+		close(stopCh)
+	}()
 	assert.NotNil(statLogger, "statLogger should not be nil")
 
 	stat := newStats()
