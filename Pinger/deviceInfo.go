@@ -209,11 +209,15 @@ func init() {
 func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *logging.Logger) (*DeviceInfo, error) {
 	var devices []DeviceInfo
 	var err error
-	_, err = dbm.Select(
-		&devices,
-		fmt.Sprintf("select * from %s where %s=? and %s=? and %s=? and %s=?", DeviceTableName,
-			clientIdField.Tag.Get("db"), contextField.Tag.Get("db"), deviceidField.Tag.Get("db"), pingerField.Tag.Get("db")),
-		clientId, clientContext, deviceId, pingerHostId)
+	sql := fmt.Sprintf(
+		"select * from %s where %s=? and %s=? and %s=?",
+		DeviceTableName,
+		clientIdField.Tag.Get("db"),
+		contextField.Tag.Get("db"),
+		deviceidField.Tag.Get("db"),
+	)
+	logger.Debug("%s:%s:%s: looking for device in DB: %s", deviceId, clientId, clientContext, sql)
+	_, err = dbm.Select(&devices, sql, clientId, clientContext, deviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -226,6 +230,11 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, lo
 
 	case len(devices) == 1:
 		device := &(devices[0])
+		if device.Pinger != pingerHostId {
+			logger.Warning("%s: device belongs to a different pinger (%s). Stealing it", device.getLogPrefix(), device.Pinger)
+			device.Pinger = pingerHostId
+			device.update()
+		}
 		device.dbm = dbm
 		device.logger = logger
 		return device, nil
