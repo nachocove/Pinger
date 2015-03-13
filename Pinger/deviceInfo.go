@@ -383,7 +383,7 @@ func (di *DeviceInfo) update() (int64, error) {
 	}
 	n, err := di.dbm.Update(di)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("%s: update error: %s", di.getLogPrefix(), err.Error()))
 	}
 	return n, nil
 }
@@ -397,7 +397,7 @@ func (di *DeviceInfo) insert(dbm *gorp.DbMap) error {
 	}
 	err := dbm.Insert(di)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("%s: insert error: %s", di.getLogPrefix(), err.Error()))
 	}
 	return nil
 }
