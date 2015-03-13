@@ -22,7 +22,7 @@ var testAppnumber = "(dev) Foo"
 
 func TestMain(m *testing.M) {
 	var err error
-	testDbFilename := "unittest.db"
+	testDbFilename := "/tmp/unittest.db"
 	os.Remove(testDbFilename)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: testDbFilename}
 	dbmap, err = initDB(&dbconfig, true, true, logger)
