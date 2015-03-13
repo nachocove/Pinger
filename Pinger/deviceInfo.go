@@ -310,7 +310,7 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.L
 		}
 		err = di.insert(dbm)
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
 	} else {
 		_, err := di.updateDeviceInfo(pi.ClientContext, pi.DeviceId, pi.PushService, pi.PushToken, pi.Platform, pi.OSVersion, pi.AppBuildVersion, pi.AppBuildNumber)
