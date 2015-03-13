@@ -12,6 +12,7 @@ type Configuration struct {
 	Global GlobalConfiguration
 	Aws    AWSConfiguration
 	Db     DBConfiguration
+	Rpc    RPCServerConfiguration
 }
 
 type GlobalConfiguration struct {

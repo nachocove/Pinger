@@ -17,6 +17,11 @@ import (
 	"github.com/op/go-logging"
 )
 
+// TODO Need to combine the configs into one, since there's shared settings. Just
+//  have a webserver section and a backend section for daemon-specific stuff. 
+// Tricky: Need to be able to override some of the Global stuff per daemon
+//  (like DumpRequests)
+
 const (
 	defaultPort           = 443
 	defaultBindAddress    = "0.0.0.0"
@@ -40,20 +45,11 @@ type ServerConfiguration struct {
 	SessionSecret  string `gcfg:"session-secret"`
 }
 
-type RPCServerConfiguration struct {
-	Hostname string
-	Port     int
-}
-
-func (rpcConf *RPCServerConfiguration) String() string {
-	return fmt.Sprintf("%s:%d", rpcConf.Hostname, rpcConf.Port)
-}
-
 // Configuration - The top level configuration structure.
 type Configuration struct {
 	Server ServerConfiguration
 	Global Pinger.GlobalConfiguration
-	Rpc    RPCServerConfiguration
+	Rpc    Pinger.RPCServerConfiguration
 }
 
 func (config *Configuration) Read(filename string) error {
@@ -75,10 +71,7 @@ func NewConfiguration() *Configuration {
 			NonTlsPort:     defaultNonTLSPort,
 			SessionSecret:  "",
 		},
-		Rpc: RPCServerConfiguration{
-			Hostname: "localhost",
-			Port:     Pinger.RPCPort,
-		},
+		Rpc: Pinger.NewRPCServerConfiguration(),
 	}
 	config.Global = *Pinger.NewGlobalConfiguration()
 	return config

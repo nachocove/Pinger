@@ -16,6 +16,37 @@ import (
 	"runtime"
 )
 
+type RPCServerConfiguration struct {
+	Protocol string
+	Path     string
+	Hostname string
+	Port     int
+}
+
+func (rpcConf *RPCServerConfiguration) ConnectString() string {
+	switch {
+	case rpcConf.Protocol == "http":
+		return fmt.Sprintf("%s:%d", rpcConf.Hostname, rpcConf.Port)
+		
+	case rpcConf.Protocol == "unix":
+		return fmt.Sprintf("%s", rpcConf.Path)
+	}
+	return ""
+}
+
+func (rpcConf *RPCServerConfiguration) String() string {
+	return fmt.Sprintf("%s://%s", rpcConf.Protocol, rpcConf.ConnectString())
+}
+
+func NewRPCServerConfiguration() RPCServerConfiguration {
+	return RPCServerConfiguration{
+		Protocol: "http",  // options: "unix", "http"
+		Path:     "/tmp/PingerRpc",  // used if Protocol is "unix"
+		Hostname: "localhost",  // used if Protocol is "http"
+		Port:     RPCPort, // used if Protocol is "http"
+	}	
+}
+
 type pollMapType map[string]*MailClientContext
 
 type BackendPolling struct {
@@ -320,9 +351,8 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *logging.Lo
 
 	go alertAllDevices()
 
-	rpcConnectString := fmt.Sprintf("%s:%d", "localhost", RPCPort)
-	logger.Info("Starting RPC server on %s (pinger id %s)", rpcConnectString, pingerHostId)
-	err = http.ListenAndServe(rpcConnectString, nil)
+	logger.Info("Starting RPC server on %s (pinger id %s)", config.Rpc.String(), pingerHostId)
+	err = http.ListenAndServe(config.Rpc.ConnectString(), nil)
 	if err != nil {
 		return err
 	}
