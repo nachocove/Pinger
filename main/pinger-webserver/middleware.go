@@ -19,7 +19,7 @@ const (
 func GetContext(r *http.Request) *Context {
 	val, ok := context.GetOk(r, serverContext)
 	if !ok {
-		log.Fatal("No template in context")
+		log.Fatal("No serverContext in context")
 	}
 
 	context, ok := val.(*Context)
