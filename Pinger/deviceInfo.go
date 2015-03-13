@@ -353,12 +353,14 @@ func (di *DeviceInfo) updateDeviceInfo(
 	}
 	// TODO if the push token or service change, then the AWS endpoint is no longer valid: We should send a delete to AWS for the endpoint
 	if di.PushService != pushService {
+		di.logger.Warning("%s: Resetting Token ('%s') and AWSEndpointArn ('%s')", di.getLogPrefix(), di.PushToken, di.AWSEndpointArn)
 		di.PushService = pushService
 		di.PushToken = ""
 		di.AWSEndpointArn = ""
 		changed = true
 	}
 	if di.PushToken != pushToken {
+		di.logger.Warning("%s: Resetting AWSEndpointArn ('%s')", di.getLogPrefix(), di.AWSEndpointArn)
 		di.PushToken = pushToken
 		di.AWSEndpointArn = ""
 		changed = true
@@ -462,7 +464,7 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 		return errors.New("Endpoint is disabled. Can not push.")
 	}
 	if di.AWSEndpointArn == "" {
-		return errors.New("Endpoint not registered.")
+		return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", di.PushService, di.PushToken)
 	}
 	var days_28 int64 = 2419200
 	pushMessage, err := di.pushMessage(message, days_28)
@@ -595,6 +597,9 @@ func (di *DeviceInfo) validateClient() error {
 			}
 		} else {
 			di.logger.Debug("%s: endpoint created %s", di.getLogPrefix(), di.AWSEndpointArn)
+		}
+		if di.AWSEndpointArn == "" {
+			di.logger.Error("%s: AWSEndpointArn empty after register!", di.getLogPrefix())
 		}
 		// TODO We should send a test-ping here, so we don't find out the endpoint is unreachable later.
 		// It's optional (we'll find out eventually), but this would speed it up.
