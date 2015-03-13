@@ -62,6 +62,7 @@ func (config *Configuration) Read(filename string) error {
 
 func NewConfiguration() *Configuration {
 	config := &Configuration{
+		Global: Pinger.NewGlobalConfiguration(),
 		Server: ServerConfiguration{
 			Port:           defaultPort,
 			BindAddress:    defaultBindAddress,
@@ -73,7 +74,6 @@ func NewConfiguration() *Configuration {
 		},
 		Rpc: Pinger.NewRPCServerConfiguration(),
 	}
-	config.Global = *Pinger.NewGlobalConfiguration()
 	return config
 }
 
