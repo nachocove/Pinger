@@ -12,7 +12,7 @@ update:
 all: install test
 
 test:
-	go test -v ./...
+	go test ./...
 
 vet:
 	go vet ./... 2>&1 | grep -v 'possible formatting directive in Error call'
