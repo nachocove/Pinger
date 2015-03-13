@@ -86,7 +86,6 @@ type Context struct {
 	Config           *Configuration
 	Logger           *logging.Logger
 	loggerLevel      logging.Level
-	RpcConnectString string
 	SessionStore     *sessions.CookieStore
 }
 
@@ -99,7 +98,6 @@ func NewContext(
 		Config:           config,
 		Logger:           logger,
 		loggerLevel:      -1,
-		RpcConnectString: rpcConnectString,
 		SessionStore:     sessionStore,
 	}
 }

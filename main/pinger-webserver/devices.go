@@ -164,9 +164,9 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 	//	session.Values[SessionVarClientId] = postInfo.ClientId
 
-	reply, err := Pinger.StartPoll(context.RpcConnectString, postInfo.AsMailInfo())
+	reply, err := Pinger.StartPoll(context.Config.Rpc.ConnectString(), postInfo.AsMailInfo())
 	if err != nil {
-		context.Logger.Warning("%s: Could not re/start polling for device %s: %s", postInfo.getLogPrefix(), err)
+		context.Logger.Warning("%s: Could not re/start polling for device: %s", postInfo.getLogPrefix(), err)
 		responseError(w, RPCServerError, "")
 		return
 	}
@@ -260,7 +260,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 	//		return
 	//	}
-	reply, err := Pinger.DeferPoll(context.RpcConnectString, deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout, deferData.Token)
+	reply, err := Pinger.DeferPoll(context.Config.Rpc.ConnectString(), deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout, deferData.Token)
 	if err != nil {
 		context.Logger.Error("%s: Error deferring poll %s", deferData.getLogPrefix(), err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -344,7 +344,7 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 	//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 	//		return
 	//	}
-	reply, err := Pinger.StopPoll(context.RpcConnectString, stopData.ClientId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
+	reply, err := Pinger.StopPoll(context.Config.Rpc.ConnectString(), stopData.ClientId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
 	if err != nil {
 		context.Logger.Error("%s: Error stopping poll %s", stopData.getLogPrefix(), err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
