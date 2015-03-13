@@ -230,13 +230,13 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, lo
 
 	case len(devices) == 1:
 		device := &(devices[0])
+		device.dbm = dbm
+		device.logger = logger
 		if device.Pinger != pingerHostId {
 			logger.Warning("%s: device belongs to a different pinger (%s). Stealing it", device.getLogPrefix(), device.Pinger)
 			device.Pinger = pingerHostId
 			device.update()
 		}
-		device.dbm = dbm
-		device.logger = logger
 		return device, nil
 
 	default:
