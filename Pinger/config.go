@@ -46,8 +46,12 @@ const (
 )
 
 func NewConfiguration() *Configuration {
-	config := &Configuration{}
-	config.Global = *NewGlobalConfiguration()
+	config := &Configuration{
+		Global: *NewGlobalConfiguration(),
+		Aws: AWSConfiguration{},
+		Db: DBConfiguration{},
+		Rpc: NewRPCServerConfiguration(),
+	}
 	return config
 }
 
