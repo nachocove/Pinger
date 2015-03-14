@@ -18,7 +18,7 @@ import (
 )
 
 // TODO Need to combine the configs into one, since there's shared settings. Just
-//  have a webserver section and a backend section for daemon-specific stuff. 
+//  have a webserver section and a backend section for daemon-specific stuff.
 // Tricky: Need to be able to override some of the Global stuff per daemon
 //  (like DumpRequests)
 
@@ -83,10 +83,10 @@ func usage() {
 }
 
 type Context struct {
-	Config           *Configuration
-	Logger           *logging.Logger
-	loggerLevel      logging.Level
-	SessionStore     *sessions.CookieStore
+	Config       *Configuration
+	Logger       *logging.Logger
+	loggerLevel  logging.Level
+	SessionStore *sessions.CookieStore
 }
 
 func NewContext(
@@ -95,10 +95,10 @@ func NewContext(
 	rpcConnectString string,
 	sessionStore *sessions.CookieStore) *Context {
 	return &Context{
-		Config:           config,
-		Logger:           logger,
-		loggerLevel:      -1,
-		SessionStore:     sessionStore,
+		Config:       config,
+		Logger:       logger,
+		loggerLevel:  -1,
+		SessionStore: sessionStore,
 	}
 }
 

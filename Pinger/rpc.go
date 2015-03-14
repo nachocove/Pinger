@@ -27,7 +27,7 @@ func (rpcConf *RPCServerConfiguration) ConnectString() string {
 	switch {
 	case rpcConf.Protocol == "http":
 		return fmt.Sprintf("%s:%d", rpcConf.Hostname, rpcConf.Port)
-		
+
 	case rpcConf.Protocol == "unix":
 		return fmt.Sprintf("%s", rpcConf.Path)
 	}
@@ -40,11 +40,11 @@ func (rpcConf *RPCServerConfiguration) String() string {
 
 func NewRPCServerConfiguration() RPCServerConfiguration {
 	return RPCServerConfiguration{
-		Protocol: "http",  // options: "unix", "http"
-		Path:     "/tmp/PingerRpc",  // used if Protocol is "unix"
-		Hostname: "localhost",  // used if Protocol is "http"
-		Port:     RPCPort, // used if Protocol is "http"
-	}	
+		Protocol: "http",           // options: "unix", "http"
+		Path:     "/tmp/PingerRpc", // used if Protocol is "unix"
+		Hostname: "localhost",      // used if Protocol is "http"
+		Port:     RPCPort,          // used if Protocol is "http"
+	}
 }
 
 type pollMapType map[string]*MailClientContext

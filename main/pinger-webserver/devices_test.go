@@ -3,14 +3,14 @@ package main
 import (
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
+	"github.com/nachocove/Pinger/Pinger"
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
-	"github.com/nachocove/Pinger/Pinger"
-	"os"
 )
 
 var logger *logging.Logger
@@ -32,16 +32,16 @@ func TestMain(m *testing.M) {
 	logger = logging.MustGetLogger("unittest")
 
 	os.Remove(testDbFilename)
-	
+
 	rpcConfig := Pinger.RPCServerConfiguration{
 		Protocol: "http",
 		Hostname: "localhost",
-		Port: rpcTestPort,
+		Port:     rpcTestPort,
 	}
 	pingerConfig = Pinger.NewConfiguration()
 	pingerConfig.Db.Type = "sqlite"
 	pingerConfig.Db.Filename = testDbFilename
-	
+
 	mx = mux.NewRouter()
 	mx.HandleFunc(registerPath, registerDevice)
 	config = &Configuration{Rpc: rpcConfig}
@@ -49,7 +49,7 @@ func TestMain(m *testing.M) {
 	n.UseHandler(mx)
 
 	go startRpc(pingerConfig)
-	
+
 	defer os.Remove(testDbFilename)
 
 	os.Exit(m.Run())
@@ -59,7 +59,7 @@ func startRpc(config *Pinger.Configuration) {
 	err := Pinger.StartPollingRPCServer(pingerConfig, true, logger)
 	if err != nil {
 		panic(err)
-	}	
+	}
 }
 func TestRegisterGet(t *testing.T) {
 	assert := assert.New(t)
