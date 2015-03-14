@@ -209,15 +209,11 @@ func init() {
 func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *logging.Logger) (*DeviceInfo, error) {
 	var devices []DeviceInfo
 	var err error
-	sql := fmt.Sprintf(
-		"select * from %s where %s=? and %s=? and %s=?",
-		DeviceTableName,
-		clientIdField.Tag.Get("db"),
-		contextField.Tag.Get("db"),
-		deviceidField.Tag.Get("db"),
-	)
-	logger.Debug("%s:%s:%s: looking for device in DB: %s", deviceId, clientId, clientContext, sql)
-	_, err = dbm.Select(&devices, sql, clientId, clientContext, deviceId)
+	_, err = dbm.Select(&devices,
+		fmt.Sprintf(
+			"select * from %s where %s=? and %s=? and %s=?", DeviceTableName,
+			clientIdField.Tag.Get("db"), contextField.Tag.Get("db"), deviceidField.Tag.Get("db")),
+		clientId, clientContext, deviceId)
 	if err != nil {
 		return nil, err
 	}
