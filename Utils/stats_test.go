@@ -1,16 +1,15 @@
 package Utils
 
 import (
-	"github.com/op/go-logging"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestStats(t *testing.T) {
 	assert := assert.New(t)
-	logger, err := logging.GetLogger("Unittests")
+	logger := logging.InitLogging("unittest", "", logging.DEBUG, true, logging.DEBUG, true)
 	assert.NotNil(logger)
-	assert.Nil(err)
 	stopCh := make(chan int)
 	statLogger := NewStatLogger(stopCh, logger, false)
 	defer func() {

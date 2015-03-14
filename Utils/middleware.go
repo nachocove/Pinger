@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/codegangsta/negroni"
-	"github.com/op/go-logging"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"time"
 )
 
@@ -63,9 +63,9 @@ type Logger struct {
 	*logging.Logger
 }
 
-// NewLogger returns a new Logger instance
-func NewLogger() *Logger {
-	return &Logger{logging.MustGetLogger("webserver")}
+// NewLogger returns a new Logger Middleware instance
+func NewLogger(logger *logging.Logger) *Logger {
+	return &Logger{logger}
 }
 
 func (l *Logger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {

@@ -2,26 +2,21 @@ package Pinger
 
 import (
 	"fmt"
-	"github.com/op/go-logging"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/stretchr/testify/assert"
-	"os"
 	"testing"
 )
 
-const testingDbFilename = "testingDB.db"
-
 func TestRpcStart(t *testing.T) {
 	assert := assert.New(t)
-	logger, err := logging.GetLogger("Unittests")
-	assert.Nil(err, "err should be nil")
+	logger := logging.InitLogging("unittest", "", logging.DEBUG, true, logging.DEBUG, true)
 
 	config := NewConfiguration()
 	config.Db.Type = "sqlite"
-	config.Db.Filename = testingDbFilename
+	config.Db.Filename = ":memory:"
 
 	poll, err := NewBackendPolling(config, true, logger)
 	assert.Nil(err, "err should be nil")
-	defer os.Remove(testingDbFilename)
 
 	mailInfo := &MailPingInformation{}
 	args := StartPollArgs{

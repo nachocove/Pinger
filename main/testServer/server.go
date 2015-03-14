@@ -15,9 +15,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/nachocove/Pinger/Pinger"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/nachocove/Pinger/Utils"
-	"github.com/op/go-logging"
 )
 
 var rng *rand.Rand
@@ -224,11 +223,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "LevelNameToLevel: %v\n", err)
 		os.Exit(1)
 	}
-	logger, err = Pinger.InitLogging("TestServer", logFileName, fileLevel, screenLogging, screenLevel, debug)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "InitLogging: %v\n", err)
-		os.Exit(1)
-	}
+	logger = logging.InitLogging("TestServer", logFileName, fileLevel, screenLogging, screenLevel, debug)
 
 	var TLSconfig *tls.Config
 

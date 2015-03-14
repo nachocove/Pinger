@@ -11,8 +11,8 @@ import (
 	"net/rpc"
 
 	"github.com/coopernurse/gorp"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/nachocove/Pinger/Utils"
-	"github.com/op/go-logging"
 	"runtime"
 )
 
@@ -120,7 +120,7 @@ const (
 
 func (t *BackendPolling) ToggleDebug() {
 	t.debug = !t.debug
-	t.loggerLevel = ToggleLogging(t.logger, t.loggerLevel)
+	t.loggerLevel = logging.ToggleLogging(t.logger, t.loggerLevel)
 }
 
 func validateClientID(clientID string) error {

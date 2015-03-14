@@ -3,9 +3,10 @@ package Pinger
 import (
 	"code.google.com/p/gcfg"
 	"fmt"
-	"github.com/op/go-logging"
 	"os"
 	"path"
+
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 )
 
 type Configuration struct {
@@ -55,6 +56,17 @@ func NewConfiguration() *Configuration {
 	return config
 }
 
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	return false
+}
+
 func (gconfig *GlobalConfiguration) Validate() error {
 	if gconfig.LogFileName == "" {
 		gconfig.LogFileName = fmt.Sprintf("%s.log", path.Base(os.Args[0]))
@@ -76,7 +88,7 @@ func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel logging
 		return nil, fmt.Errorf("Logging directory %s does not exist.", gconfig.LogDir)
 	}
 	loggerName := path.Base(os.Args[0])
-	logger, err := InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel, debug)
+	logger := logging.InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel, debug)
 	if err != nil {
 		return nil, err
 	}

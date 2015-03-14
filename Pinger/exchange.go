@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/op/go-logging"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 )
 
 // ExchangeClient A client with type exchange.

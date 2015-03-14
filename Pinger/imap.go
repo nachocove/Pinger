@@ -6,7 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
-	"github.com/op/go-logging"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"net/url"
 	"time"
 )

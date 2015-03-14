@@ -12,7 +12,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/coopernurse/gorp"
-	"github.com/op/go-logging"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 )
 
 type DBConfiguration struct {

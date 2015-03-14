@@ -2,14 +2,14 @@ package Pinger
 
 import (
 	"github.com/coopernurse/gorp"
-	"github.com/op/go-logging"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 )
 
 var dbmap *gorp.DbMap
-var logger *logging.Logger = logging.MustGetLogger("unittest")
+var logger *logging.Logger
 var testClientID = "clientID"
 var testClientContext = "clientContext"
 var testDeviceId = "NCHOXfherekgrgr"
@@ -22,14 +22,12 @@ var testAppnumber = "(dev) Foo"
 
 func TestMain(m *testing.M) {
 	var err error
-	testDbFilename := "/tmp/unittest.db"
-	os.Remove(testDbFilename)
-	dbconfig := DBConfiguration{Type: "sqlite", Filename: testDbFilename}
+	logger = logging.InitLogging("unittest", "", logging.DEBUG, true, logging.DEBUG, true)
+	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
 	dbmap, err = initDB(&dbconfig, true, true, logger)
 	if err != nil {
 		panic("Could not create DB")
 	}
-	defer os.Remove(testDbFilename)
 	os.Exit(m.Run())
 }
 

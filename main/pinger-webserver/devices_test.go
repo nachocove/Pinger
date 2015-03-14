@@ -4,7 +4,7 @@ import (
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
 	"github.com/nachocove/Pinger/Pinger"
-	"github.com/op/go-logging"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
@@ -25,13 +25,7 @@ var registerJson string = "{\"ClientContext\": \"12345\", \"DeviceId\": \"NchoDC
 var rpcTestPort = 40800
 
 func TestMain(m *testing.M) {
-	testDbFilename := "/tmp/unittest.db"
-	formatStr := "%{time:2006-01-02T15:04:05.000} %{level} %{shortfile}:%{shortfunc} %{message}"
-	format := logging.MustStringFormatter(formatStr)
-	logging.SetFormatter(format)
-	logger = logging.MustGetLogger("unittest")
-
-	os.Remove(testDbFilename)
+	logger = logging.InitLogging("unittest", "", logging.DEBUG, true, logging.DEBUG, true)
 
 	rpcConfig := Pinger.RPCServerConfiguration{
 		Protocol: "http",
@@ -40,7 +34,8 @@ func TestMain(m *testing.M) {
 	}
 	pingerConfig = Pinger.NewConfiguration()
 	pingerConfig.Db.Type = "sqlite"
-	pingerConfig.Db.Filename = testDbFilename
+	pingerConfig.Db.Filename = ":memory:"
+	pingerConfig.Rpc = rpcConfig
 
 	mx = mux.NewRouter()
 	mx.HandleFunc(registerPath, registerDevice)
@@ -49,8 +44,6 @@ func TestMain(m *testing.M) {
 	n.UseHandler(mx)
 
 	go startRpc(pingerConfig)
-
-	defer os.Remove(testDbFilename)
 
 	os.Exit(m.Run())
 }
@@ -61,6 +54,7 @@ func startRpc(config *Pinger.Configuration) {
 		panic(err)
 	}
 }
+
 func TestRegisterGet(t *testing.T) {
 	assert := assert.New(t)
 	req, err := http.NewRequest("GET", fakeRegisterUrl, nil)

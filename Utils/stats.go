@@ -3,7 +3,7 @@ package Utils
 import (
 	"time"
 
-	"github.com/op/go-logging"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 )
 
 type StatLogger struct {

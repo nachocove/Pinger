@@ -15,9 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nachocove/Pinger/Pinger"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/nachocove/Pinger/Utils"
-	"github.com/op/go-logging"
 )
 
 var debug bool
@@ -119,7 +118,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "LevelNameToLevel: %v\n", err)
 		os.Exit(1)
 	}
-	logger, err = Pinger.InitLogging("testClient", logFileName, fileLevel, screenLogging, screenLevel, debug)
+	logger = logging.InitLogging("testClient", logFileName, fileLevel, screenLogging, screenLevel, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "InitLogging: %v\n", err)
 		os.Exit(1)

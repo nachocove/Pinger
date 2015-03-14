@@ -8,8 +8,8 @@ import (
 	"runtime"
 
 	"github.com/nachocove/Pinger/Pinger"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/nachocove/Pinger/Utils"
-	"github.com/op/go-logging"
 )
 
 var debug bool

@@ -13,8 +13,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/nachocove/Pinger/Pinger"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/nachocove/Pinger/Utils"
-	"github.com/op/go-logging"
 )
 
 // TODO Need to combine the configs into one, since there's shared settings. Just
@@ -103,7 +103,7 @@ func NewContext(
 }
 
 func (context *Context) ToggleDebug() {
-	context.loggerLevel = Pinger.ToggleLogging(context.Logger, context.loggerLevel)
+	context.loggerLevel = logging.ToggleLogging(context.Logger, context.loggerLevel)
 }
 
 // GetConfigAndRun process command line arguments and run the server
@@ -187,7 +187,7 @@ func (context *Context) run() error {
 	config := context.Config
 	httpsMiddlewares := negroni.New(
 		Utils.NewRecovery("Pinger-web", config.Global.Debug),
-		Utils.NewLogger(),
+		Utils.NewLogger(context.Logger),
 		Utils.NewStatic("/public", "/static", ""),
 		NewContextMiddleWare(context))
 
@@ -199,7 +199,7 @@ func (context *Context) run() error {
 	go func() {
 		httpMiddlewares := negroni.New(
 			Utils.NewRecovery("Pinger-web", config.Global.Debug),
-			Utils.NewLogger(),
+			Utils.NewLogger(context.Logger),
 			Utils.NewRedirectMiddleware("", config.Server.Port),
 		)
 		httpRouter := mux.NewRouter()
