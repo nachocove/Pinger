@@ -57,8 +57,8 @@ func (log *Logger) formatLogString(format string, args ...interface{}) string {
 // TODO: Add telemetry pushing to logging
 
 const (
-	debugFormatStr = "%{time:2006-01-02T15:04:05.000} %{level} %{shortfile}:%{shortfunc} %{message}"
-	formatStr      = "%{time:2006-01-02T15:04:05.000} %{level} %{shortfunc} %{message}"
+	debugFormatStr  = "%{time:2006-01-02T15:04:05.000} %{level} %{shortfile}:%{shortfunc} %{message}"
+	normalFormatStr = "%{time:2006-01-02T15:04:05.000} %{level} %{shortfunc} %{message}"
 )
 
 var loggerCache map[string]*Logger
@@ -85,7 +85,7 @@ func InitLogging(loggerName string, logFileName string, fileLevel Level, screen 
 		if debug {
 			formatStr = debugFormatStr
 		} else {
-			formatStr = formatStr
+			formatStr = normalFormatStr
 		}
 		format := logging.MustStringFormatter(formatStr)
 		fileLogger := logging.AddModuleLevel(logging.NewLogBackend(logFile, "", 0))
