@@ -71,6 +71,7 @@ func NewLogger(logger *logging.Logger) *Logger {
 func (l *Logger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	start := time.Now()
 	l.Debug("Started %s %s", r.Method, r.URL.Path)
+	rw.Header().Add("X-Clacks-Overhead", "Terry Pratchett")
 
 	next(rw, r)
 
