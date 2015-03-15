@@ -14,9 +14,11 @@ func LogLevel(level string) (Level, error) {
 }
 
 const (
-	ERROR Level = Level(logging.ERROR)
-	DEBUG Level = Level(logging.DEBUG)
-	INFO  Level = Level(logging.INFO)
+	ERROR    Level = Level(logging.ERROR)
+	WARNING  Level = Level(logging.WARNING)
+	INFO     Level = Level(logging.INFO)
+	DEBUG    Level = Level(logging.DEBUG)
+	CRITICAL Level = Level(logging.CRITICAL)
 )
 
 type Logger struct {

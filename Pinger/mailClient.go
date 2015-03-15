@@ -3,7 +3,6 @@ package Pinger
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/nachocove/Pinger/Utils"
@@ -140,8 +139,9 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		exitCh:    make(chan int),
 		command:   make(chan PingerCommand, 10),
 		stats:     nil,
+		pi:        pi,
 	}
-	logger.Debug("%s: Validating clientID", pi.getLogPrefix())
+	client.Debug("Validating clientID")
 	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, pi.ClientContext, pi.DeviceId, client.logger)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,6 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		return nil, err
 	}
 	client.di = deviceInfo
-	client.pi = pi
 	if doStats {
 		client.stats = Utils.NewStatLogger(client.stopAllCh, logger, false)
 	}
@@ -169,20 +168,35 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		//			return nil, err
 		//		}
 	default:
-		msg := fmt.Sprintf("%s: Unsupported Mail Protocol %s", pi.getLogPrefix(), client.pi.Protocol)
-		client.logger.Error(msg)
-		return nil, errors.New(msg)
+		client.Error("Unsupported Mail Protocol %s", client.pi.Protocol)
+		return nil, fmt.Errorf("%s: Unsupported Mail Protocol %s", pi.getLogPrefix(), client.pi.Protocol)
 	}
 
 	if mailclient == nil {
 		return nil, fmt.Errorf("%s: Could not create new Mail Client Pinger", pi.getLogPrefix())
 	}
-	client.logger.Debug("%s: Starting polls", pi.getLogPrefix())
+	client.Debug("Starting polls")
 	uuid.SwitchFormat(uuid.Clean)
 	client.stopToken = uuid.NewV4().String()
 	client.mailClient = mailclient
 	go client.start()
 	return client, nil
+}
+
+func (client *MailClientContext) Debug(format string, args ...interface{}) {
+	client.logger.Debug(fmt.Sprintf("%s: %s", client.pi.getLogPrefix(), format), args...)
+}
+
+func (client *MailClientContext) Info(format string, args ...interface{}) {
+	client.logger.Info(fmt.Sprintf("%s: %s", client.pi.getLogPrefix(), format), args...)
+}
+
+func (client *MailClientContext) Error(format string, args ...interface{}) {
+	client.logger.Error(fmt.Sprintf("%s: %s", client.pi.getLogPrefix(), format), args...)
+}
+
+func (client *MailClientContext) Warning(format string, args ...interface{}) {
+	client.logger.Warning(fmt.Sprintf("%s: %s", client.pi.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Status() (MailClientStatus, error) {
@@ -195,8 +209,9 @@ func (client *MailClientContext) Status() (MailClientStatus, error) {
 		return MailClientStatusStopped, nil
 	}
 }
+
 func (client *MailClientContext) cleanup() {
-	client.logger.Debug("%s: Cleaning up MailClientContext struct", client.pi.getLogPrefix())
+	client.Debug("Cleaning up MailClientContext struct")
 	if client.pi != nil {
 		client.pi.cleanup()
 		client.pi = nil
@@ -242,25 +257,25 @@ func (client *MailClientContext) start() {
 	defer client.cleanup()
 
 	deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
-	client.logger.Debug("%s: Starting deferTimer for %s", client.pi.getLogPrefix(), deferTime)
+	client.Debug("Starting deferTimer for %s", deferTime)
 	deferTimer := time.NewTimer(deferTime)
 	defer deferTimer.Stop()
 	if client.stats != nil {
 		go client.stats.TallyResponseTimes()
 	}
 	maxPollTime := time.Duration(client.pi.MaxPollTimeout) * time.Millisecond
-	client.logger.Debug("%s: Setting maxPollTimer for %s", client.pi.getLogPrefix(), maxPollTime)
+	client.Debug("Setting maxPollTimer for %s", maxPollTime)
 	maxPollTimer := time.NewTimer(maxPollTime)
 	var longPollStopCh chan int
 	for {
 		select {
 		case <-maxPollTimer.C:
-			client.logger.Debug("%s: maxPollTimer expired. Stopping everything.", client.pi.getLogPrefix())
+			client.Debug("maxPollTimer expired. Stopping everything.")
 			return
 
 		case <-deferTimer.C:
 			// defer timer has timed out. Now it's time to do something
-			client.logger.Debug("%s: DeferTimer expired. Starting Polling.", client.pi.getLogPrefix())
+			client.Debug("DeferTimer expired. Starting Polling.")
 			maxPollTimer.Reset(maxPollTime)
 			// launch the longpoll and wait for it to exit
 			longPollStopCh = make(chan int)
@@ -268,19 +283,19 @@ func (client *MailClientContext) start() {
 
 		case <-client.exitCh:
 			// the mailClient.LongPoll has indicated that it has exited. Clean up.
-			client.logger.Debug("%s: LongPoll exited. Stopping.", client.pi.getLogPrefix())
+			client.Debug("LongPoll exited. Stopping.")
 			client.Action(PingerStop)
 
 		case err := <-client.errCh:
 			// the mailClient.LongPoll has thrown an error. note it.
-			client.logger.Debug("%s: Error thrown. Stopping.", client.pi.getLogPrefix())
+			client.Debug("Error thrown. Stopping.")
 			client.lastError = err
 
 		case cmd := <-client.command:
 			switch {
 			case cmd == PingerStop:
 				close(client.stopAllCh) // tell all goroutines listening on this channel that they can stop now.
-				client.logger.Debug("%s: got 'PingerStop' command", client.pi.getLogPrefix())
+				client.Debug("got 'PingerStop' command")
 				return
 
 			case cmd == PingerDefer:
@@ -289,13 +304,13 @@ func (client *MailClientContext) start() {
 					longPollStopCh = nil
 				}
 				deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
-				client.logger.Debug("%s: reStarting deferTimer for %s", client.pi.getLogPrefix(), deferTime)
+				client.Debug("reStarting deferTimer for %s", deferTime)
 				deferTimer.Stop()
 				deferTimer.Reset(deferTime)
 				maxPollTimer.Stop()
 
 			default:
-				client.logger.Error("%s: Unknown command %d", client.pi.getLogPrefix(), cmd)
+				client.Error("Unknown command %d", cmd)
 				continue
 
 			}
@@ -305,7 +320,7 @@ func (client *MailClientContext) start() {
 
 func (client *MailClientContext) sendError(err error) {
 	_, fn, line, _ := runtime.Caller(1)
-	client.logger.Error("%s: %s/%s:%d %s", client.pi.getLogPrefix(), path.Base(path.Dir(fn)), path.Base(fn), line, err)
+	client.Error("%s/%s:%d %s", path.Base(path.Dir(fn)), path.Base(fn), line, err)
 	client.errCh <- err
 }
 
@@ -316,7 +331,7 @@ func (client *MailClientContext) Action(action PingerCommand) error {
 
 func (client *MailClientContext) stop() error {
 	if client.mailClient != nil {
-		client.logger.Debug("%s: Stopping polls", client.pi.getLogPrefix())
+		client.Debug("Stopping polls")
 		return client.Action(PingerStop)
 	}
 	return nil
@@ -324,7 +339,7 @@ func (client *MailClientContext) stop() error {
 
 func (client *MailClientContext) deferPoll(timeout int64) error {
 	if client.mailClient != nil {
-		client.logger.Debug("%s: Deferring polls", client.pi.getLogPrefix())
+		client.Debug("Deferring polls")
 		if timeout > 0 {
 			client.pi.WaitBeforeUse = timeout
 		}
