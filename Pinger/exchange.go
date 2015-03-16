@@ -44,7 +44,7 @@ func (ex *ExchangeClient) getLogPrefix() (prefix string) {
 	if ex.parent != nil && ex.parent.di != nil {
 		prefix = ex.parent.di.getLogPrefix() + "/ActiveSync"
 	} else {
-		prefix = "<unset>"
+		prefix = ""
 	}
 	return
 }
@@ -127,7 +127,7 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	// Make the request and wait for response; this could take a while
 	response, err := ex.httpClient.Do(ex.request)
 	if err != nil {
-		ex.Warning("httpClient.Do failed: %s", err.Error())
+		ex.Debug("httpClient.Do failed: %s", err.Error())
 		ex.incoming <- retryResponse
 		return
 	}
@@ -195,16 +195,16 @@ func (ex *ExchangeClient) exponentialBackoff(sleepTime int) int {
 func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	defer recoverCrash(ex.logger)
 	askedToStop := false
-	defer func() {
+	defer func(prefixStr string) {
 		if ex.request != nil {
 			ex.transport.CancelRequest(ex.request)
 		}
 		ex.transport.CloseIdleConnections()
 		if askedToStop == false {
-			ex.Debug("Stopping")
+			ex.logger.Debug("%s: Stopping", prefixStr)
 			exitCh <- 1 // tell the parent we've exited.
 		}
-	}()
+	}(ex.getLogPrefix())
 
 	reqTimeout := ex.parent.pi.ResponseTimeout
 	reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
