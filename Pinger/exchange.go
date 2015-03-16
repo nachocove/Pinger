@@ -127,6 +127,9 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	// Make the request and wait for response; this could take a while
 	response, err := ex.httpClient.Do(ex.request)
 	if err != nil {
+		// if we cancel requests, we drop into this error case. We will wind up sending
+		// the retryResponse, but since no one is listening, we don't care (there's no
+		// memory leakage in this case
 		ex.Debug("httpClient.Do failed: %s", err.Error())
 		ex.incoming <- retryResponse
 		return
