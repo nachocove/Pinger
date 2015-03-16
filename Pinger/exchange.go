@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -74,13 +75,18 @@ func (ex *ExchangeClient) maxResponseSize() (size int) {
 	return
 }
 
+var retryResponse *http.Response
+
+func init() {
+	retryResponse = &http.Response{}
+}
 func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	var err error
 	requestBody := bytes.NewReader(ex.parent.pi.RequestData)
 	ex.Debug("request WBXML %s", base64.StdEncoding.EncodeToString(ex.parent.pi.RequestData))
 	req, err := http.NewRequest("POST", ex.parent.pi.MailServerUrl, requestBody)
 	if err != nil {
-		errCh <- err
+		errCh <- fmt.Errorf("Failed to create request: %s", err.Error())
 		return
 	}
 	for k, v := range ex.parent.pi.HttpHeaders {
@@ -115,17 +121,14 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 
 	if ex.parent.pi.MailServerCredentials.Username != "" && ex.parent.pi.MailServerCredentials.Password != "" {
 		req.SetBasicAuth(ex.parent.pi.MailServerCredentials.Username, ex.parent.pi.MailServerCredentials.Password)
-		if err != nil {
-			errCh <- err
-			return
-		}
 	}
 	ex.request = req // save it so we can cancel it in another routine
 
 	// Make the request and wait for response; this could take a while
 	response, err := ex.httpClient.Do(ex.request)
 	if err != nil {
-		errCh <- err
+		ex.Warning("httpClient.Do failed: %s", err.Error())
+		ex.incoming <- retryResponse
 		return
 	}
 	ex.request = nil // unsave it. We're done with it.
@@ -145,8 +148,14 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	// TODO Do I need to loop here to make sure I get the number of bytes I expect?
 	n, err := response.Body.Read(responseBytes)
 	if err != nil {
-		errCh <- err
-		return
+		if err != io.EOF {
+			errCh <- fmt.Errorf("Failed ro read response: %s", err.Error())
+			return
+		} else {
+			ex.Info("EOF on body read.")
+			ex.incoming <- retryResponse
+			return
+		}
 	}
 	if n < toRead && n != len(ex.parent.pi.ExpectedReply) && n != len(ex.parent.pi.NoChangeReply) {
 		ex.Warning("Read less than expected: %d < %d", n, toRead)
@@ -245,6 +254,11 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 			return
 
 		case response := <-ex.incoming:
+			if response == retryResponse {
+				ex.Debug("Retry-response from response reader.")
+				sleepTime = ex.exponentialBackoff(sleepTime)
+				continue
+			}
 			// the response body tends to be pretty short. Let's just read it all.
 			responseBody, err := ioutil.ReadAll(response.Body)
 			if err != nil {
