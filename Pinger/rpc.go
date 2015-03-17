@@ -2,17 +2,13 @@ package Pinger
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net/http"
-
-	// needed to get the http.ListenAndServe below to pick up the profiler
-	_ "net/http/pprof"
-	"net/rpc"
-
 	"github.com/coopernurse/gorp"
 	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/nachocove/Pinger/Utils"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"net/rpc"
 	"runtime"
 )
 

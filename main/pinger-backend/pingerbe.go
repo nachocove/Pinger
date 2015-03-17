@@ -3,13 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"path"
-	"runtime"
-
 	"github.com/nachocove/Pinger/Pinger"
 	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"github.com/nachocove/Pinger/Utils"
+	"os"
+	"path"
+	"runtime"
 )
 
 var debug bool
@@ -94,7 +93,7 @@ func main() {
 		memstats.SetBaseMemStats()
 	}
 
-	err = Pinger.StartPollingRPCServer(config, debug, logger) // will also include the pprof server
+	err = Pinger.StartPollingRPCServer(config, debug, logger)
 	if err != nil {
 		panic(err.Error())
 	}
