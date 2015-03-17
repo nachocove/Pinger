@@ -61,6 +61,7 @@ func main() {
 	}
 	var screenLogging = false
 	var screenLevel = logging.ERROR
+	debug = debug || config.Global.Debug
 	if debug || verbose {
 		screenLogging = true
 		if debug {

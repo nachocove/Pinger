@@ -152,6 +152,7 @@ func GetConfigAndRun() {
 	if debug != defaultDebug {
 		config.Global.Debug = debug
 	}
+	debug = debug || config.Global.Debug
 	if config.Server.TemplateDir == "" {
 		log.Fatalf("No template directory specified!")
 		os.Exit(1)
