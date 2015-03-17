@@ -15,8 +15,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 	"sync"
+	"time"
 )
 
 // ExchangeClient A client with type exchange.
@@ -85,7 +85,7 @@ func init() {
 }
 func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errCh chan error) {
 	defer recoverCrash(ex.logger)
-	ex.mutex.Lock()  // prevents the longpoll from cancelling the request while we're still setting it up.
+	ex.mutex.Lock() // prevents the longpoll from cancelling the request while we're still setting it up.
 	unlockMutex := true
 	defer func() {
 		ex.Debug("Exiting doRequestResponse")
@@ -94,7 +94,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 			ex.mutex.Unlock()
 		}
 	}()
-	
+
 	var err error
 	if ex == nil || ex.parent == nil || ex.parent.pi == nil {
 		if ex.logger != nil {

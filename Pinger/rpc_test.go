@@ -15,7 +15,7 @@ func TestRpcStart(t *testing.T) {
 	config.Db.Type = "sqlite"
 	config.Db.Filename = ":memory:"
 
-	poll, err := NewBackendPolling(config, true, logger)
+	poll, err := NewBackendPolling(config, true, false, logger)
 	assert.Nil(err, "err should be nil")
 
 	mailInfo := &MailPingInformation{}

@@ -49,7 +49,7 @@ func TestMain(m *testing.M) {
 }
 
 func startRpc(config *Pinger.Configuration) {
-	err := Pinger.StartPollingRPCServer(pingerConfig, true, logger)
+	err := Pinger.StartPollingRPCServer(pingerConfig, true, false, logger)
 	if err != nil {
 		panic(err)
 	}

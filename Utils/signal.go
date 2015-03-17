@@ -92,12 +92,12 @@ func usr2Catcher() {
 						cpuprofile = ""
 						memprofile = ""
 					}()
-			        m, err := os.Create(memprofile)
-			        if err != nil {
+					m, err := os.Create(memprofile)
+					if err != nil {
 						fmt.Fprintf(os.Stderr, "ERROR: Could not open memprof file %s", memprofile)
 						return
-			        }
-			        defer m.Close()
+					}
+					defer m.Close()
 					f, err := os.Create(cpuprofile)
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "ERROR: Could not open cpuprof file %s", cpuprofile)
@@ -105,7 +105,7 @@ func usr2Catcher() {
 					}
 					pprof.StartCPUProfile(f)
 					time.Sleep(time.Duration(60) * time.Second)
-			        pprof.WriteHeapProfile(m)
+					pprof.WriteHeapProfile(m)
 					defer func() {
 						pprof.StopCPUProfile()
 						f.Close()
