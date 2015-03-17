@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"io"
 	"io/ioutil"
 	"math"
@@ -13,29 +14,31 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"time"
 	"strings"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"time"
+	"sync"
 )
 
 // ExchangeClient A client with type exchange.
 type ExchangeClient struct {
-	incoming   chan *http.Response
 	transport  *http.Transport
 	request    *http.Request
 	debug      bool
 	logger     *logging.Logger
 	parent     *MailClientContext
 	httpClient *http.Client
+	cancelled  bool
+	mutex      *sync.Mutex
 }
 
 // NewExchangeClient set up a new exchange client
 func NewExchangeClient(parent *MailClientContext, debug bool, logger *logging.Logger) (*ExchangeClient, error) {
 	ex := &ExchangeClient{
-		parent:   parent,
-		incoming: make(chan *http.Response),
-		debug:    debug,
-		logger:   logger,
+		parent:    parent,
+		debug:     debug,
+		logger:    logger,
+		cancelled: false,
+		mutex:     &sync.Mutex{},
 	}
 	return ex, nil
 }
@@ -80,15 +83,27 @@ var retryResponse *http.Response
 func init() {
 	retryResponse = &http.Response{}
 }
-func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
+func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errCh chan error) {
 	defer recoverCrash(ex.logger)
-	defer ex.parent.wg.Done()
+	ex.mutex.Lock()  // prevents the longpoll from cancelling the request while we're still setting it up.
+	unlockMutex := true
+	defer func() {
+		ex.Debug("Exiting doRequestResponse")
+		ex.parent.wg.Done()
+		if unlockMutex {
+			ex.mutex.Unlock()
+		}
+	}()
+	
 	var err error
 	if ex == nil || ex.parent == nil || ex.parent.pi == nil {
 		if ex.logger != nil {
 			ex.Warning("doRequestResponse called but structures cleaned up")
 		}
 		return
+	}
+	if ex.request != nil {
+		panic("Doing doRequestResponse with an active request in process!!")
 	}
 	requestBody := bytes.NewReader(ex.parent.pi.RequestData)
 	ex.Debug("request WBXML %s", base64.StdEncoding.EncodeToString(ex.parent.pi.RequestData))
@@ -131,9 +146,15 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		req.SetBasicAuth(ex.parent.pi.MailServerCredentials.Username, ex.parent.pi.MailServerCredentials.Password)
 	}
 	ex.request = req // save it so we can cancel it in another routine
+	ex.mutex.Unlock()
+	unlockMutex = false
 
 	// Make the request and wait for response; this could take a while
 	response, err := ex.httpClient.Do(ex.request)
+	ex.request = nil // unsave it. We're done with it.
+	if ex.cancelled == true {
+		return
+	}
 	if err != nil {
 		// if we cancel requests, we drop into this error case. We will wind up sending
 		// the retryResponse, but since no one is listening, we don't care (there's no
@@ -141,10 +162,9 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		if strings.Contains(err.Error(), "use of closed network connection") == false {
 			ex.Warning("httpClient.Do failed: %s", err.Error())
 		}
-		ex.incoming <- retryResponse
+		responseCh <- retryResponse
 		return
 	}
-	ex.request = nil // unsave it. We're done with it.
 
 	// read at most ex.maxResponseSize() bytes. We do this so that an attacker can't
 	// flood us with an infinte amount of data. Note we also do not (and SHOULD not)
@@ -164,7 +184,7 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		if err != io.EOF {
 			ex.Error("Failed ro read response: %s", err.Error())
 		}
-		ex.incoming <- retryResponse
+		responseCh <- retryResponse
 		return
 	}
 	if n < toRead && n != len(ex.parent.pi.ExpectedReply) && n != len(ex.parent.pi.NoChangeReply) {
@@ -190,7 +210,7 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 			ex.Debug("response:\n%s%s", headerBytes, responseBytes)
 		}
 	}
-	ex.incoming <- response
+	responseCh <- response
 }
 
 func (ex *ExchangeClient) exponentialBackoff(sleepTime int) int {
@@ -207,12 +227,16 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	defer ex.parent.wg.Done()
 	askedToStop := false
 	defer func(prefixStr string) {
+		ex.mutex.Lock()
+		ex.cancelled = true
 		if ex.request != nil {
+			ex.Debug("Cancelling outstanding request")
 			ex.transport.CancelRequest(ex.request)
 		}
+		ex.mutex.Unlock()
 		ex.transport.CloseIdleConnections()
 		if askedToStop == false {
-			ex.logger.Debug("%s: Stopping", prefixStr)
+			ex.logger.Debug("%s: exiting LongPoll", prefixStr)
 			exitCh <- 1 // tell the parent we've exited.
 		}
 	}(ex.getLogPrefix())
@@ -249,25 +273,36 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	}
 	ex.Debug("New HTTP Client with timeout %s %s", ex.transport.ResponseHeaderTimeout, ex.parent.pi.MailServerUrl)
 	sleepTime := 0
-	tooFastResponse := (time.Duration(ex.parent.pi.ResponseTimeout)*time.Millisecond)/4
+	tooFastResponse := (time.Duration(ex.parent.pi.ResponseTimeout) * time.Millisecond) / 4
 	ex.Debug("TooFast timeout set to %s", tooFastResponse)
+	var responseCh chan *http.Response
+	var errCh chan error
 	for {
 		if sleepTime > 0 {
 			s := time.Duration(sleepTime) * time.Second
 			ex.Debug("Sleeping %s before retry", s)
 			time.Sleep(s)
 		}
-		errCh := make(chan error)
+		if errCh != nil {
+			close(errCh)
+		}
+		errCh = make(chan error)
+		if responseCh != nil {
+			close(responseCh)
+		}
+		responseCh = make(chan *http.Response)
+
 		timeSent := time.Now()
 		ex.parent.wg.Add(1)
-		go ex.doRequestResponse(errCh)
+		ex.cancelled = false
+		go ex.doRequestResponse(responseCh, errCh)
 		ex.Debug("Waiting for response")
 		select {
 		case err := <-errCh:
 			ex.parent.sendError(err)
 			return
 
-		case response := <-ex.incoming:
+		case response := <-responseCh:
 			if response == retryResponse {
 				ex.Debug("Retry-response from response reader.")
 				sleepTime = ex.exponentialBackoff(sleepTime)
@@ -336,9 +371,12 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 			}
 
 		case <-ex.parent.stopAllCh: // parent will close this, at which point this will trigger.
+			ex.Debug("Was told to stop (allStop). Stopping")
+			askedToStop = true
 			return
 
 		case <-stopCh:
+			ex.Debug("Was told to stop. Stopping")
 			askedToStop = true
 			return
 		}
