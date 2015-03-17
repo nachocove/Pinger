@@ -76,7 +76,7 @@ func main() {
 	}
 
 	Utils.InitCpuProfileSignal()
-	
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	logger.Info("Running with %d Processors", runtime.NumCPU())
 
@@ -95,7 +95,7 @@ func main() {
 		memstats.SetBaseMemStats()
 	}
 
-	err = Pinger.StartPollingRPCServer(config, debug, logger)
+	err = Pinger.StartPollingRPCServer(config, debug, config.Global.DebugSql, logger)
 	if err != nil {
 		panic(err.Error())
 	}

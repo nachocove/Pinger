@@ -318,8 +318,8 @@ func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) erro
 
 var DefaultPollingContext *BackendPolling
 
-func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger) (*BackendPolling, error) {
-	dbm, err := initDB(&config.Db, true, debug, logger)
+func NewBackendPolling(config *Configuration, debug, debugSql bool, logger *logging.Logger) (*BackendPolling, error) {
+	dbm, err := initDB(&config.Db, true, debugSql, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -336,8 +336,8 @@ func NewBackendPolling(config *Configuration, debug bool, logger *logging.Logger
 	return DefaultPollingContext, nil
 }
 
-func StartPollingRPCServer(config *Configuration, debug bool, logger *logging.Logger) error {
-	pollingAPI, err := NewBackendPolling(config, debug, logger)
+func StartPollingRPCServer(config *Configuration, debug, debugSql bool, logger *logging.Logger) error {
+	pollingAPI, err := NewBackendPolling(config, debug, debugSql, logger)
 	if err != nil {
 		return err
 	}

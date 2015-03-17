@@ -22,6 +22,7 @@ type GlobalConfiguration struct {
 	LogFileName       string
 	LogFileLevel      string
 	Debug             bool
+	DebugSql          bool
 
 	// private
 	logFileLevel logging.Level
@@ -30,6 +31,7 @@ type GlobalConfiguration struct {
 func NewGlobalConfiguration() *GlobalConfiguration {
 	return &GlobalConfiguration{
 		Debug:        defaultDebug,
+		DebugSql:     defaultDebugSql,
 		LogDir:       defaultLogDir,
 		LogFileName:  defaultLogFileName,
 		LogFileLevel: defaultLogFileLevel,
@@ -40,6 +42,7 @@ const (
 	defaultDumpRequests      = false
 	defaultIgnorePushFailure = false
 	defaultDebug             = false
+	defaultDebugSql          = false
 	defaultLogDir            = "./log"
 	defaultLogFileName       = ""
 	defaultLogFileLevel      = "INFO"
