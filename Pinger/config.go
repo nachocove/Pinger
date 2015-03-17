@@ -3,10 +3,9 @@ package Pinger
 import (
 	"code.google.com/p/gcfg"
 	"fmt"
+	logging "github.com/nachocove/Pinger/Pinger/logging"
 	"os"
 	"path"
-
-	logging "github.com/nachocove/Pinger/Pinger/logging"
 )
 
 type Configuration struct {
