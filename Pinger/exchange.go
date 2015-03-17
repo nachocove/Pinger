@@ -81,6 +81,7 @@ func init() {
 	retryResponse = &http.Response{}
 }
 func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
+	defer recoverCrash(ex.logger)
 	var err error
 	requestBody := bytes.NewReader(ex.parent.pi.RequestData)
 	ex.Debug("request WBXML %s", base64.StdEncoding.EncodeToString(ex.parent.pi.RequestData))
