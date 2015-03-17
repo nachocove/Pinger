@@ -6,7 +6,11 @@ PINGER_VERSION ?= 1
 pinger:
 	go build ./...
 
-update:
+git-update:
+	git pull
+	
+
+update-all:
 	go get -u ./...
 
 all: install test
@@ -16,7 +20,8 @@ test:
 
 vet:
 	go vet ./... 2>&1 | grep -v 'possible formatting directive in Error call'
-install:
+	
+install: git-update
 	go install ./...
 	sh scripts/webserver-capabilities.sh
 
