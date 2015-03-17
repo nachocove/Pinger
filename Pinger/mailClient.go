@@ -2,6 +2,7 @@ package Pinger
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	logging "github.com/nachocove/Pinger/Pinger/logging"
@@ -63,6 +64,14 @@ type MailPingInformation struct {
 	AppBuildNumber         string
 
 	logPrefix string
+}
+
+func (pi *MailPingInformation) String() string {
+	return fmt.Sprintf("%s: NoChangeReply:%s, RequestData:%s, ExpectedReply:%s",
+		pi.getLogPrefix(),
+		base64.StdEncoding.EncodeToString(pi.NoChangeReply),
+		base64.StdEncoding.EncodeToString(pi.RequestData),
+		base64.StdEncoding.EncodeToString(pi.ExpectedReply))
 }
 
 func (pi *MailPingInformation) cleanup() {
@@ -175,7 +184,7 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 	if mailclient == nil {
 		return nil, fmt.Errorf("%s: Could not create new Mail Client Pinger", pi.getLogPrefix())
 	}
-	client.Debug("Starting polls")
+	client.Debug("Starting polls for %s", pi.String())
 	uuid.SwitchFormat(uuid.Clean)
 	client.stopToken = uuid.NewV4().String()
 	client.mailClient = mailclient
@@ -229,13 +238,6 @@ func (client *MailClientContext) cleanup() {
 	// tell Garbage collection to run. Might not free/remove all instances we free'd above,
 	// but it's worth the effort.
 	go runtime.GC()
-}
-
-func (pi *MailPingInformation) String() string {
-	// let's try to be safe and not print this at all. There's a number of fields we don't
-	// want to be printed (Password is one, but also an HttpHeader might give away user info!),
-	// So let's just not.
-	return "<MailPingInformation; redacted completely>"
 }
 
 func UserSha256(username string) string {
