@@ -75,6 +75,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	Utils.InitCpuProfileSignal()
+	
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	logger.Info("Running with %d Processors", runtime.NumCPU())
 
