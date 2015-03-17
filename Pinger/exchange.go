@@ -241,7 +241,8 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	}
 	ex.Debug("New HTTP Client with timeout %s %s", ex.transport.ResponseHeaderTimeout, ex.parent.pi.MailServerUrl)
 	sleepTime := 0
-
+	tooFastResponse := (time.Duration(ex.parent.pi.ResponseTimeout)*time.Millisecond)/4
+	ex.Debug("TooFast timeout set to %s", tooFastResponse)
 	for {
 		if sleepTime > 0 {
 			s := time.Duration(sleepTime) * time.Second
@@ -249,6 +250,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 			time.Sleep(s)
 		}
 		errCh := make(chan error)
+		timeSent := time.Now()
 		go ex.doRequestResponse(errCh)
 		ex.Debug("Waiting for response")
 		select {
@@ -295,7 +297,12 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 			case ex.parent.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.parent.pi.NoChangeReply) == 0:
 				// go back to polling
 				ex.Debug("Reply matched NoChangeReply. Back to polling")
-				sleepTime = 0 // good reply. Reset any exponential backoff stuff.
+				if time.Since(timeSent) <= tooFastResponse {
+					ex.Warning("Response was too fast. Doing backoff.")
+					sleepTime = ex.exponentialBackoff(sleepTime)
+				} else {
+					sleepTime = 0 // good reply. Reset any exponential backoff stuff.
+				}
 
 			case ex.parent.pi.ExpectedReply == nil || bytes.Compare(responseBody, ex.parent.pi.ExpectedReply) == 0:
 				// there's new mail!
