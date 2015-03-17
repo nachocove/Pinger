@@ -36,10 +36,11 @@ func NewExchangeClient(parent *MailClientContext, debug bool, logger *logging.Lo
 	ex := &ExchangeClient{
 		parent:    parent,
 		debug:     debug,
-		logger:    logger,
+		logger:    logger.Copy(),
 		cancelled: false,
 		mutex:     &sync.Mutex{},
 	}
+	ex.logger.SetCallDepth(1)
 	return ex, nil
 }
 
@@ -236,7 +237,9 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 		ex.mutex.Unlock()
 		ex.transport.CloseIdleConnections()
 		if askedToStop == false {
+			ex.logger.SetCallDepth(0)
 			ex.logger.Debug("%s: exiting LongPoll", prefixStr)
+			ex.logger.SetCallDepth(1)
 			exitCh <- 1 // tell the parent we've exited.
 		}
 	}(ex.getLogPrefix())

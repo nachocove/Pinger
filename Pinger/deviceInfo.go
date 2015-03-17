@@ -140,8 +140,8 @@ func newDeviceInfo(
 		AppBuildVersion: appBuildVersion,
 		AppBuildNumber:  appBuildNumber,
 		Enabled:         false,
-		logger:          logger,
 	}
+	di.SetLogger(logger)
 	err := di.validate()
 	if err != nil {
 		return nil, err
@@ -149,8 +149,36 @@ func newDeviceInfo(
 	return di, nil
 }
 
+func (di *DeviceInfo) SetLogger(logger *logging.Logger) {
+	di.logger = logger.Copy()
+	di.logger.SetCallDepth(1)
+}
+
+func (di *DeviceInfo) getLogPrefix() string {
+	if di.logPrefix == "" {
+		di.logPrefix = fmt.Sprintf("%s:%s:%s", di.DeviceId, di.ClientId, di.ClientContext)
+	}
+	return di.logPrefix
+}
+
+func (di *DeviceInfo) Debug(format string, args ...interface{}) {
+	di.logger.Debug(fmt.Sprintf("%s: %s", di.getLogPrefix(), format), args...)
+}
+
+func (di *DeviceInfo) Info(format string, args ...interface{}) {
+	di.logger.Info(fmt.Sprintf("%s: %s", di.getLogPrefix(), format), args...)
+}
+
+func (di *DeviceInfo) Error(format string, args ...interface{}) {
+	di.logger.Error(fmt.Sprintf("%s: %s", di.getLogPrefix(), format), args...)
+}
+
+func (di *DeviceInfo) Warning(format string, args ...interface{}) {
+	di.logger.Warning(fmt.Sprintf("%s: %s", di.getLogPrefix(), format), args...)
+}
+
 func (di *DeviceInfo) cleanup() {
-	di.logger.Debug("%s: Cleaning up DeviceInfo", di.getLogPrefix())
+	di.Debug("Cleaning up DeviceInfo")
 	di.ClientId = ""
 	di.ClientContext = ""
 	di.DeviceId = ""
@@ -227,9 +255,9 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, lo
 	case len(devices) == 1:
 		device := &(devices[0])
 		device.dbm = dbm
-		device.logger = logger
+		device.SetLogger(logger)
 		if device.Pinger != pingerHostId {
-			logger.Warning("%s: device belongs to a different pinger (%s). Stealing it", device.getLogPrefix(), device.Pinger)
+			device.Warning("device belongs to a different pinger (%s). Stealing it", device.Pinger)
 			device.Pinger = pingerHostId
 			device.update()
 		}
@@ -252,7 +280,7 @@ func getAllMyDeviceInfo(dbm *gorp.DbMap, logger *logging.Logger) ([]DeviceInfo, 
 	}
 	for k := range devices {
 		devices[k].dbm = dbm
-		devices[k].logger = logger
+		devices[k].SetLogger(logger)
 	}
 	return devices, nil
 }
@@ -358,14 +386,14 @@ func (di *DeviceInfo) updateDeviceInfo(
 	}
 	// TODO if the push token or service change, then the AWS endpoint is no longer valid: We should send a delete to AWS for the endpoint
 	if di.PushService != pushService {
-		di.logger.Warning("%s: Resetting Token ('%s') and AWSEndpointArn ('%s')", di.getLogPrefix(), di.PushToken, di.AWSEndpointArn)
+		di.Warning("Resetting Token ('%s') and AWSEndpointArn ('%s')", di.PushToken, di.AWSEndpointArn)
 		di.PushService = pushService
 		di.PushToken = ""
 		di.AWSEndpointArn = ""
 		changed = true
 	}
 	if di.PushToken != pushToken {
-		di.logger.Warning("%s: Resetting AWSEndpointArn ('%s')", di.getLogPrefix(), di.AWSEndpointArn)
+		di.Warning("Resetting AWSEndpointArn ('%s')", di.AWSEndpointArn)
 		di.PushToken = pushToken
 		di.AWSEndpointArn = ""
 		changed = true
@@ -484,7 +512,7 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 	if err != nil {
 		return err
 	}
-	di.logger.Debug("%s: Sending push message to AWS: %s", di.getLogPrefix(), pushMessage)
+	di.Debug("Sending push message to AWS: %s", pushMessage)
 	err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, pushMessage)
 	if err == nil {
 		di.LastContactRequest = time.Now().UnixNano()
@@ -521,7 +549,7 @@ func (di *DeviceInfo) registerAws() error {
 		}
 		if re.MatchString(registerErr.Error()) == true {
 			arn := re.ReplaceAllString(registerErr.Error(), fmt.Sprintf("${%s}", re.SubexpNames()[1]))
-			di.logger.Warning("%s: Previously registered as %s. Updating.", di.getLogPrefix(), arn)
+			di.Warning("Previously registered as %s. Updating.", arn)
 			attributes, err := DefaultPollingContext.config.Aws.getEndpointAttributes(arn)
 			if err != nil {
 				return err
@@ -600,19 +628,19 @@ func (di *DeviceInfo) validateAws() error {
 func (di *DeviceInfo) validateClient() error {
 	// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
 	if di.AWSEndpointArn == "" {
-		di.logger.Debug("%s: Registering %s:%s with AWS.", di.getLogPrefix(), di.PushService, di.PushToken)
+		di.Debug("Registering %s:%s with AWS.", di.PushService, di.PushToken)
 		err := di.registerAws()
 		if err != nil {
 			if DefaultPollingContext.config.Global.IgnorePushFailure == false {
 				return err
 			} else {
-				di.logger.Warning("%s: Registering %s:%s error (ignored): %s", di.getLogPrefix(), di.PushService, di.PushToken, err.Error())
+				di.Warning("Registering %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
 			}
 		} else {
-			di.logger.Debug("%s: endpoint created %s", di.getLogPrefix(), di.AWSEndpointArn)
+			di.Debug("endpoint created %s", di.AWSEndpointArn)
 		}
 		if di.AWSEndpointArn == "" {
-			di.logger.Error("%s: AWSEndpointArn empty after register!", di.getLogPrefix())
+			di.Error("AWSEndpointArn empty after register!")
 		}
 		// TODO We should send a test-ping here, so we don't find out the endpoint is unreachable later.
 		// It's optional (we'll find out eventually), but this would speed it up.
@@ -624,18 +652,11 @@ func (di *DeviceInfo) validateClient() error {
 			if DefaultPollingContext.config.Global.IgnorePushFailure == false {
 				return err
 			} else {
-				di.logger.Warning("%s: Validating %s:%s error (ignored): %s", di.getLogPrefix(), di.PushService, di.PushToken, err.Error())
+				di.Warning("Validating %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
 			}
 		} else {
-			di.logger.Debug("%s: endpoint validated %s", di.getLogPrefix(), di.AWSEndpointArn)
+			di.Debug("endpoint validated %s", di.AWSEndpointArn)
 		}
 	}
 	return nil
-}
-
-func (di *DeviceInfo) getLogPrefix() string {
-	if di.logPrefix == "" {
-		di.logPrefix = fmt.Sprintf("%s:%s:%s", di.DeviceId, di.ClientId, di.ClientContext)
-	}
-	return di.logPrefix
 }

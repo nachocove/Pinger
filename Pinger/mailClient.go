@@ -144,7 +144,7 @@ type MailClientContext struct {
 
 func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStats bool, logger *logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
-		logger:    logger,
+		logger:    logger.Copy(),
 		errCh:     make(chan error),
 		stopAllCh: make(chan int),
 		exitCh:    make(chan int),
@@ -152,6 +152,7 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		stats:     nil,
 		pi:        pi,
 	}
+	client.logger.SetCallDepth(1)
 	client.Debug("Validating clientID")
 	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, pi.ClientContext, pi.DeviceId, client.logger)
 	if err != nil {

@@ -102,7 +102,7 @@ func InitLogging(loggerName string, logFileName string, fileLevel Level, screen 
 		logging.SetFormatter(format)
 		logger := Logger{}
 		logger.logger = logging.MustGetLogger(loggerName)
-		logger.logger.ExtraCalldepth = 1
+		logger.SetCallDepth(0)
 		loggerCache[loggerName] = &logger
 	}
 	if loggerCache[loggerName] == nil {
@@ -111,15 +111,20 @@ func InitLogging(loggerName string, logFileName string, fileLevel Level, screen 
 	return loggerCache[loggerName]
 }
 
-//func GetLogger(loggerName string) *Logger {
-//	_, ok := loggerCache[loggerName]
-//	if !ok {
-//		logger := Logger{}
-//		logger.logger = logging.MustGetLogger(loggerName)
-//		loggerCache[loggerName] = &logger
-//	}
-//	return loggerCache[loggerName]
-//}
+func (logger *Logger) Copy() *Logger {
+	var loggerCopy Logger = *logger
+	var loggingLoggerCopy logging.Logger = *logger.logger
+	loggerCopy.logger = &loggingLoggerCopy
+	return &loggerCopy
+}
+
+func (logger *Logger) SetCallDepth(depth int) {
+	logger.logger.ExtraCalldepth = depth+1
+}
+
+func (logger *Logger) GetCallDepth() int {
+	return logger.logger.ExtraCalldepth-1
+}
 
 func ToggleLogging(logger *Logger, previousLevel Level) Level {
 	currentLevel := logging.GetLevel(logger.logger.Module)
