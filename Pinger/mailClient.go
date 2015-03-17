@@ -11,6 +11,7 @@ import (
 	"path"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -138,6 +139,7 @@ type MailClientContext struct {
 	stats      *Utils.StatLogger
 	di         *DeviceInfo
 	pi         *MailPingInformation
+	wg         sync.WaitGroup
 }
 
 func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStats bool, logger *logging.Logger) (*MailClientContext, error) {
@@ -256,7 +258,12 @@ func (client *MailClientContext) validateStopToken(token string) bool {
 
 func (client *MailClientContext) start() {
 	defer recoverCrash(client.logger)
-	defer client.cleanup()
+	defer func() {
+		client.Debug("Waiting for subroutines to finish")
+		client.wg.Wait()
+		client.Debug("Cleaning up")
+		client.cleanup()
+	}()
 
 	deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
 	client.Debug("Starting deferTimer for %s", deferTime)
@@ -281,6 +288,7 @@ func (client *MailClientContext) start() {
 			maxPollTimer.Reset(maxPollTime)
 			// launch the longpoll and wait for it to exit
 			longPollStopCh = make(chan int)
+			client.wg.Add(1)
 			go client.mailClient.LongPoll(longPollStopCh, client.exitCh)
 
 		case <-client.exitCh:

@@ -14,7 +14,7 @@ import (
 	"net/url"
 	"os"
 	"time"
-
+	"strings"
 	logging "github.com/nachocove/Pinger/Pinger/logging"
 )
 
@@ -82,6 +82,7 @@ func init() {
 }
 func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	defer recoverCrash(ex.logger)
+	defer ex.parent.wg.Done()
 	var err error
 	if ex == nil || ex.parent == nil || ex.parent.pi == nil {
 		if ex.logger != nil {
@@ -137,7 +138,9 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 		// if we cancel requests, we drop into this error case. We will wind up sending
 		// the retryResponse, but since no one is listening, we don't care (there's no
 		// memory leakage in this case
-		ex.Debug("httpClient.Do failed: %s", err.Error())
+		if strings.Contains(err.Error(), "use of closed network connection") == false {
+			ex.Warning("httpClient.Do failed: %s", err.Error())
+		}
 		ex.incoming <- retryResponse
 		return
 	}
@@ -159,13 +162,10 @@ func (ex *ExchangeClient) doRequestResponse(errCh chan error) {
 	n, err := response.Body.Read(responseBytes)
 	if err != nil {
 		if err != io.EOF {
-			errCh <- fmt.Errorf("Failed ro read response: %s", err.Error())
-			return
-		} else {
-			ex.Info("EOF on body read.")
-			ex.incoming <- retryResponse
-			return
+			ex.Error("Failed ro read response: %s", err.Error())
 		}
+		ex.incoming <- retryResponse
+		return
 	}
 	if n < toRead && n != len(ex.parent.pi.ExpectedReply) && n != len(ex.parent.pi.NoChangeReply) {
 		ex.Warning("Read less than expected: %d < %d", n, toRead)
@@ -204,6 +204,7 @@ func (ex *ExchangeClient) exponentialBackoff(sleepTime int) int {
 
 func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	defer recoverCrash(ex.logger)
+	defer ex.parent.wg.Done()
 	askedToStop := false
 	defer func(prefixStr string) {
 		if ex.request != nil {
@@ -258,6 +259,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 		}
 		errCh := make(chan error)
 		timeSent := time.Now()
+		ex.parent.wg.Add(1)
 		go ex.doRequestResponse(errCh)
 		ex.Debug("Waiting for response")
 		select {
@@ -305,7 +307,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				// go back to polling
 				ex.Debug("Reply matched NoChangeReply. Back to polling")
 				if time.Since(timeSent) <= tooFastResponse {
-					ex.Warning("Response was too fast. Doing backoff.")
+					ex.Error("Response was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
 					sleepTime = ex.exponentialBackoff(sleepTime)
 				} else {
 					sleepTime = 0 // good reply. Reset any exponential backoff stuff.
