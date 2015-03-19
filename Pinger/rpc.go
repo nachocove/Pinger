@@ -13,6 +13,11 @@ import (
 	"time"
 )
 
+const (
+	RPCProtocolHTTP = "http"
+	RPCProtocolUnix = "unix"
+)
+
 type RPCServerConfiguration struct {
 	Protocol string
 	Path     string
@@ -22,10 +27,10 @@ type RPCServerConfiguration struct {
 
 func (rpcConf *RPCServerConfiguration) ConnectString() string {
 	switch {
-	case rpcConf.Protocol == "http":
+	case rpcConf.Protocol == RPCProtocolHTTP:
 		return fmt.Sprintf("%s:%d", rpcConf.Hostname, rpcConf.Port)
 
-	case rpcConf.Protocol == "unix":
+	case rpcConf.Protocol == RPCProtocolUnix:
 		return fmt.Sprintf("%s", rpcConf.Path)
 	}
 	return ""
@@ -37,7 +42,7 @@ func (rpcConf *RPCServerConfiguration) String() string {
 
 func NewRPCServerConfiguration() RPCServerConfiguration {
 	return RPCServerConfiguration{
-		Protocol: "http",           // options: "unix", "http"
+		Protocol: RPCProtocolHTTP,  // options: "unix", "http"
 		Path:     "/tmp/PingerRpc", // used if Protocol is "unix"
 		Hostname: "localhost",      // used if Protocol is "http"
 		Port:     RPCPort,          // used if Protocol is "http"
@@ -344,14 +349,19 @@ func StartPollingRPCServer(config *Configuration, debug, debugSql bool, logger *
 	log.SetOutput(ioutil.Discard) // rpc.Register logs a warning for ToggleDebug, which we don't want.
 
 	rpc.Register(pollingAPI)
-	rpc.HandleHTTP()
 
 	go alertAllDevices()
 
 	logger.Info("Starting RPC server on %s (pinger id %s)", config.Rpc.String(), pingerHostId)
-	err = http.ListenAndServe(config.Rpc.ConnectString(), nil)
-	if err != nil {
-		return err
+	switch {
+	case config.Rpc.Protocol == RPCProtocolHTTP:
+		rpc.HandleHTTP()
+		err = http.ListenAndServe(config.Rpc.ConnectString(), nil)
+		if err != nil {
+			return err
+		}
+	case config.Rpc.Protocol == RPCProtocolUnix:
+		panic("UNIX server is not yet implemented")
 	}
 	return nil
 }
