@@ -11,8 +11,6 @@ import (
 	"runtime"
 )
 
-var debug bool
-
 var usage = func() {
 	fmt.Printf("USAGE: %s <flags> <connection string>\n", path.Base(os.Args[0]))
 	flag.PrintDefaults()
@@ -33,6 +31,7 @@ func main() {
 	var printMemPeriodic int
 	var printMem bool
 	var help bool
+	var debug bool
 	var verbose bool
 	var configFile string
 
