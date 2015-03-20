@@ -1,7 +1,6 @@
 package Telemetry
 
 import (
-	"math"
 	"time"
 )
 
@@ -47,7 +46,5 @@ func TelemetryTimefromTime(t time.Time) TelemetryMsgPackTime {
 func TimeFromTelemetryTime(t TelemetryMsgPackTime) time.Time {
 	// unixtime in msecs
 	nano := float64(t-TelemetryTimeUnixZeroTicks) / TicksPerNanosecond
-	secs := nano / float64(time.Second)
-	rem := math.Remainder(nano, float64(time.Second))
-	return time.Unix(int64(secs), int64(rem)).Round(time.Millisecond).UTC()
+	return time.Unix(0, int64(nano)).Round(time.Millisecond).UTC()
 }
