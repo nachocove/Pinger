@@ -229,4 +229,3 @@ func validateClientID(clientID string) error {
 	}
 	return DefaultPollingContext.config.Aws.validateCognitoID(clientID)
 }
-

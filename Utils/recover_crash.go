@@ -13,4 +13,3 @@ func RecoverCrash(logger *Logging.Logger) {
 		logger.Debug("Stack: %s", stack)
 	}
 }
-

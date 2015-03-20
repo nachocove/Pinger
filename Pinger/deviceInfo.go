@@ -682,4 +682,3 @@ func alertAllDevices() error {
 	}
 	return nil
 }
-
