@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/nachocove/Pinger/Pinger"
-	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils"
+	"github.com/nachocove/Pinger/Utils/Logging"
 )
 
 type TestClient struct {

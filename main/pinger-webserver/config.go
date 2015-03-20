@@ -13,8 +13,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/nachocove/Pinger/Pinger"
-	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils"
+	"github.com/nachocove/Pinger/Utils/Logging"
 )
 
 // TODO Need to combine the configs into one, since there's shared settings. Just

@@ -19,14 +19,14 @@ const (
 )
 
 type TelemetryMsg struct {
-	Id         string             
-	EventType  TelemetryEventType 
-	Timestamp  time.Time              
-	UploadedAt time.Time           
-	Module     string             
-	Message    string             
+	Id         string
+	EventType  TelemetryEventType
+	Timestamp  time.Time
+	UploadedAt time.Time
+	Module     string
+	Message    string
 }
- 
+
 func (msg *TelemetryMsg) PrepareForUpload() error {
 	msg.Id = "12345" // TODO who fills this in? DynamoDB? Or client?
 	msg.UploadedAt = time.Now().UTC()

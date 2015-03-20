@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils"
+	"github.com/nachocove/Pinger/Utils/Logging"
 )
 
 type PingerCommand int

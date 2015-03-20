@@ -119,11 +119,11 @@ func (logger *Logger) Copy() *Logger {
 }
 
 func (logger *Logger) SetCallDepth(depth int) {
-	logger.logger.ExtraCalldepth = depth+1
+	logger.logger.ExtraCalldepth = depth + 1
 }
 
 func (logger *Logger) GetCallDepth() int {
-	return logger.logger.ExtraCalldepth-1
+	return logger.logger.ExtraCalldepth - 1
 }
 
 func ToggleLogging(logger *Logger, previousLevel Level) Level {

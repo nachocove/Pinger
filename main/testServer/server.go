@@ -15,8 +15,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils"
+	"github.com/nachocove/Pinger/Utils/Logging"
 )
 
 var rng *rand.Rand

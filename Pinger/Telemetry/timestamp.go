@@ -16,7 +16,7 @@ const (
 
 	// How many ticks in a millisecond
 	TicksPerMillisecond uint64 = 10000
-	TicksPerNanosecond uint64 = 10
+	TicksPerNanosecond  uint64 = 10
 )
 
 var TelemetryZeroTime time.Time
@@ -38,7 +38,7 @@ func TelemetryTimeUtcNow() TelemetryMsgPackTime {
 }
 
 func TelemetryTimefromTime(t time.Time) TelemetryMsgPackTime {
-	msecs := uint64(t.UnixNano()/int64(time.Millisecond))
+	msecs := uint64(t.UnixNano() / int64(time.Millisecond))
 	ticks := TelemetryMsgPackTime(msecs * TicksPerMillisecond)
 	ttime := ticks + TelemetryTimeUnixZeroTicks
 	return ttime

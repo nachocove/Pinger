@@ -3,17 +3,17 @@ package Pinger
 import (
 	"code.google.com/p/gcfg"
 	"fmt"
-	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Pinger/Telemetry"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"os"
 	"path"
 )
 
 type Configuration struct {
-	Global GlobalConfiguration
-	Aws    AWSConfiguration
-	Db     DBConfiguration
-	Rpc    RPCServerConfiguration
+	Global    GlobalConfiguration
+	Aws       AWSConfiguration
+	Db        DBConfiguration
+	Rpc       RPCServerConfiguration
 	Telemetry Telemetry.TelemetryConfiguration
 }
 
@@ -52,10 +52,10 @@ const (
 
 func NewConfiguration() *Configuration {
 	config := &Configuration{
-		Global: *NewGlobalConfiguration(),
-		Aws:    AWSConfiguration{},
-		Db:     DBConfiguration{},
-		Rpc:    NewRPCServerConfiguration(),
+		Global:    *NewGlobalConfiguration(),
+		Aws:       AWSConfiguration{},
+		Db:        DBConfiguration{},
+		Rpc:       NewRPCServerConfiguration(),
 		Telemetry: Telemetry.TelemetryConfiguration{},
 	}
 	return config
