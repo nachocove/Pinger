@@ -80,3 +80,28 @@ func deferPoll(rpcClient *rpc.Client, clientId, clientContext, deviceId string, 
 	}
 	return &reply, nil
 }
+
+func FindActiveSessions(rpcserver, clientId, clientContext, deviceId string) (*FindSessionsResponse, error) {
+	client, err := getRpcClient(rpcserver)
+	if err != nil {
+		return nil, err
+	}
+	return findActiveSessions(client, clientId, clientContext, deviceId)
+}
+
+func findActiveSessions(rpcClient *rpc.Client, clientId, clientContext, deviceId string) (*FindSessionsResponse, error) {
+	if rpcClient == nil {
+		panic("Can not call deferPoll without rpcClient set")
+	}
+	var reply FindSessionsResponse
+	args := FindSessionsArgs{
+		ClientId:      clientId,
+		ClientContext: clientContext,
+		DeviceId:      deviceId,
+	}
+	err := rpcClient.Call("BackendPolling.FindActiveSessions", &args, &reply)
+	if err != nil {
+		return nil, err
+	}
+	return &reply, nil
+}

@@ -229,3 +229,91 @@ func validateClientID(clientID string) error {
 	}
 	return DefaultPollingContext.config.Aws.validateCognitoID(clientID)
 }
+
+type FindSessionsArgs struct {
+	ClientId string
+	ClientContext string
+	DeviceId string
+
+	logPrefix string
+}
+
+type SessionInfo struct {
+	ClientId      string
+	ClientContext string
+	DeviceId      string
+	Status        MailClientStatus
+	Url           string
+	Error         string
+}
+
+type FindSessionsResponse struct {
+	Code        int
+	Message     string
+	SessionInfos []SessionInfo
+}
+
+func (fs *FindSessionsArgs) getLogPrefix() string {
+	if fs.logPrefix == "" {
+		fs.logPrefix = fmt.Sprintf("%s:%s:%s", fs.DeviceId, fs.ClientId, fs.ClientContext)
+	}
+	return fs.logPrefix
+}
+
+func (t *BackendPolling) appendSessionInfo(sessionInfos []SessionInfo, mcc *MailClientContext) []SessionInfo {
+	status, err := mcc.Status()
+	info := SessionInfo{
+		ClientId: mcc.pi.ClientId,
+		ClientContext: mcc.pi.ClientContext,
+		DeviceId: mcc.pi.DeviceId,
+		Status: status,
+		Url: mcc.pi.MailServerUrl,
+		}
+	if err != nil {
+		info.Error = err.Error()
+	}
+	return append(sessionInfos, info)
+}
+
+func (t *BackendPolling) FindActiveSessions(args *FindSessionsArgs, reply *FindSessionsResponse) error {
+	defer Utils.RecoverCrash(t.logger)
+	t.logger.Debug("Received findActiveSessions request with options %s", args.getLogPrefix())
+	for key, poll := range t.pollMap {
+		switch {
+		case poll.pi == nil:
+			t.logger.Debug("%s: entry has no pi.", key)
+			continue
+			
+		case poll.mailClient == nil:
+			t.logger.Debug("%s: Entry has no active client", key)
+			continue
+			
+		case poll.pi.ClientId == "" || poll.pi.ClientContext == "" || poll.pi.DeviceId == "":
+			t.logger.Debug("%s: entry has been cleaned up.", key)
+			continue
+			
+		case args.ClientId == "" && args.ClientContext == "" && args.DeviceId == "":
+			reply.SessionInfos = t.appendSessionInfo(reply.SessionInfos, poll)
+			continue
+		
+		case args.ClientId != "" && poll.pi.ClientId == args.ClientId:
+			reply.SessionInfos = t.appendSessionInfo(reply.SessionInfos, poll)
+			continue
+
+		case args.ClientContext != "" && poll.pi.ClientContext == args.ClientContext:
+			reply.SessionInfos = t.appendSessionInfo(reply.SessionInfos, poll)
+			continue
+
+		case args.DeviceId != "" && poll.pi.DeviceId == args.DeviceId:
+			reply.SessionInfos = t.appendSessionInfo(reply.SessionInfos, poll)
+			continue
+			
+		default:
+			t.logger.Debug("%s: Unknown case!", key)
+			continue
+		}
+	}
+	reply.Code = PollingReplyOK
+	reply.Message = ""
+	return nil	
+}
