@@ -234,6 +234,7 @@ type FindSessionsArgs struct {
 	ClientId string
 	ClientContext string
 	DeviceId string
+	MaxSessions int
 
 	logPrefix string
 }
@@ -279,6 +280,10 @@ func (t *BackendPolling) FindActiveSessions(args *FindSessionsArgs, reply *FindS
 	defer Utils.RecoverCrash(t.logger)
 	t.logger.Debug("Received findActiveSessions request with options %s", args.getLogPrefix())
 	for key, poll := range t.pollMap {
+		if args.MaxSessions > 0 && len(reply.SessionInfos) >= args.MaxSessions {
+			t.logger.Debug("Max sessions read (%d). Stopping search.", len(reply.SessionInfos))
+			break
+		} 
 		switch {
 		case poll.pi == nil:
 			t.logger.Debug("%s: entry has no pi.", key)

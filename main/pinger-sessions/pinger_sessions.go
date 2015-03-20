@@ -23,16 +23,18 @@ func main() {
 	var clientContext string
 	var deviceId string
 	var singleLine bool
+	var maxSessions int
 
 	flag.BoolVar(&debug, "d", false, "Debugging")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
 	flag.BoolVar(&help, "h", false, "Help")
-	flag.StringVar(&configFile, "c", "", "The configuration file. Required.")
+	flag.StringVar(&configFile, "c", "", "The configuration file (overrides the PINGER_CONFIG env-variable).")
 
 	flag.StringVar(&clientId, "client", "", "The Client ID to search for.")
 	flag.StringVar(&clientContext, "context", "", "The Client Context to search for.")
 	flag.StringVar(&deviceId, "device", "", "The Device ID to search for.")
 	flag.BoolVar(&singleLine, "s", false, "Write results on a single line for easier grepping. Field delimiter is ';'")
+	flag.IntVar(&maxSessions, "n", 100, "Max number of sessions to pull back. Default: 100. Use 0 for 'all'")
 
 	flag.Parse()
 	if help {
@@ -62,9 +64,9 @@ func main() {
 	
 	if debug {
 		fmt.Fprintf(os.Stdout, "Contacting RPC server at %s\n", rpcConnectString)
-		fmt.Fprintf(os.Stdout, "Arguments: ClientId:%s, ClientContext:%s, DeviceId:%s\n", clientId, clientContext, deviceId)
+		fmt.Fprintf(os.Stdout, "Arguments: ClientId:%s, ClientContext:%s, DeviceId:%s, maxSessions:%d\n", clientId, clientContext, deviceId, maxSessions)
 	}
-	reply, err := Pinger.FindActiveSessions(rpcConnectString, clientId, clientContext, deviceId)
+	reply, err := Pinger.FindActiveSessions(rpcConnectString, clientId, clientContext, deviceId, maxSessions)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not call FindActiveSessions: %s\n", err)
 		os.Exit(1)
