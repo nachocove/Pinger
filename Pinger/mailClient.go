@@ -257,7 +257,7 @@ func (client *MailClientContext) cleanup() {
 		client.mailClient = nil
 	}
 	client.stopToken = ""
-	client.status = MailClientStatusError
+	client.status = MailClientStatusStopped
 
 	// tell Garbage collection to run. Might not free/remove all instances we free'd above,
 	// but it's worth the effort.
@@ -324,7 +324,7 @@ func (client *MailClientContext) start() {
 
 		case err := <-client.errCh:
 			// the mailClient.LongPoll has thrown an error. note it.
-			client.status = MailClientStatusStopped
+			client.status = MailClientStatusError
 			client.Debug("Error thrown. Stopping.")
 			client.lastError = err
 
