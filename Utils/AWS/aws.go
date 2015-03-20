@@ -1,4 +1,4 @@
-package Pinger
+package AWS
 
 import (
 	"encoding/base64"
@@ -9,6 +9,10 @@ import (
 	cognitoidentity "github.com/awslabs/aws-sdk-go/gen/cognito/identity"
 	"github.com/awslabs/aws-sdk-go/gen/sns"
 	"strings"
+)
+
+const (
+	PushServiceAPNS = "APNS"
 )
 
 type AWSConfiguration struct {
@@ -44,7 +48,7 @@ func (config *AWSConfiguration) getSNSSession() (*sns.SNS, error) {
 	return snsSession, nil
 }
 
-func (config *AWSConfiguration) registerEndpointArn(service, token, customerData string) (string, error) {
+func (config *AWSConfiguration) RegisterEndpointArn(service, token, customerData string) (string, error) {
 	var platformArn string
 	if strings.EqualFold(service, PushServiceAPNS) {
 		platformArn = config.SnsIOSPlatformArn
@@ -68,7 +72,7 @@ func (config *AWSConfiguration) registerEndpointArn(service, token, customerData
 	return *response.EndpointARN, nil
 }
 
-func (config *AWSConfiguration) getEndpointAttributes(endpointArn string) (map[string]string, error) {
+func (config *AWSConfiguration) GetEndpointAttributes(endpointArn string) (map[string]string, error) {
 	options := sns.GetEndpointAttributesInput{
 		EndpointARN: aws.StringValue(&endpointArn),
 	}
@@ -83,7 +87,7 @@ func (config *AWSConfiguration) getEndpointAttributes(endpointArn string) (map[s
 	return response.Attributes, nil
 }
 
-func (config *AWSConfiguration) setEndpointAttributes(endpointArn string, attributes map[string]string) error {
+func (config *AWSConfiguration) SetEndpointAttributes(endpointArn string, attributes map[string]string) error {
 	options := sns.SetEndpointAttributesInput{
 		EndpointARN: aws.StringValue(&endpointArn),
 		Attributes:  attributes,
@@ -114,7 +118,7 @@ func (config *AWSConfiguration) deleteEndpointArn(endpointArn string) error {
 	return nil
 }
 
-func (config *AWSConfiguration) validateEndpointArn(endpointArn string) (map[string]string, error) {
+func (config *AWSConfiguration) ValidateEndpointArn(endpointArn string) (map[string]string, error) {
 	snsSession, err := config.getSNSSession()
 	if err != nil {
 		return nil, err
@@ -127,7 +131,7 @@ func (config *AWSConfiguration) validateEndpointArn(endpointArn string) (map[str
 	return response.Attributes, nil
 }
 
-func (config *AWSConfiguration) sendPushNotification(endpointArn, message string) error {
+func (config *AWSConfiguration) SendPushNotification(endpointArn, message string) error {
 	snsSession, err := config.getSNSSession()
 	if err != nil {
 		return err
@@ -156,7 +160,7 @@ func (config *AWSConfiguration) getCognitoIdentitySession() (*cognitoidentity.Co
 	return cognitoSession, nil
 }
 
-func (config *AWSConfiguration) validateCognitoID(clientId string) error {
+func (config *AWSConfiguration) ValidateCognitoID(clientId string) error {
 	cognitoSession, err := config.getCognitoIdentitySession()
 	if err != nil {
 		return err
@@ -172,7 +176,7 @@ func (config *AWSConfiguration) validateCognitoID(clientId string) error {
 	return nil
 }
 
-func decodeAPNSPushToken(token string) (string, error) {
+func DecodeAPNSPushToken(token string) (string, error) {
 	if len(token) == 64 {
 		// see if the string decodes, in which case it's probably already passed to us in hex
 		_, err := hex.DecodeString(token)

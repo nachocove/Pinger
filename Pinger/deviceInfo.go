@@ -15,10 +15,7 @@ import (
 
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/Logging"
-)
-
-const (
-	PushServiceAPNS = "APNS"
+	"github.com/nachocove/Pinger/Utils/AWS"
 )
 
 type DeviceInfo struct {
@@ -513,7 +510,7 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 		return err
 	}
 	di.Debug("Sending push message to AWS: %s", pushMessage)
-	err = DefaultPollingContext.config.Aws.sendPushNotification(di.AWSEndpointArn, pushMessage)
+	err = DefaultPollingContext.config.Aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
 	if err == nil {
 		di.LastContactRequest = time.Now().UnixNano()
 		_, err = di.update()
@@ -528,8 +525,8 @@ func (di *DeviceInfo) registerAws() error {
 	var pushToken string
 	var err error
 	switch {
-	case di.PushService == PushServiceAPNS:
-		pushToken, err = decodeAPNSPushToken(di.PushToken)
+	case di.PushService == AWS.PushServiceAPNS:
+		pushToken, err = AWS.DecodeAPNSPushToken(di.PushToken)
 		if err != nil {
 			return err
 		}
@@ -541,7 +538,7 @@ func (di *DeviceInfo) registerAws() error {
 		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
 	}
 
-	arn, registerErr := DefaultPollingContext.config.Aws.registerEndpointArn(di.PushService, pushToken, di.ClientId)
+	arn, registerErr := DefaultPollingContext.config.Aws.RegisterEndpointArn(di.PushService, pushToken, di.ClientId)
 	if registerErr != nil {
 		re, err := regexp.Compile("^.*Endpoint (?P<arn>arn:aws:sns:[^ ]+) already exists.*$")
 		if err != nil {
@@ -550,12 +547,12 @@ func (di *DeviceInfo) registerAws() error {
 		if re.MatchString(registerErr.Error()) == true {
 			arn := re.ReplaceAllString(registerErr.Error(), fmt.Sprintf("${%s}", re.SubexpNames()[1]))
 			di.Warning("Previously registered as %s. Updating.", arn)
-			attributes, err := DefaultPollingContext.config.Aws.getEndpointAttributes(arn)
+			attributes, err := DefaultPollingContext.config.Aws.GetEndpointAttributes(arn)
 			if err != nil {
 				return err
 			}
 			attributes["CustomUserData"] = di.ClientId
-			err = DefaultPollingContext.config.Aws.setEndpointAttributes(arn, attributes)
+			err = DefaultPollingContext.config.Aws.SetEndpointAttributes(arn, attributes)
 			if err != nil {
 				return err
 			}
@@ -576,7 +573,7 @@ func (di *DeviceInfo) validateAws() error {
 	if di.AWSEndpointArn == "" {
 		panic("Can't call validate before register")
 	}
-	attributes, err := DefaultPollingContext.config.Aws.validateEndpointArn(di.AWSEndpointArn)
+	attributes, err := DefaultPollingContext.config.Aws.ValidateEndpointArn(di.AWSEndpointArn)
 	if err != nil {
 		return err
 	}
@@ -598,8 +595,8 @@ func (di *DeviceInfo) validateAws() error {
 
 	var pushToken string
 	switch {
-	case di.PushService == PushServiceAPNS:
-		pushToken, err = decodeAPNSPushToken(di.PushToken)
+	case di.PushService == AWS.PushServiceAPNS:
+		pushToken, err = AWS.DecodeAPNSPushToken(di.PushToken)
 		if err != nil {
 			return err
 		}
@@ -614,7 +611,7 @@ func (di *DeviceInfo) validateAws() error {
 	if pushToken != attributes["Token"] {
 		// need to update the token with aws
 		attributes["Token"] = pushToken
-		err := DefaultPollingContext.config.Aws.setEndpointAttributes(di.AWSEndpointArn, attributes)
+		err := DefaultPollingContext.config.Aws.SetEndpointAttributes(di.AWSEndpointArn, attributes)
 		if err != nil {
 			return err
 		}

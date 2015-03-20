@@ -227,7 +227,7 @@ func validateClientID(clientID string) error {
 	if clientID == "" {
 		return fmt.Errorf("Empty client ID is not valid")
 	}
-	return DefaultPollingContext.config.Aws.validateCognitoID(clientID)
+	return DefaultPollingContext.config.Aws.ValidateCognitoID(clientID)
 }
 
 type FindSessionsArgs struct {

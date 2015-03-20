@@ -1,4 +1,4 @@
-package Pinger
+package AWS
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -11,17 +11,17 @@ func TestAPNSToken(t *testing.T) {
 	pushb64 := "pOsktxj+u6C/w7Tew4bIEiafcB4ZkBnDdbG4y/yLLoA="
 	pushraw := "BEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
 
-	token, err := decodeAPNSPushToken(pushb64)
+	token, err := DecodeAPNSPushToken(pushb64)
 	assert.NotEmpty(token)
 	assert.NoError(err)
 	assert.Equal(64, len(token))
 
-	token, err = decodeAPNSPushToken(pushraw)
+	token, err = DecodeAPNSPushToken(pushraw)
 	assert.NotEmpty(token)
 	assert.Equal(token, pushraw)
 	assert.NoError(err)
 
-	token, err = decodeAPNSPushToken("!@#$%")
+	token, err = DecodeAPNSPushToken("!@#$%")
 	assert.Empty(token)
 	assert.Error(err)
 

@@ -3,6 +3,7 @@ package Pinger
 import (
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/Logging"
+	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
@@ -267,7 +268,7 @@ func TestDeviceInfoDelete(t *testing.T) {
 
 func TestDevicePushMessageCreate(t *testing.T) {
 	assert := assert.New(t)
-	di := DeviceInfo{Platform: "ios", PushService: PushServiceAPNS, ClientContext: "FOO"}
+	di := DeviceInfo{Platform: "ios", PushService: AWS.PushServiceAPNS, ClientContext: "FOO"}
 	var days_28 int64 = 2419200
 
 	message, err := di.pushMessage(PingerNotificationRegister, days_28)

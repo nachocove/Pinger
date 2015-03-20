@@ -18,5 +18,5 @@ func TestNewExchangeClient(t *testing.T) {
 	assert.NotNil(ex.parent)
 	assert.Equal(parent, ex.parent)
 	assert.Equal(debug, ex.debug)
-	assert.Equal(logger, ex.logger)
+	assert.NotEqual(logger, ex.logger)
 }
