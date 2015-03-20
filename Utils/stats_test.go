@@ -1,14 +1,14 @@
 package Utils
 
 import (
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestStats(t *testing.T) {
 	assert := assert.New(t)
-	logger := logging.InitLogging("unittest", "", logging.DEBUG, true, logging.DEBUG, true)
+	logger := Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, true)
 	assert.NotNil(logger)
 	stopCh := make(chan int)
 	statLogger := NewStatLogger(stopCh, logger, false)

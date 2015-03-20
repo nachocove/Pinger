@@ -15,7 +15,7 @@ import (
 	"path"
 	"time"
 
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/nachocove/Pinger/Utils"
 )
 
@@ -163,7 +163,7 @@ func memStatsExtraInfo(stats *Utils.MemStats) string {
 	return fmt.Sprintf("number of connections: %d", activeConnections)
 }
 
-var logger *logging.Logger
+var logger *Logging.Logger
 
 func main() {
 	var port int
@@ -207,23 +207,23 @@ func main() {
 		os.Exit(1)
 	}
 	var screenLogging = false
-	var screenLevel = logging.ERROR
+	var screenLevel = Logging.ERROR
 	if debug || verbose {
 		screenLogging = true
 		switch {
 		case debug:
-			screenLevel = logging.DEBUG
+			screenLevel = Logging.DEBUG
 
 		case verbose:
-			screenLevel = logging.INFO
+			screenLevel = Logging.INFO
 		}
 	}
-	fileLevel, err := logging.LogLevel(logFileLevel)
+	fileLevel, err := Logging.LogLevel(logFileLevel)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "LevelNameToLevel: %v\n", err)
 		os.Exit(1)
 	}
-	logger = logging.InitLogging("TestServer", logFileName, fileLevel, screenLogging, screenLevel, debug)
+	logger = Logging.InitLogging("TestServer", logFileName, fileLevel, screenLogging, screenLevel, debug)
 
 	var TLSconfig *tls.Config
 

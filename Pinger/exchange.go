@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"io"
 	"io/ioutil"
 	"math"
@@ -24,7 +24,7 @@ type ExchangeClient struct {
 	transport  *http.Transport
 	request    *http.Request
 	debug      bool
-	logger     *logging.Logger
+	logger     *Logging.Logger
 	parent     *MailClientContext
 	httpClient *http.Client
 	cancelled  bool
@@ -32,7 +32,7 @@ type ExchangeClient struct {
 }
 
 // NewExchangeClient set up a new exchange client
-func NewExchangeClient(parent *MailClientContext, debug bool, logger *logging.Logger) (*ExchangeClient, error) {
+func NewExchangeClient(parent *MailClientContext, debug bool, logger *Logging.Logger) (*ExchangeClient, error) {
 	ex := &ExchangeClient{
 		parent:    parent,
 		debug:     debug,

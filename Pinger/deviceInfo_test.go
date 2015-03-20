@@ -2,14 +2,14 @@ package Pinger
 
 import (
 	"github.com/coopernurse/gorp"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 )
 
 var dbmap *gorp.DbMap
-var logger *logging.Logger
+var logger *Logging.Logger
 var testClientID = "clientID"
 var testClientContext = "clientContext"
 var testDeviceId = "NCHOXfherekgrgr"
@@ -22,7 +22,7 @@ var testAppnumber = "(dev) Foo"
 
 func TestMain(m *testing.M) {
 	var err error
-	logger = logging.InitLogging("unittest", "", logging.DEBUG, true, logging.DEBUG, true)
+	logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, true)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
 	dbmap, err = initDB(&dbconfig, true, true, logger)
 	if err != nil {

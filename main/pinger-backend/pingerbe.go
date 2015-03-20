@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/nachocove/Pinger/Utils"
 	"os"
 	"path"
@@ -27,7 +27,7 @@ func memStatsExtraInfo(stats *Utils.MemStats) string {
 	return fmt.Sprintf("number of connections: %d", Utils.ActiveClientCount)
 }
 
-var logger *logging.Logger
+var logger *Logging.Logger
 
 func main() {
 	var printMemPeriodic int
@@ -60,14 +60,14 @@ func main() {
 		os.Exit(1)
 	}
 	var screenLogging = false
-	var screenLevel = logging.ERROR
+	var screenLevel = Logging.ERROR
 	debug = debug || config.Global.Debug
 	if debug || verbose {
 		screenLogging = true
 		if debug {
-			screenLevel = logging.DEBUG
+			screenLevel = Logging.DEBUG
 		} else {
-			screenLevel = logging.INFO
+			screenLevel = Logging.INFO
 		}
 	}
 	logger, err = config.Global.InitLogging(screenLogging, screenLevel, debug)

@@ -2,14 +2,14 @@ package Pinger
 
 import (
 	"fmt"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestRpcStart(t *testing.T) {
 	assert := assert.New(t)
-	logger := logging.InitLogging("unittest", "", logging.DEBUG, true, logging.DEBUG, true)
+	logger := Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, true)
 
 	config := NewConfiguration()
 	config.Db.Type = "sqlite"

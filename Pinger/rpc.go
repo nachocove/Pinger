@@ -3,7 +3,7 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/nachocove/Pinger/Utils"
 	"io/ioutil"
 	"log"
@@ -54,8 +54,8 @@ type pollMapType map[string]*MailClientContext
 type BackendPolling struct {
 	dbm         *gorp.DbMap
 	config      *Configuration
-	logger      *logging.Logger
-	loggerLevel logging.Level
+	logger      *Logging.Logger
+	loggerLevel Logging.Level
 	debug       bool
 	pollMap     pollMapType
 }
@@ -122,7 +122,7 @@ const (
 
 func (t *BackendPolling) ToggleDebug() {
 	t.debug = !t.debug
-	t.loggerLevel = logging.ToggleLogging(t.logger, t.loggerLevel)
+	t.loggerLevel = Logging.ToggleLogging(t.logger, t.loggerLevel)
 }
 
 func validateClientID(clientID string) error {
@@ -297,7 +297,7 @@ func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingRespons
 	return nil
 }
 
-func recoverCrash(logger *logging.Logger) {
+func recoverCrash(logger *Logging.Logger) {
 	if err := recover(); err != nil {
 		logger.Error("Error: %s", err)
 		stack := make([]byte, 8*1024)
@@ -323,7 +323,7 @@ func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) erro
 
 var DefaultPollingContext *BackendPolling
 
-func NewBackendPolling(config *Configuration, debug, debugSql bool, logger *logging.Logger) (*BackendPolling, error) {
+func NewBackendPolling(config *Configuration, debug, debugSql bool, logger *Logging.Logger) (*BackendPolling, error) {
 	dbm, err := initDB(&config.Db, true, debugSql, logger)
 	if err != nil {
 		return nil, err
@@ -341,7 +341,7 @@ func NewBackendPolling(config *Configuration, debug, debugSql bool, logger *logg
 	return DefaultPollingContext, nil
 }
 
-func StartPollingRPCServer(config *Configuration, debug, debugSql bool, logger *logging.Logger) error {
+func StartPollingRPCServer(config *Configuration, debug, debugSql bool, logger *Logging.Logger) error {
 	pollingAPI, err := NewBackendPolling(config, debug, debugSql, logger)
 	if err != nil {
 		return err

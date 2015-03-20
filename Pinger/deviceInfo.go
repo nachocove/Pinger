@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/coopernurse/gorp"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 )
 
 const (
@@ -41,7 +41,7 @@ type DeviceInfo struct {
 	Pinger             string `db:"pinger"`
 
 	dbm       *gorp.DbMap     `db:"-"`
-	logger    *logging.Logger `db:"-"`
+	logger    *Logging.Logger `db:"-"`
 	logPrefix string          `db:"-"`
 }
 
@@ -128,7 +128,7 @@ func newDeviceInfo(
 	pushToken, pushService,
 	platform, osVersion,
 	appBuildVersion, appBuildNumber string,
-	logger *logging.Logger) (*DeviceInfo, error) {
+	logger *Logging.Logger) (*DeviceInfo, error) {
 	di := &DeviceInfo{
 		ClientId:        clientID,
 		ClientContext:   clientContext,
@@ -149,7 +149,7 @@ func newDeviceInfo(
 	return di, nil
 }
 
-func (di *DeviceInfo) SetLogger(logger *logging.Logger) {
+func (di *DeviceInfo) SetLogger(logger *Logging.Logger) {
 	di.logger = logger.Copy()
 	di.logger.SetCallDepth(1)
 }
@@ -234,7 +234,7 @@ func init() {
 	}
 }
 
-func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *logging.Logger) (*DeviceInfo, error) {
+func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *Logging.Logger) (*DeviceInfo, error) {
 	var devices []DeviceInfo
 	var err error
 	_, err = dbm.Select(&devices,
@@ -268,7 +268,7 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, lo
 	}
 }
 
-func getAllMyDeviceInfo(dbm *gorp.DbMap, logger *logging.Logger) ([]DeviceInfo, error) {
+func getAllMyDeviceInfo(dbm *gorp.DbMap, logger *Logging.Logger) ([]DeviceInfo, error) {
 	var devices []DeviceInfo
 	var err error
 	_, err = dbm.Select(
@@ -304,7 +304,7 @@ func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
 	return di.validate()
 }
 
-func updateLastContact(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *logging.Logger) error {
+func updateLastContact(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *Logging.Logger) error {
 	di, err := getDeviceInfo(dbm, clientId, clientContext, deviceId, logger)
 	if err != nil {
 		return err
@@ -317,7 +317,7 @@ func updateLastContact(dbm *gorp.DbMap, clientId, clientContext, deviceId string
 	return nil
 }
 
-func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *logging.Logger) (*DeviceInfo, error) {
+func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *Logging.Logger) (*DeviceInfo, error) {
 	var err error
 	di, err := getDeviceInfo(dbm, pi.ClientId, pi.ClientContext, pi.DeviceId, logger)
 	if err != nil {

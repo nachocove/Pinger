@@ -2,8 +2,7 @@ package Utils
 
 import (
 	"time"
-
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 )
 
 type StatLogger struct {
@@ -11,10 +10,10 @@ type StatLogger struct {
 	FirstTimeResponseTimeCh chan float64
 	OverageSleepTimeCh      chan float64
 	stopCh                  chan int
-	tallyLogger             *logging.Logger
+	tallyLogger             *Logging.Logger
 }
 
-func NewStatLogger(stopCh chan int, logger *logging.Logger, startTally bool) *StatLogger {
+func NewStatLogger(stopCh chan int, logger *Logging.Logger, startTally bool) *StatLogger {
 	stat := &StatLogger{
 		ResponseTimeCh:          make(chan float64, 1000),
 		FirstTimeResponseTimeCh: make(chan float64, 1000),
@@ -106,6 +105,6 @@ func (r *statStruct) Avg() float64 {
 	return r.avg
 }
 
-func (r *statStruct) log(logger *logging.Logger, prefix string) {
+func (r *statStruct) log(logger *Logging.Logger, prefix string) {
 	logger.Info("%s(min/avg/max): %8.2fms / %8.2fms / %8.2fms (connections: %7d,  messages: %7d)\n", prefix, r.min*1000.00, r.Avg()*1000.00, r.max*1000.00, ActiveClientCount, r.count)
 }

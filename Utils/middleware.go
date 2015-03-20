@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/codegangsta/negroni"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"time"
 )
 
@@ -60,11 +60,11 @@ func NewRedirectMiddleware(host string, port int) *RedirectMiddleWare {
 
 // Logger is a middleware handler that logs the request as it goes in and the response as it goes out.
 type Logger struct {
-	*logging.Logger
+	*Logging.Logger
 }
 
 // NewLogger returns a new Logger Middleware instance
-func NewLogger(logger *logging.Logger) *Logger {
+func NewLogger(logger *Logging.Logger) *Logger {
 	return &Logger{logger}
 }
 

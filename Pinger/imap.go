@@ -6,14 +6,14 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"net/url"
 	"time"
 )
 
 type IMAPClient struct {
 	debug     bool
-	logger    *logging.Logger
+	logger    *Logging.Logger
 	parent    *MailClientContext
 	url       *url.URL
 	tlsConfig *tls.Config
@@ -28,7 +28,7 @@ func (imap *IMAPClient) getLogPrefix() (prefix string) {
 	return
 }
 
-func NewIMAPClient(parent *MailClientContext, debug bool, logger *logging.Logger) (*IMAPClient, error) {
+func NewIMAPClient(parent *MailClientContext, debug bool, logger *Logging.Logger) (*IMAPClient, error) {
 	imap := IMAPClient{
 		debug:  debug,
 		logger: logger,

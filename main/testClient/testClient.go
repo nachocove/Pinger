@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"flag"
 	"fmt"
+	"github.com/nachocove/Pinger/Pinger/Logging"
+	"github.com/nachocove/Pinger/Utils"
 	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
@@ -14,9 +16,6 @@ import (
 	"runtime/pprof"
 	"sync"
 	"time"
-
-	logging "github.com/nachocove/Pinger/Pinger/logging"
-	"github.com/nachocove/Pinger/Utils"
 )
 
 var debug bool
@@ -35,7 +34,7 @@ func memStatsExtraInfo(stats *Utils.MemStats) string {
 	return fmt.Sprintf("number of connections: %d", Utils.ActiveClientCount)
 }
 
-var logger *logging.Logger
+var logger *Logging.Logger
 
 func main() {
 	var printMemPeriodic int
@@ -104,21 +103,21 @@ func main() {
 		logFileName = "/dev/null"
 	}
 	var screenLogging = false
-	var screenLevel = logging.ERROR
+	var screenLevel = Logging.ERROR
 	if debug || verbose {
 		screenLogging = true
 		if debug {
-			screenLevel = logging.DEBUG
+			screenLevel = Logging.DEBUG
 		} else {
-			screenLevel = logging.INFO
+			screenLevel = Logging.INFO
 		}
 	}
-	fileLevel, err := logging.LogLevel(logFileLevel)
+	fileLevel, err := Logging.LogLevel(logFileLevel)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "LevelNameToLevel: %v\n", err)
 		os.Exit(1)
 	}
-	logger = logging.InitLogging("testClient", logFileName, fileLevel, screenLogging, screenLevel, debug)
+	logger = Logging.InitLogging("testClient", logFileName, fileLevel, screenLogging, screenLevel, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "InitLogging: %v\n", err)
 		os.Exit(1)

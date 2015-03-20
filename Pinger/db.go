@@ -12,7 +12,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/coopernurse/gorp"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 )
 
 type DBConfiguration struct {
@@ -46,14 +46,14 @@ func (dbconfig *DBConfiguration) Validate() error {
 }
 
 type DBLogger struct {
-	logger *logging.Logger
+	logger *Logging.Logger
 }
 
 func (dbl DBLogger) Printf(format string, v ...interface{}) {
 	dbl.logger.Debug(format, v...)
 }
 
-func initDB(dbconfig *DBConfiguration, init, debug bool, logger *logging.Logger) (*gorp.DbMap, error) {
+func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger) (*gorp.DbMap, error) {
 	var dbmap *gorp.DbMap
 	err := dbconfig.Validate()
 	if err != nil {

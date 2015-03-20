@@ -4,7 +4,7 @@ import (
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
 	"github.com/nachocove/Pinger/Pinger"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-var logger *logging.Logger
+var logger *Logging.Logger
 var mx *mux.Router
 var n *negroni.Negroni
 var registerPath string = "/register"
@@ -25,7 +25,7 @@ var registerJson string = "{\"ClientContext\": \"12345\", \"DeviceId\": \"NchoDC
 var rpcTestPort = 40800
 
 func TestMain(m *testing.M) {
-	logger = logging.InitLogging("unittest", "", logging.DEBUG, true, logging.DEBUG, true)
+	logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, true)
 
 	rpcConfig := Pinger.RPCServerConfiguration{
 		Protocol: "http",

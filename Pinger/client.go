@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/nachocove/Pinger/Utils"
 )
 
@@ -40,11 +40,11 @@ type Client struct {
 	reopenOnClose bool
 	tlsConfig     *tls.Config
 	tcpKeepAlive  int
-	logger        *logging.Logger
+	logger        *Logging.Logger
 }
 
 // NewClient Set up a new client
-func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, tcpKeepAlive int, debug bool, logger *logging.Logger) *Client {
+func NewClient(dialString string, reopenOnClose bool, tlsConfig *tls.Config, tcpKeepAlive int, debug bool, logger *Logging.Logger) *Client {
 	client := &Client{
 		Connection: nil,
 		Incoming:   make(chan []byte, 2),

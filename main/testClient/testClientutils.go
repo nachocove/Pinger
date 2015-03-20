@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/nachocove/Pinger/Pinger"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/nachocove/Pinger/Utils"
 )
 
@@ -18,7 +18,7 @@ type TestClient struct {
 	stopCh          chan int
 	pingPeriodicity int
 	debug           bool
-	logger          *logging.Logger
+	logger          *Logging.Logger
 	stats           *Utils.StatLogger
 }
 
@@ -117,7 +117,7 @@ func (tc *TestClient) Action(action Pinger.PingerCommand) error {
 }
 
 // NewTestClient set up a new TestClient
-func NewTestClient(dialString string, pingPeriodic int, reopenConnection, debug bool, tcpKeepAlive int, tlsConfig *tls.Config, logger *logging.Logger) *TestClient {
+func NewTestClient(dialString string, pingPeriodic int, reopenConnection, debug bool, tcpKeepAlive int, tlsConfig *tls.Config, logger *Logging.Logger) *TestClient {
 	client := Pinger.NewClient(dialString, reopenConnection, tlsConfig, tcpKeepAlive, debug, logger)
 	if client == nil {
 		logger.Error("Could not get Client")

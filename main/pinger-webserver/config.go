@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/nachocove/Pinger/Pinger"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/nachocove/Pinger/Utils"
 )
 
@@ -84,14 +84,14 @@ func usage() {
 
 type Context struct {
 	Config       *Configuration
-	Logger       *logging.Logger
-	loggerLevel  logging.Level
+	Logger       *Logging.Logger
+	loggerLevel  Logging.Level
 	SessionStore *sessions.CookieStore
 }
 
 func NewContext(
 	config *Configuration,
-	logger *logging.Logger,
+	logger *Logging.Logger,
 	rpcConnectString string,
 	sessionStore *sessions.CookieStore) *Context {
 	return &Context{
@@ -103,7 +103,7 @@ func NewContext(
 }
 
 func (context *Context) ToggleDebug() {
-	context.loggerLevel = logging.ToggleLogging(context.Logger, context.loggerLevel)
+	context.loggerLevel = Logging.ToggleLogging(context.Logger, context.loggerLevel)
 }
 
 // GetConfigAndRun process command line arguments and run the server
@@ -158,10 +158,10 @@ func GetConfigAndRun() {
 		os.Exit(1)
 	}
 	var screenLogging = false
-	var screenLevel = logging.ERROR
+	var screenLevel = Logging.ERROR
 	if debug {
 		screenLogging = true
-		screenLevel = logging.DEBUG
+		screenLevel = Logging.DEBUG
 	}
 	logger, err := config.Global.InitLogging(screenLogging, screenLevel, debug)
 	if err != nil {

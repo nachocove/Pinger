@@ -3,7 +3,7 @@ package Pinger
 import (
 	"code.google.com/p/gcfg"
 	"fmt"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/nachocove/Pinger/Pinger/Telemetry"
 	"os"
 	"path"
@@ -27,7 +27,7 @@ type GlobalConfiguration struct {
 	DebugSql          bool
 
 	// private
-	logFileLevel logging.Level
+	logFileLevel Logging.Level
 }
 
 func NewGlobalConfiguration() *GlobalConfiguration {
@@ -76,7 +76,7 @@ func (gconfig *GlobalConfiguration) Validate() error {
 	if gconfig.LogFileName == "" {
 		gconfig.LogFileName = fmt.Sprintf("%s.log", path.Base(os.Args[0]))
 	}
-	level, err := logging.LogLevel(gconfig.LogFileLevel)
+	level, err := Logging.LogLevel(gconfig.LogFileLevel)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (gconfig *GlobalConfiguration) Validate() error {
 	return nil
 }
 
-func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel logging.Level, debug bool) (*logging.Logger, error) {
+func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel Logging.Level, debug bool) (*Logging.Logger, error) {
 	err := gconfig.Validate()
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel logging
 		return nil, fmt.Errorf("Logging directory %s does not exist.", gconfig.LogDir)
 	}
 	loggerName := path.Base(os.Args[0])
-	logger := logging.InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel, debug)
+	logger := Logging.InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel, debug)
 	if err != nil {
 		return nil, err
 	}

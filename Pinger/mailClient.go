@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Logging"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/twinj/uuid"
 	"path"
@@ -130,7 +130,7 @@ func (pi *MailPingInformation) getLogPrefix() string {
 type MailClientContext struct {
 	mailClient MailClient // a mail client with the MailClient interface
 	stopToken  string
-	logger     *logging.Logger
+	logger     *Logging.Logger
 	errCh      chan error
 	stopAllCh  chan int // closed when client is exiting, so that any sub-routine can exit
 	exitCh     chan int // used by MailClient{} to signal it has exited
@@ -142,7 +142,7 @@ type MailClientContext struct {
 	wg         sync.WaitGroup
 }
 
-func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStats bool, logger *logging.Logger) (*MailClientContext, error) {
+func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
 		logger:    logger.Copy(),
 		errCh:     make(chan error),
