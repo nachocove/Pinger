@@ -28,10 +28,32 @@ const (
 type MailClientStatus int
 
 const (
-	MailClientStatusError   = iota
-	MailClientStatusPinging = iota
-	MailClientStatusStopped = iota
+	MailClientStatusError       = iota
+	MailClientStatusInitialized = iota
+	MailClientStatusPinging     = iota
+	MailClientStatusDeferred    = iota
+	MailClientStatusStopped     = iota
 )
+
+func (status MailClientStatus) String() string {
+	switch {
+	case status == MailClientStatusError:
+		return "Error"
+		
+	case status == MailClientStatusInitialized:
+		return "Initialized"
+
+	case status == MailClientStatusPinging:
+		return "Active"
+
+	case status == MailClientStatusDeferred:
+		return "Waiting"
+
+	case status == MailClientStatusStopped:
+		return "Stopped"
+	}
+	panic(fmt.Sprintf("Unknown status %d", status))
+}
 
 const (
 	DefaultMaxPollTimeout int64 = 2 * 24 * 60 * 60 * 1000 // 2 days in milliseconds
@@ -140,6 +162,7 @@ type MailClientContext struct {
 	di         *DeviceInfo
 	pi         *MailPingInformation
 	wg         sync.WaitGroup
+	status     MailClientStatus
 }
 
 func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
@@ -151,6 +174,7 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		command:   make(chan PingerCommand, 10),
 		stats:     nil,
 		pi:        pi,
+		status:    MailClientStatusInitialized,
 	}
 	client.logger.SetCallDepth(1)
 	client.Debug("Validating clientID")
@@ -215,11 +239,7 @@ func (client *MailClientContext) Status() (MailClientStatus, error) {
 	if client.lastError != nil {
 		return MailClientStatusError, client.lastError
 	}
-	if client.mailClient != nil {
-		return MailClientStatusPinging, nil
-	} else {
-		return MailClientStatusStopped, nil
-	}
+	return client.status, nil
 }
 
 func (client *MailClientContext) cleanup() {
@@ -237,6 +257,7 @@ func (client *MailClientContext) cleanup() {
 		client.mailClient = nil
 	}
 	client.stopToken = ""
+	client.status = MailClientStatusError
 
 	// tell Garbage collection to run. Might not free/remove all instances we free'd above,
 	// but it's worth the effort.
@@ -260,12 +281,14 @@ func (client *MailClientContext) validateStopToken(token string) bool {
 func (client *MailClientContext) start() {
 	defer Utils.RecoverCrash(client.logger)
 	defer func() {
+		client.status = MailClientStatusStopped
 		client.Debug("Waiting for subroutines to finish")
 		client.wg.Wait()
 		client.Debug("Cleaning up")
 		client.cleanup()
 	}()
-
+	
+	client.status = MailClientStatusDeferred
 	deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
 	client.Debug("Starting deferTimer for %s", deferTime)
 	deferTimer := time.NewTimer(deferTime)
@@ -291,20 +314,24 @@ func (client *MailClientContext) start() {
 			longPollStopCh = make(chan int)
 			client.wg.Add(1)
 			go client.mailClient.LongPoll(longPollStopCh, client.exitCh)
+			client.status = MailClientStatusPinging
 
 		case <-client.exitCh:
 			// the mailClient.LongPoll has indicated that it has exited. Clean up.
+			client.status = MailClientStatusStopped
 			client.Debug("LongPoll exited. Stopping.")
 			client.Action(PingerStop)
 
 		case err := <-client.errCh:
 			// the mailClient.LongPoll has thrown an error. note it.
+			client.status = MailClientStatusStopped
 			client.Debug("Error thrown. Stopping.")
 			client.lastError = err
 
 		case cmd := <-client.command:
 			switch {
 			case cmd == PingerStop:
+				client.status = MailClientStatusStopped
 				close(client.stopAllCh) // tell all goroutines listening on this channel that they can stop now.
 				client.Debug("got 'PingerStop' command")
 				return
@@ -319,6 +346,7 @@ func (client *MailClientContext) start() {
 				deferTimer.Stop()
 				deferTimer.Reset(deferTime)
 				maxPollTimer.Stop()
+				client.status = MailClientStatusDeferred
 
 			default:
 				client.Error("Unknown command %d", cmd)
