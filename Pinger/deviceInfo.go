@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/coopernurse/gorp"
-	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils/AWS"
+	"github.com/nachocove/Pinger/Utils/Logging"
 )
 
 type DeviceInfo struct {

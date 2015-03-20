@@ -43,7 +43,7 @@ func main() {
 	}
 
 	rpcConnectString := os.Getenv("PINGER_RPC")
-	
+
 	if rpcConnectString == "" {
 		if configFile == "" {
 			configFile = os.Getenv("PINGER_CONFIG")
@@ -61,7 +61,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "No Rpc Connect string found. Set environment PINGER_RPC or use -c\n")
 		os.Exit(1)
 	}
-	
+
 	if debug {
 		fmt.Fprintf(os.Stdout, "Contacting RPC server at %s\n", rpcConnectString)
 		fmt.Fprintf(os.Stdout, "Arguments: ClientId:%s, ClientContext:%s, DeviceId:%s, maxSessions:%d\n", clientId, clientContext, deviceId, maxSessions)

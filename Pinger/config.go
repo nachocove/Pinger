@@ -3,9 +3,9 @@ package Pinger
 import (
 	"code.google.com/p/gcfg"
 	"fmt"
-	"github.com/nachocove/Pinger/Utils/Telemetry"
-	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils/AWS"
+	"github.com/nachocove/Pinger/Utils/Logging"
+	"github.com/nachocove/Pinger/Utils/Telemetry"
 	"os"
 	"path"
 )

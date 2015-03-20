@@ -1,8 +1,8 @@
 package Telemetry
 
 import (
-	"time"
 	"github.com/twinj/uuid"
+	"time"
 )
 
 type TelemetryMessages interface {

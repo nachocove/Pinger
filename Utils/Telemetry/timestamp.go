@@ -14,8 +14,8 @@ const (
 	TelemetryTimeUnixZeroTicks TelemetryMsgPackTime = 621355968000000000
 
 	// How many ticks in a millisecond
-	TicksPerMillisecond uint64 = 10000
-	TicksPerNanosecond float64 = 0.01
+	TicksPerMillisecond uint64  = 10000
+	TicksPerNanosecond  float64 = 0.01
 )
 
 var TelemetryZeroTime time.Time

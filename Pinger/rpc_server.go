@@ -231,10 +231,10 @@ func validateClientID(clientID string) error {
 }
 
 type FindSessionsArgs struct {
-	ClientId string
+	ClientId      string
 	ClientContext string
-	DeviceId string
-	MaxSessions int
+	DeviceId      string
+	MaxSessions   int
 
 	logPrefix string
 }
@@ -249,8 +249,8 @@ type SessionInfo struct {
 }
 
 type FindSessionsResponse struct {
-	Code        int
-	Message     string
+	Code         int
+	Message      string
 	SessionInfos []SessionInfo
 }
 
@@ -264,12 +264,12 @@ func (fs *FindSessionsArgs) getLogPrefix() string {
 func (t *BackendPolling) appendSessionInfo(sessionInfos []SessionInfo, mcc *MailClientContext) []SessionInfo {
 	status, err := mcc.Status()
 	info := SessionInfo{
-		ClientId: mcc.pi.ClientId,
+		ClientId:      mcc.pi.ClientId,
 		ClientContext: mcc.pi.ClientContext,
-		DeviceId: mcc.pi.DeviceId,
-		Status: status,
-		Url: mcc.pi.MailServerUrl,
-		}
+		DeviceId:      mcc.pi.DeviceId,
+		Status:        status,
+		Url:           mcc.pi.MailServerUrl,
+	}
 	if err != nil {
 		info.Error = err.Error()
 	}
@@ -283,24 +283,24 @@ func (t *BackendPolling) FindActiveSessions(args *FindSessionsArgs, reply *FindS
 		if args.MaxSessions > 0 && len(reply.SessionInfos) >= args.MaxSessions {
 			t.logger.Debug("Max sessions read (%d). Stopping search.", len(reply.SessionInfos))
 			break
-		} 
+		}
 		switch {
 		case poll.pi == nil:
 			t.logger.Debug("%s: entry has no pi.", key)
 			continue
-			
+
 		case poll.mailClient == nil:
 			t.logger.Debug("%s: Entry has no active client", key)
 			continue
-			
+
 		case poll.pi.ClientId == "" || poll.pi.ClientContext == "" || poll.pi.DeviceId == "":
 			t.logger.Debug("%s: entry has been cleaned up.", key)
 			continue
-			
+
 		case args.ClientId == "" && args.ClientContext == "" && args.DeviceId == "":
 			reply.SessionInfos = t.appendSessionInfo(reply.SessionInfos, poll)
 			continue
-		
+
 		case args.ClientId != "" && poll.pi.ClientId == args.ClientId:
 			reply.SessionInfos = t.appendSessionInfo(reply.SessionInfos, poll)
 			continue
@@ -312,7 +312,7 @@ func (t *BackendPolling) FindActiveSessions(args *FindSessionsArgs, reply *FindS
 		case args.DeviceId != "" && poll.pi.DeviceId == args.DeviceId:
 			reply.SessionInfos = t.appendSessionInfo(reply.SessionInfos, poll)
 			continue
-			
+
 		default:
 			t.logger.Debug("%s: Unknown case!", key)
 			continue
@@ -320,5 +320,5 @@ func (t *BackendPolling) FindActiveSessions(args *FindSessionsArgs, reply *FindS
 	}
 	reply.Code = PollingReplyOK
 	reply.Message = ""
-	return nil	
+	return nil
 }

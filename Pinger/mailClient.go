@@ -39,7 +39,7 @@ func (status MailClientStatus) String() string {
 	switch {
 	case status == MailClientStatusError:
 		return "Error"
-		
+
 	case status == MailClientStatusInitialized:
 		return "Initialized"
 
@@ -286,7 +286,7 @@ func (client *MailClientContext) start() {
 		client.Debug("Cleaning up")
 		client.cleanup()
 	}()
-	
+
 	client.status = MailClientStatusDeferred
 	deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
 	client.Debug("Starting deferTimer for %s", deferTime)
