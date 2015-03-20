@@ -11,8 +11,8 @@ func TestMsgSerialize(t *testing.T) {
 	assert := assert.New(t)
 
 	msg := NewTelemetryMsg(TelemetryEventInfo, "foo", "bar")
-	assert.NotEmpty(msg)
-	msg.PrepareForUpload()
+	err = msg.prepareForUpload()
+	assert.NoError(err)
 	enc, err := msg.Encode()
 	assert.NoError(err)
 	assert.NotNil(enc)

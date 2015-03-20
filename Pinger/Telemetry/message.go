@@ -2,6 +2,7 @@ package Telemetry
 
 import (
 	"time"
+	"github.com/twinj/uuid"
 )
 
 type TelemetryMessages interface {
@@ -27,14 +28,15 @@ type TelemetryMsg struct {
 	Message    string
 }
 
-func (msg *TelemetryMsg) PrepareForUpload() error {
-	msg.Id = "12345" // TODO who fills this in? DynamoDB? Or client?
+func (msg *TelemetryMsg) prepareForUpload() error {
+	uuid.SwitchFormat(uuid.Clean)
+	msg.Id = uuid.NewV4().String()
 	msg.UploadedAt = time.Now().Round(time.Millisecond).UTC()
 	return nil
 }
 
 func (msg *TelemetryMsg) Upload(location string) error {
-	err := msg.PrepareForUpload()
+	err := msg.prepareForUpload()
 	if err != nil {
 		return err
 	}
