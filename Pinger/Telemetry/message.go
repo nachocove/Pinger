@@ -29,7 +29,7 @@ type TelemetryMsg struct {
 
 func (msg *TelemetryMsg) PrepareForUpload() error {
 	msg.Id = "12345" // TODO who fills this in? DynamoDB? Or client?
-	msg.UploadedAt = time.Now().UTC()
+	msg.UploadedAt = time.Now().Round(time.Millisecond).UTC()
 	return nil
 }
 
@@ -45,7 +45,7 @@ func (msg *TelemetryMsg) Upload(location string) error {
 func NewTelemetryMsg(eventType TelemetryEventType, module, message string) TelemetryMsg {
 	return TelemetryMsg{
 		EventType: eventType,
-		Timestamp: time.Now().UTC(),
+		Timestamp: time.Now().Round(time.Millisecond).UTC(),
 		Module:    module,
 		Message:   message,
 	}
