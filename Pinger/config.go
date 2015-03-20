@@ -4,6 +4,7 @@ import (
 	"code.google.com/p/gcfg"
 	"fmt"
 	logging "github.com/nachocove/Pinger/Pinger/logging"
+	"github.com/nachocove/Pinger/Pinger/Telemetry"
 	"os"
 	"path"
 )
@@ -13,6 +14,7 @@ type Configuration struct {
 	Aws    AWSConfiguration
 	Db     DBConfiguration
 	Rpc    RPCServerConfiguration
+	Telemetry Telemetry.TelemetryConfiguration
 }
 
 type GlobalConfiguration struct {
@@ -54,6 +56,7 @@ func NewConfiguration() *Configuration {
 		Aws:    AWSConfiguration{},
 		Db:     DBConfiguration{},
 		Rpc:    NewRPCServerConfiguration(),
+		Telemetry: Telemetry.TelemetryConfiguration{},
 	}
 	return config
 }
