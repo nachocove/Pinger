@@ -55,7 +55,7 @@ func main() {
 
 	config, err := Pinger.ReadConfig(configFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Reading aws config: %s", err)
+		fmt.Fprintf(os.Stderr, "Reading pinger config: %s\n", err)
 		os.Exit(1)
 	}
 	var screenLogging = false
@@ -71,7 +71,7 @@ func main() {
 	}
 	logger, err = config.Global.InitLogging(screenLogging, screenLevel, debug)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Init Logging: %s", err)
+		fmt.Fprintf(os.Stderr, "Init Logging: %s\n", err)
 		os.Exit(1)
 	}
 
