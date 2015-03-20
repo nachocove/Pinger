@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"io"
 	"io/ioutil"
@@ -85,7 +86,7 @@ func init() {
 	retryResponse = &http.Response{}
 }
 func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errCh chan error) {
-	defer recoverCrash(ex.logger)
+	defer Utils.RecoverCrash(ex.logger)
 	ex.mutex.Lock() // prevents the longpoll from cancelling the request while we're still setting it up.
 	unlockMutex := true
 	defer func() {
@@ -224,7 +225,7 @@ func (ex *ExchangeClient) exponentialBackoff(sleepTime int) int {
 }
 
 func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
-	defer recoverCrash(ex.logger)
+	defer Utils.RecoverCrash(ex.logger)
 	defer ex.parent.wg.Done()
 	askedToStop := false
 	defer func(prefixStr string) {

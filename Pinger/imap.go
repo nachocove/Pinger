@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"net/url"
 	"time"
@@ -153,7 +154,7 @@ func (imap *IMAPClient) setupConn() error {
 	return nil
 }
 func (imap *IMAPClient) LongPoll(stopCh, exitCh chan int) {
-	defer recoverCrash(imap.logger)
+	defer Utils.RecoverCrash(imap.logger)
 	askedToStop := false
 	defer func() {
 		if imap.conn != nil {

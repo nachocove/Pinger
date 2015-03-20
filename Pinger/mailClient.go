@@ -258,7 +258,7 @@ func (client *MailClientContext) validateStopToken(token string) bool {
 }
 
 func (client *MailClientContext) start() {
-	defer recoverCrash(client.logger)
+	defer Utils.RecoverCrash(client.logger)
 	defer func() {
 		client.Debug("Waiting for subroutines to finish")
 		client.wg.Wait()

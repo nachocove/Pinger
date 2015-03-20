@@ -660,3 +660,26 @@ func (di *DeviceInfo) validateClient() error {
 	}
 	return nil
 }
+
+func alertAllDevices() error {
+	devices, err := getAllMyDeviceInfo(DefaultPollingContext.dbm, DefaultPollingContext.logger)
+	if err != nil {
+		return err
+	}
+	count := 0
+	for _, di := range devices {
+		DefaultPollingContext.logger.Info("%s: sending PingerNotificationRegister to device", di.getLogPrefix())
+		err = di.push(PingerNotificationRegister)
+		if err != nil {
+			DefaultPollingContext.logger.Warning("%s: Could not send push: %s", di.getLogPrefix(), err.Error())
+		} else {
+			count++
+		}
+		if count >= 10 {
+			count = 0
+			time.Sleep(time.Duration(1) * time.Second)
+		}
+	}
+	return nil
+}
+
