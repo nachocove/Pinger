@@ -49,8 +49,6 @@ func NewRPCServerConfiguration() RPCServerConfiguration {
 	}
 }
 
-type pollMapType map[string]*MailClientContext
-
 type BackendPolling struct {
 	dbm         *gorp.DbMap
 	config      *Configuration
@@ -60,52 +58,13 @@ type BackendPolling struct {
 	pollMap     pollMapType
 }
 
-type StartPollArgs struct {
-	MailInfo *MailPingInformation
-}
-
-func (sa *StartPollArgs) getLogPrefix() string {
-	return sa.MailInfo.getLogPrefix()
-}
-
-type StopPollArgs struct {
-	ClientId      string
-	ClientContext string
-	DeviceId      string
-	StopToken     string
-
-	logPrefix string
-}
-
-func (sp *StopPollArgs) getLogPrefix() string {
-	if sp.logPrefix == "" {
-		sp.logPrefix = fmt.Sprintf("%s:%s:%s", sp.DeviceId, sp.ClientId, sp.ClientContext)
-	}
-	return sp.logPrefix
-}
-
-type DeferPollArgs struct {
-	ClientId      string
-	ClientContext string
-	DeviceId      string
-	Timeout       int64
-	StopToken     string
-
-	logPrefix string
-}
-
-func (dp *DeferPollArgs) getLogPrefix() string {
-	if dp.logPrefix == "" {
-		dp.logPrefix = fmt.Sprintf("%s:%s:%s", dp.DeviceId, dp.ClientId, dp.ClientContext)
-	}
-	return dp.logPrefix
-}
-
+// PollingResponse is used by Stop and Defer
 type PollingResponse struct {
 	Code    int
 	Message string
 }
 
+// StartPollingResponse is used by the start polling rpc
 type StartPollingResponse struct {
 	Code    int
 	Token   string
@@ -132,8 +91,18 @@ func validateClientID(clientID string) error {
 	return DefaultPollingContext.config.Aws.validateCognitoID(clientID)
 }
 
+type pollMapType map[string]*MailClientContext
+
 func (t *BackendPolling) pollMapKey(clientId, clientContext, deviceId string) string {
 	return fmt.Sprintf("%s--%s--%s", clientId, clientContext, deviceId)
+}
+
+type StartPollArgs struct {
+	MailInfo *MailPingInformation
+}
+
+func (sa *StartPollArgs) getLogPrefix() string {
+	return sa.MailInfo.getLogPrefix()
 }
 
 func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingResponse) error {
@@ -212,6 +181,22 @@ func (t *BackendPolling) startPolling(args *StartPollArgs, reply *StartPollingRe
 	return nil
 }
 
+type StopPollArgs struct {
+	ClientId      string
+	ClientContext string
+	DeviceId      string
+	StopToken     string
+
+	logPrefix string
+}
+
+func (sp *StopPollArgs) getLogPrefix() string {
+	if sp.logPrefix == "" {
+		sp.logPrefix = fmt.Sprintf("%s:%s:%s", sp.DeviceId, sp.ClientId, sp.ClientContext)
+	}
+	return sp.logPrefix
+}
+
 func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse) error {
 	t.logger.Debug("%s: Received stopPoll request", args.getLogPrefix())
 	pollMapKey := t.pollMapKey(args.ClientId, args.ClientContext, args.DeviceId)
@@ -254,6 +239,23 @@ func (t *BackendPolling) stopPolling(args *StopPollArgs, reply *PollingResponse)
 	}
 	reply.Code = PollingReplyOK
 	return nil
+}
+
+type DeferPollArgs struct {
+	ClientId      string
+	ClientContext string
+	DeviceId      string
+	Timeout       int64
+	StopToken     string
+
+	logPrefix string
+}
+
+func (dp *DeferPollArgs) getLogPrefix() string {
+	if dp.logPrefix == "" {
+		dp.logPrefix = fmt.Sprintf("%s:%s:%s", dp.DeviceId, dp.ClientId, dp.ClientContext)
+	}
+	return dp.logPrefix
 }
 
 func (t *BackendPolling) deferPolling(args *DeferPollArgs, reply *PollingResponse) error {
