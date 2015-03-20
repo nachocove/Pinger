@@ -51,35 +51,51 @@ func main() {
 		os.Exit(1)
 	}
 
+	if debug {
+		fmt.Fprintf(os.Stdout, "Contacting RPC server at %s\n", config.Rpc.ConnectString())
+		fmt.Fprintf(os.Stdout, "Arguments: ClientId:%s, ClientContext:%s, DeviceId:%s\n", clientId, clientContext, deviceId)
+	}
 	reply, err := Pinger.FindActiveSessions(config.Rpc.ConnectString(), clientId, clientContext, deviceId)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not call FindActiveSessions: %s", err)
 		os.Exit(1)
 	}
-	if reply.Code != Pinger.PollingReplyOK {
+	if debug {
+		fmt.Fprintf(os.Stdout, "Reply is %+v\n", reply)
+	}
+	switch {
+	case reply.Code == Pinger.PollingReplyError:
 		fmt.Fprintf(os.Stderr, "Error fetching sessions: %s\n", reply.Message)
 		os.Exit(1)
-	}
-//	ClientId      string
-//	ClientContext string
-//	DeviceId      string
-//	Status        string
-//	Url           string
-//	Error         string
-	fmt.Fprintf(os.Stdout, "Found %d sessions.\n", len(reply.SessionInfos))
-	for _, info := range reply.SessionInfos {
-		if singleLine {
-			fmt.Fprintf(os.Stdout, "%s;%s;%s;%s;%s;%s\n",
-				info.ClientId, info.ClientContext, info.DeviceId, info.Url, info.Status, info.Error)
-		} else {
-			fmt.Fprintf(os.Stdout, "ClientID:%s\nClientContext:%s\nDeviceId:%s\nUrl:%s\nStatus:%s\n",
-				info.ClientId, info.ClientContext, info.DeviceId, info.Url, info.Status)
-			if info.Status == Pinger.MailClientStatusError {
-				fmt.Fprintf(os.Stdout, "Error:%s\n", info.Error)
-			}
-			fmt.Fprintf(os.Stdout, "\n")
+
+	case reply.Code == Pinger.PollingReplyOK || reply.Code == Pinger.PollingReplyWarn:
+		if reply.Code == Pinger.PollingReplyWarn {
+			fmt.Fprintf(os.Stdout, "Warning: %s\n", reply.Message)
 		}
+		if verbose {
+			if singleLine {
+				fmt.Fprintf(os.Stdout, "ClientId;ClientContext;DeviceId;Url;Status;Error\n")
+			} else {
+				fmt.Fprintf(os.Stdout, "Found %d sessions.\n", len(reply.SessionInfos))
+			}
+		}
+		for _, info := range reply.SessionInfos {
+			if singleLine {
+				fmt.Fprintf(os.Stdout, "%s;%s;%s;%s;%s;%s\n",
+					info.ClientId, info.ClientContext, info.DeviceId, info.Url, info.Status, info.Error)
+			} else {
+				fmt.Fprintf(os.Stdout, "ClientID:%s\nClientContext:%s\nDeviceId:%s\nUrl:%s\nStatus:%s\n",
+					info.ClientId, info.ClientContext, info.DeviceId, info.Url, info.Status)
+				if info.Status == Pinger.MailClientStatusError {
+					fmt.Fprintf(os.Stdout, "Error:%s\n", info.Error)
+				}
+				fmt.Fprintf(os.Stdout, "\n")
+			}
+		}
+
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown response %+v\n", reply)
+		os.Exit(1)
 	}
 	os.Exit(0)
-
 }
