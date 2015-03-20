@@ -3,7 +3,7 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
-	"github.com/nachocove/Pinger/Pinger/Logging"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils"
 	"io/ioutil"
 	"log"

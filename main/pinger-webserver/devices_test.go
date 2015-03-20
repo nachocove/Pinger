@@ -4,7 +4,7 @@ import (
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
 	"github.com/nachocove/Pinger/Pinger"
-	"github.com/nachocove/Pinger/Pinger/Logging"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"

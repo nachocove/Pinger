@@ -2,7 +2,7 @@ package Utils
 
 import (
 	"time"
-	"github.com/nachocove/Pinger/Pinger/Logging"
+	"github.com/nachocove/Pinger/Utils/Logging"
 )
 
 type StatLogger struct {

@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"flag"
 	"fmt"
-	"github.com/nachocove/Pinger/Pinger/Logging"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils"
 	"io/ioutil"
 	"net/http"

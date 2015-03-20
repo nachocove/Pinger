@@ -3,7 +3,7 @@ package Pinger
 import (
 	"code.google.com/p/gcfg"
 	"fmt"
-	"github.com/nachocove/Pinger/Pinger/Logging"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Pinger/Telemetry"
 	"os"
 	"path"

@@ -1,7 +1,7 @@
 package Utils
 
 import (
-	"github.com/nachocove/Pinger/Pinger/Logging"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

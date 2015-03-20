@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
-	"github.com/nachocove/Pinger/Pinger/Logging"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils"
 	"os"
 	"path"

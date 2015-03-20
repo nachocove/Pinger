@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/codegangsta/negroni"
-	"github.com/nachocove/Pinger/Pinger/Logging"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"time"
 )
 
