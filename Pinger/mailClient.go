@@ -257,7 +257,6 @@ func (client *MailClientContext) cleanup() {
 		client.mailClient = nil
 	}
 	client.stopToken = ""
-	client.status = MailClientStatusStopped
 
 	// tell Garbage collection to run. Might not free/remove all instances we free'd above,
 	// but it's worth the effort.
@@ -304,6 +303,7 @@ func (client *MailClientContext) start() {
 		select {
 		case <-maxPollTimer.C:
 			client.Debug("maxPollTimer expired. Stopping everything.")
+			client.status = MailClientStatusStopped
 			return
 
 		case <-deferTimer.C:
