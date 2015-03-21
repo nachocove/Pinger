@@ -2,19 +2,16 @@ package Pinger
 
 import (
 	"crypto/sha1"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
-	"reflect"
-	"regexp"
-	"time"
-
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
+	"reflect"
+	"regexp"
+	"time"
 )
 
 type DeviceInfo struct {
@@ -45,11 +42,13 @@ const (
 	DeviceTableName string = "device_info"
 )
 
-func addDeviceInfoTable(dbmap *gorp.DbMap) error {
+func addDeviceInfoTable(dbmap *gorp.DbMap) {
 	tMap := dbmap.AddTableWithName(DeviceInfo{}, DeviceTableName)
-	if tMap.SetKeys(true, "Id") == nil {
+	if tMap.SetKeys(false, "ClientId", "ClientContext", "DeviceId") == nil {
 		panic(fmt.Sprintf("Could not create key on %s:ID", DeviceTableName))
 	}
+	tMap.SetVersionCol("Id")
+
 	cMap := tMap.ColMap("Created")
 	cMap.SetNotNull(true)
 
@@ -61,15 +60,12 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 
 	cMap = tMap.ColMap("ClientId")
 	cMap.SetNotNull(true)
-	clientCol := cMap
 
 	cMap = tMap.ColMap("ClientContext")
 	cMap.SetNotNull(true)
-	contextCol := cMap
 
 	cMap = tMap.ColMap("DeviceId")
 	cMap.SetNotNull(true)
-	deviceCol := cMap
 
 	cMap = tMap.ColMap("Platform")
 	cMap.SetNotNull(true)
@@ -91,9 +87,6 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 
 	cMap = tMap.ColMap("Pinger")
 	cMap.SetNotNull(true)
-
-	tMap = tMap.SetUniqueTogether(clientCol.ColumnName, contextCol.ColumnName, deviceCol.ColumnName)
-	return nil
 }
 
 func (di *DeviceInfo) validate() error {
@@ -175,6 +168,7 @@ func (di *DeviceInfo) Warning(format string, args ...interface{}) {
 
 func (di *DeviceInfo) cleanup() {
 	di.Debug("Cleaning up DeviceInfo")
+	di.dbm.Delete(di)
 	di.ClientId = ""
 	di.ClientContext = ""
 	di.DeviceId = ""
@@ -184,77 +178,33 @@ func (di *DeviceInfo) cleanup() {
 	di.OSVersion = ""
 	di.AppBuildNumber = ""
 	di.AppBuildVersion = ""
-	di.dbm.Delete(di.Id)
 	di.Id = 0
 }
 
-var pingerHostId string
-var getDeviceInfoSql string
 var getAllMyDeviceInfoSql string
 
 func init() {
-	interfaces, _ := net.Interfaces()
-	for _, inter := range interfaces {
-		if inter.Name[0:2] == "lo" {
-			continue
-		}
-		if inter.HardwareAddr.String() == "" {
-			continue
-		}
-		hash := sha256.New()
-		hash.Write(inter.HardwareAddr)
-		md := hash.Sum(nil)
-		pingerHostId = hex.EncodeToString(md)
-		break
-	}
 	var ok bool
 	var deviceInfoReflection reflect.Type
-	var clientIdField reflect.StructField
-	var contextField reflect.StructField
-	var deviceidField reflect.StructField
 	var pingerField reflect.StructField
 	deviceInfoReflection = reflect.TypeOf(DeviceInfo{})
-	clientIdField, ok = deviceInfoReflection.FieldByName("ClientId")
-	if ok == false {
-		panic("Could not get ClientId Field information")
-	}
-	contextField, ok = deviceInfoReflection.FieldByName("ClientContext")
-	if ok == false {
-		panic("Could not get ClientContext Field information")
-	}
-	deviceidField, ok = deviceInfoReflection.FieldByName("DeviceId")
-	if ok == false {
-		panic("Could not get DeviceId Field information")
-	}
 	pingerField, ok = deviceInfoReflection.FieldByName("Pinger")
 	if ok == false {
 		panic("Could not get Pinger Field information")
 	}
-	getDeviceInfoSql = fmt.Sprintf(
-		"select * from %s where %s=? and %s=? and %s=?",
-		DeviceTableName,
-		clientIdField.Tag.Get("db"), contextField.Tag.Get("db"), deviceidField.Tag.Get("db"))
 	getAllMyDeviceInfoSql = fmt.Sprintf("select * from %s where %s=?",
 		DeviceTableName,
 		pingerField.Tag.Get("db"))
 }
 
 func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *Logging.Logger) (*DeviceInfo, error) {
-	var devices []DeviceInfo
-	var err error
-	_, err = dbm.Select(&devices, getDeviceInfoSql, clientId, clientContext, deviceId)
+	var device *DeviceInfo
+	obj, err := dbm.Get(&DeviceInfo{}, clientId, clientContext, deviceId)
 	if err != nil {
 		return nil, err
 	}
-	switch {
-	case len(devices) > 1:
-		return nil, fmt.Errorf("More than one entry from select: %d", len(devices))
-
-	case len(devices) == 0:
-		return nil, nil
-
-	case len(devices) == 1:
-		device := &(devices[0])
+	if obj != nil {
+		device = obj.(*DeviceInfo)
 		device.dbm = dbm
 		device.SetLogger(logger)
 		if device.Pinger != pingerHostId {
@@ -262,11 +212,8 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, lo
 			device.Pinger = pingerHostId
 			device.update()
 		}
-		return device, nil
-
-	default:
-		return nil, fmt.Errorf("Bad number of rows returned: %d", len(devices))
 	}
+	return device, nil
 }
 
 func getAllMyDeviceInfo(dbm *gorp.DbMap, logger *Logging.Logger) ([]DeviceInfo, error) {

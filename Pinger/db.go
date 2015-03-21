@@ -83,15 +83,24 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger)
 	// map tables
 	///////////////
 	addDeviceInfoTable(dbmap)
+	addPingerInfoTable(dbmap)
 
 	if init {
-		// create the table. in a production system you'd generally
+		// create the tables. in a production system you'd generally
 		// use a migration tool, or create the tables via scripts
 		err := dbmap.CreateTablesIfNotExists()
 		if err != nil {
 			return nil, fmt.Errorf("Create tables failed: %s", err)
 		}
 	}
+	
+	// Add us (if not already there), and start the updater
+	pinger, err := newPingerInfo(dbmap)
+	if err != nil {
+		return nil, err
+	}
+	go pinger.Updater()
+
 	return dbmap, nil
 }
 
