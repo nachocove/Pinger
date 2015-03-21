@@ -1,7 +1,9 @@
 package Telemetry
 
-import ()
+import (
+)
 
 type TelemetryConfiguration struct {
-	Location string
+	FileLocationPrefix   string
+	UploadLocationPrefix string
 }

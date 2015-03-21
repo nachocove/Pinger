@@ -85,7 +85,7 @@ func (gconfig *GlobalConfiguration) Validate() error {
 	return nil
 }
 
-func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel Logging.Level, debug bool) (*Logging.Logger, error) {
+func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel Logging.Level, telemetryWriter *Telemetry.TelemetryWriter, debug bool) (*Logging.Logger, error) {
 	err := gconfig.Validate()
 	if err != nil {
 		return nil, err
@@ -94,11 +94,11 @@ func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel Logging
 		return nil, fmt.Errorf("Logging directory %s does not exist.", gconfig.LogDir)
 	}
 	loggerName := path.Base(os.Args[0])
-	logger := Logging.InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel, debug)
+	logger := Logging.InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel, telemetryWriter, debug)
 	if err != nil {
 		return nil, err
 	}
-	logger.Info("Started logging %s %v", gconfig.LogFileLevel, os.Args)
+	logger.Info("Started %v", os.Args)
 	return logger, nil
 }
 

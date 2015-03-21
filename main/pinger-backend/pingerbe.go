@@ -6,6 +6,7 @@ import (
 	"github.com/nachocove/Pinger/Pinger"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
+	"github.com/nachocove/Pinger/Utils/Telemetry"
 	"os"
 	"path"
 	"runtime"
@@ -69,16 +70,22 @@ func main() {
 			screenLevel = Logging.INFO
 		}
 	}
-	logger, err = config.Global.InitLogging(screenLogging, screenLevel, debug)
+	telemetryWriter, err := Telemetry.NewTelemetryWriter(&config.Telemetry, debug)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Init Telemetry: %s\n", err)
+		os.Exit(1)
+	}
+
+	logger, err = config.Global.InitLogging(screenLogging, screenLevel, telemetryWriter, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Init Logging: %s\n", err)
 		os.Exit(1)
 	}
-
+	
 	Utils.InitCpuProfileSignal()
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	logger.Info("Running with %d Processors", runtime.NumCPU())
+	logger.Debug("Running with %d Processors", runtime.NumCPU())
 
 	var memstats *Utils.MemStats
 	if printMemPeriodic > 0 || printMem {

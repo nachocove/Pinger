@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/op/go-logging"
 	"os"
+	"github.com/nachocove/Pinger/Utils/Telemetry"
 )
 
 type Level logging.Level
@@ -45,10 +46,6 @@ func (log *Logger) Fatalf(format string, args ...interface{}) {
 	log.logger.Fatalf(format, args...)
 }
 
-func (log *Logger) Fatal(args ...interface{}) {
-	log.logger.Fatal(args...)
-}
-
 func (log *Logger) formatLogString(format string, args ...interface{}) string {
 	return fmt.Sprintf(format, args...)
 }
@@ -68,7 +65,7 @@ var loggerCache map[string]*Logger
 func init() {
 	loggerCache = make(map[string]*Logger)
 }
-func InitLogging(loggerName string, logFileName string, fileLevel Level, screen bool, screenLevel Level, debug bool) *Logger {
+func InitLogging(loggerName string, logFileName string, fileLevel Level, screen bool, screenLevel Level, telemetryWriter *Telemetry.TelemetryWriter, debug bool) *Logger {
 	_, ok := loggerCache[loggerName]
 	if !ok {
 		var logFile *os.File
@@ -89,19 +86,32 @@ func InitLogging(loggerName string, logFileName string, fileLevel Level, screen 
 		} else {
 			formatStr = normalFormatStr
 		}
+		
+		var fileLogger logging.LeveledBackend
+		var screenLogger logging.LeveledBackend
 		format := logging.MustStringFormatter(formatStr)
-		fileLogger := logging.AddModuleLevel(logging.NewLogBackend(logFile, "", 0))
+		fileLogger = logging.AddModuleLevel(logging.NewLogBackend(logFile, "", 0))
 		fileLogger.SetLevel(logging.Level(fileLevel), "")
 		if screen {
-			screenLogger := logging.AddModuleLevel(logging.NewLogBackend(os.Stdout, "", 0))
+			screenLogger = logging.AddModuleLevel(logging.NewLogBackend(os.Stdout, "", 0))
 			screenLogger.SetLevel(logging.Level(screenLevel), "")
-			logging.SetBackend(fileLogger, screenLogger)
 		} else {
+			
+		}
+		switch {
+		case fileLogger != nil && screenLogger != nil && telemetryWriter != nil:
+			logging.SetBackend(fileLogger, screenLogger, telemetryWriter)
+			
+		case fileLogger != nil && screenLogger != nil:
+			logging.SetBackend(fileLogger, screenLogger)
+
+		default:
 			logging.SetBackend(fileLogger)
 		}
 		logging.SetFormatter(format)
-		logger := Logger{}
-		logger.logger = logging.MustGetLogger(loggerName)
+		logger := Logger{
+			logger: logging.MustGetLogger(loggerName),
+		}
 		logger.SetCallDepth(0)
 		loggerCache[loggerName] = &logger
 	}

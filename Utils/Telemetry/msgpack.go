@@ -20,6 +20,7 @@ const (
 	TelemetryMsgPackInfo    int64 = 1
 	TelemetryMsgPackWarning int64 = 2
 	TelemetryMsgPackError   int64 = 3
+	TelemetryMsgPackDebug   int64 = 4
 )
 
 func TelemetryMsgEventTypeToPack(eventType TelemetryEventType) int64 {
@@ -30,6 +31,8 @@ func TelemetryMsgEventTypeToPack(eventType TelemetryEventType) int64 {
 		return TelemetryMsgPackWarning
 	case eventType == TelemetryEventError:
 		return TelemetryMsgPackError
+	case eventType == TelemetryEventDebug: 
+		return TelemetryMsgPackDebug
 	}
 	panic(fmt.Sprintf("TelemetryMsgEventTypeToPack: unknown eventType: %v", eventType))
 }
@@ -42,6 +45,8 @@ func TelemetryPackEventTypeToMsg(eventType int64) TelemetryEventType {
 		return TelemetryEventWarning
 	case eventType == TelemetryMsgPackError:
 		return TelemetryEventError
+	case eventType == TelemetryMsgPackDebug:
+		return TelemetryEventDebug
 	}
 	panic(fmt.Sprintf("TelemetryPackEventTypeToMsg: unknown eventType: %v", eventType))
 }

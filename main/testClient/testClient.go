@@ -117,7 +117,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "LevelNameToLevel: %v\n", err)
 		os.Exit(1)
 	}
-	logger = Logging.InitLogging("testClient", logFileName, fileLevel, screenLogging, screenLevel, debug)
+	logger = Logging.InitLogging("testClient", logFileName, fileLevel, screenLogging, screenLevel, nil, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "InitLogging: %v\n", err)
 		os.Exit(1)
@@ -178,7 +178,7 @@ func main() {
 		logger.Info("Writing memory profile: %s\n", profileFile)
 		f, err := os.Create(profileFile)
 		if err != nil {
-			logger.Fatal(err)
+			logger.Fatalf(err.Error())
 		}
 		pprof.WriteHeapProfile(f)
 	}()

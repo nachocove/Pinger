@@ -223,7 +223,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "LevelNameToLevel: %v\n", err)
 		os.Exit(1)
 	}
-	logger = Logging.InitLogging("TestServer", logFileName, fileLevel, screenLogging, screenLevel, debug)
+	logger = Logging.InitLogging("TestServer", logFileName, fileLevel, screenLogging, screenLevel, nil, debug)
 
 	var TLSconfig *tls.Config
 

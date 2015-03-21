@@ -122,7 +122,7 @@ func (client *Client) connectionReader(Command <-chan PingerCommand) {
 func (client *Client) wait() {
 	defer client.Done()
 	if client.Connection == nil {
-		client.logger.Fatal("Wait called without an open connection")
+		client.logger.Fatalf("Wait called without an open connection")
 	}
 	defer client.closeConn()
 

@@ -14,10 +14,17 @@ type TelemetryMessages interface {
 type TelemetryEventType string
 
 const (
+	TelemetryEventDebug   TelemetryEventType = "DEBUG"
 	TelemetryEventInfo    TelemetryEventType = "INFO"
 	TelemetryEventWarning TelemetryEventType = "WARNING"
 	TelemetryEventError   TelemetryEventType = "ERROR"
 )
+
+var TelemetryEventTypes []TelemetryEventType
+
+func init() {
+	TelemetryEventTypes = []TelemetryEventType{ TelemetryEventDebug, TelemetryEventInfo, TelemetryEventWarning, TelemetryEventError }
+}
 
 type TelemetryMsg struct {
 	Id         string
