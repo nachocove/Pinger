@@ -98,7 +98,6 @@ func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel Logging
 	if err != nil {
 		return nil, err
 	}
-	logger.Info("Started %v", os.Args)
 	return logger, nil
 }
 

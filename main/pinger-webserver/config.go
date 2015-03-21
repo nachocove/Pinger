@@ -1,19 +1,19 @@
 package main
 
 import (
+	"code.google.com/p/gcfg"
 	"flag"
 	"fmt"
-	"net/http"
-	"os"
-	"path"
-
-	"code.google.com/p/gcfg"
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/nachocove/Pinger/Pinger"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
+	"net/http"
+	"os"
+	"path"
+	"runtime"
 )
 
 // TODO Need to combine the configs into one, since there's shared settings. Just
@@ -174,6 +174,11 @@ func GetConfigAndRun() {
 		logger,
 		fmt.Sprintf("%s:%d", config.Rpc.Hostname, config.Rpc.Port),
 		sessions.NewCookieStore([]byte(config.Server.SessionSecret)))
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	logger.Debug("Running with %d Processors", runtime.NumCPU())
+
+	logger.Info("Started %v", os.Args)
 	err = context.run()
 	if err != nil {
 		logger.Error("Could not run server! %v", err)

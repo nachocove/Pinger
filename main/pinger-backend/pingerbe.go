@@ -105,6 +105,7 @@ func main() {
 		memstats.SetBaseMemStats()
 	}
 
+	logger.Info("Started %v", os.Args)
 	err = Pinger.StartPollingRPCServer(config, debug, config.Global.DebugSql, logger)
 	if err != nil {
 		panic(err.Error())
