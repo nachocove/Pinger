@@ -69,7 +69,7 @@ func main() {
 			screenLevel = Logging.INFO
 		}
 	}
-	
+
 	// From here on, treat the cfg debug and cli debug the same.
 	// Don't do this before we decide on the screen output above
 	debug = debug || config.Global.Debug

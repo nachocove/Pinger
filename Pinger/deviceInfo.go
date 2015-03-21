@@ -191,6 +191,7 @@ func (di *DeviceInfo) cleanup() {
 var pingerHostId string
 var getDeviceInfoSql string
 var getAllMyDeviceInfoSql string
+
 func init() {
 	interfaces, _ := net.Interfaces()
 	for _, inter := range interfaces {

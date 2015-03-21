@@ -1,9 +1,9 @@
 package Utils
 
 import (
+	"fmt"
 	"runtime"
 	"time"
-	"fmt"
 )
 
 // MemStats various print memory statistics related data and functions

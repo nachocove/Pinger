@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/op/go-logging"
-	"os"
 	"io/ioutil"
+	"os"
 	"runtime"
-	"time"
 	"strings"
+	"time"
 )
 
 type TelemetryWriter struct {
@@ -78,7 +78,7 @@ func (writer *TelemetryWriter) dbWriter() {
 func (writer *TelemetryWriter) uploader() {
 	ticker := time.NewTicker(time.Duration(1) * time.Second)
 	longRangerTicker := time.NewTicker(time.Duration(1) * time.Hour)
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -92,8 +92,8 @@ func (writer *TelemetryWriter) uploader() {
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Could not createFilesAndUpload: %v\n", err)
 			}
-			
-		case <- longRangerTicker.C:
+
+		case <-longRangerTicker.C:
 			err := writer.upload()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Could not upload files: %v\n", err)
@@ -187,7 +187,7 @@ func (writer *TelemetryWriter) createFiles() error {
 	rollback = false
 	return nil
 }
-	
+
 func (writer *TelemetryWriter) upload() error {
 	// Read all entries in the telemetry directory, look for any json files, and upload them
 	entries, err := ioutil.ReadDir(writer.fileLocationPrefix)
@@ -209,4 +209,3 @@ func (writer *TelemetryWriter) upload() error {
 	}
 	return nil
 }
-
