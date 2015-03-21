@@ -5,11 +5,12 @@ import (
 	"runtime"
 )
 
-func RecoverCrash(logger *Logging.Logger) {
-	if err := recover(); err != nil {
-		logger.Error("Error: %s", err)
+func RecoverCrash(logger *Logging.Logger) error {
+	if r := recover(); r != nil {
 		stack := make([]byte, 8*1024)
 		stack = stack[:runtime.Stack(stack, false)]
-		logger.Debug("Stack: %s", stack)
+		logger.Error("Recovered Crash: %s\nStack: %s", r, stack)
+		return r.(error)
 	}
+	return nil
 }

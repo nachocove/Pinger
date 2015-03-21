@@ -26,8 +26,13 @@ func (sa *StartPollArgs) getLogPrefix() string {
 	return sa.MailInfo.getLogPrefix()
 }
 
-func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse) error {
-	defer Utils.RecoverCrash(t.logger)
+func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse) (err error) {
+	defer func() {
+		e := Utils.RecoverCrash(t.logger)
+		if e != nil {
+			err = e
+		}
+	}()
 	t.logger.Debug("%s: Received StartPoll request", args.getLogPrefix())
 	pollMapKey := t.pollMapKey(args.MailInfo.ClientId, args.MailInfo.ClientContext, args.MailInfo.DeviceId)
 	reply.Code = PollingReplyOK
@@ -74,7 +79,7 @@ func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse)
 			panic("Got a client but ok is false?")
 		}
 	}
-	err := validateClientID(args.MailInfo.ClientId)
+	err = validateClientID(args.MailInfo.ClientId)
 	if err != nil {
 		return err
 	}
@@ -96,11 +101,11 @@ func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse)
 		t.logger.Warning(message)
 		reply.Message = message
 		reply.Code = PollingReplyError
-		return nil
+		return
 	}
 	t.pollMap[pollMapKey] = client
 	reply.Token = client.stopToken
-	return nil
+	return
 }
 
 type StopPollArgs struct {
@@ -119,8 +124,13 @@ func (sp *StopPollArgs) getLogPrefix() string {
 	return sp.logPrefix
 }
 
-func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error {
-	defer Utils.RecoverCrash(t.logger)
+func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) (err error) {
+	defer func() {
+		e := Utils.RecoverCrash(t.logger)
+		if e != nil {
+			err = e
+		}
+	}()
 	t.logger.Debug("%s: Received stopPoll request", args.getLogPrefix())
 	pollMapKey := t.pollMapKey(args.ClientId, args.ClientContext, args.DeviceId)
 	client, ok := t.pollMap[pollMapKey]
@@ -129,7 +139,8 @@ func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error 
 		t.logger.Warning("%s: No active sessions found for key %s", args.getLogPrefix(), pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "Not Polling"
-		return nil
+		err = nil
+		return
 	} else {
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
@@ -139,21 +150,24 @@ func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error 
 			t.logger.Warning("%s: invalid token", args.getLogPrefix())
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
-			return nil
+			err = nil
+			return
 		} else {
-			err := updateLastContact(t.dbm, args.ClientId, args.ClientContext, args.DeviceId, t.logger)
+			err = updateLastContact(t.dbm, args.ClientId, args.ClientContext, args.DeviceId, t.logger)
 			if err != nil {
 				t.logger.Error("%s: Could not update last contact %s", args.getLogPrefix(), err.Error())
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
-				return nil
+				err = nil
+				return
 			}
 			err = client.stop()
 			if err != nil {
 				t.logger.Error("%s:: Error stopping poll: %s", args.getLogPrefix(), err.Error())
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
-				return nil
+				err = nil
+				return
 			} else {
 				delete(t.pollMap, args.ClientId)
 				reply.Message = "Stopped"
@@ -161,7 +175,8 @@ func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) error 
 		}
 	}
 	reply.Code = PollingReplyOK
-	return nil
+	err = nil
+	return
 }
 
 type DeferPollArgs struct {
@@ -181,8 +196,13 @@ func (dp *DeferPollArgs) getLogPrefix() string {
 	return dp.logPrefix
 }
 
-func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) error {
-	defer Utils.RecoverCrash(t.logger)
+func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) (err error) {
+	defer func() {
+		e := Utils.RecoverCrash(t.logger)
+		if e != nil {
+			err = e
+		}
+	}()
 	t.logger.Debug("%s: Received deferPoll request", args.getLogPrefix())
 	pollMapKey := t.pollMapKey(args.ClientId, args.ClientContext, args.DeviceId)
 	client, ok := t.pollMap[pollMapKey]
@@ -276,8 +296,13 @@ func (t *BackendPolling) appendSessionInfo(sessionInfos []SessionInfo, mcc *Mail
 	return append(sessionInfos, info)
 }
 
-func (t *BackendPolling) FindActiveSessions(args *FindSessionsArgs, reply *FindSessionsResponse) error {
-	defer Utils.RecoverCrash(t.logger)
+func (t *BackendPolling) FindActiveSessions(args *FindSessionsArgs, reply *FindSessionsResponse) (err error) {
+	defer func() {
+		e := Utils.RecoverCrash(t.logger)
+		if e != nil {
+			err = e
+		}
+	}()
 	t.logger.Debug("Received findActiveSessions request with options %s", args.getLogPrefix())
 	for key, poll := range t.pollMap {
 		if args.MaxSessions > 0 && len(reply.SessionInfos) >= args.MaxSessions {
