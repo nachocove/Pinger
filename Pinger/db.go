@@ -4,14 +4,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
-
 	// blank import to get the mysql mappings for gorp
 	_ "github.com/Go-SQL-Driver/MySQL"
 	// blank import to get the mysql mappings for gorp
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/coopernurse/gorp"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/nachocove/Pinger/Utils/Logging"
 )
 
@@ -62,15 +59,17 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger)
 
 	switch {
 	case dbconfig.Type == "mysql":
-		dbmap = initDbMySql(dbconfig)
+		dbmap, err = initDbMySql(dbconfig)
 
 	case dbconfig.Type == "sqlite" || dbconfig.Type == "sqlite3":
-		dbmap = initDbSqlite(dbconfig)
+		dbmap, err = initDbSqlite(dbconfig)
 
 	default:
 		return nil, fmt.Errorf("Unknown db type %s", dbconfig.Type)
 	}
-
+	if err != nil {
+		return nil, err
+	}
 	if dbmap == nil {
 		return nil, errors.New("Could not get dbmap")
 	}
@@ -96,20 +95,20 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger)
 	return dbmap, nil
 }
 
-func initDbSqlite(dbconfig *DBConfiguration) *gorp.DbMap {
+func initDbSqlite(dbconfig *DBConfiguration) (*gorp.DbMap, error) {
 	db, err := sql.Open("sqlite3", dbconfig.Filename)
 	if err != nil {
 		// DO NOT LOG THE PASSWORD!
-		log.Fatalf("Failed to open sqlite3 DB: %s\n%v", dbconfig.Filename, err)
+		return nil, fmt.Errorf("Failed to open sqlite3 DB: %s\n%v", dbconfig.Filename, err)
 	}
 	err = db.Ping()
 	if err != nil {
-		log.Fatalf("Could not ping database: %v", err)
+		return nil, fmt.Errorf("Could not ping database: %v", err)
 	}
-	return &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}
+	return &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}, nil
 }
 
-func initDbMySql(dbConfig *DBConfiguration) *gorp.DbMap {
+func initDbMySql(dbConfig *DBConfiguration) (*gorp.DbMap, error) {
 	//const mysqlDBInitString string = "%s:%s@tcp(%s:%d)/%s/collation=utf8_general_ci&autocommit=true"
 	const mysqlDBInitString string = "%s:%s@tcp(%s:%d)/%s"
 	// connect to db using standard Go database/sql API
@@ -124,11 +123,11 @@ func initDbMySql(dbConfig *DBConfiguration) *gorp.DbMap {
 	db, err := sql.Open("mysql", connectString)
 	if err != nil {
 		// DO NOT LOG THE PASSWORD!
-		log.Fatalf("Failed to open DB: %s\n", fmt.Sprintf(mysqlDBInitString, dbConfig.Username, "XXXXXXX", dbConfig.Host, dbConfig.Port, dbConfig.Name))
+		return nil, fmt.Errorf("Failed to open DB: %s\n", fmt.Sprintf(mysqlDBInitString, dbConfig.Username, "XXXXXXX", dbConfig.Host, dbConfig.Port, dbConfig.Name))
 	}
 	err = db.Ping()
 	if err != nil {
-		log.Fatalf("Could not ping database: %v", err)
+		return nil, fmt.Errorf("Could not ping database: %v", err)
 	}
-	return &gorp.DbMap{Db: db, Dialect: gorp.MySQLDialect{Engine: "InnoDB", Encoding: "UTF8"}}
+	return &gorp.DbMap{Db: db, Dialect: gorp.MySQLDialect{Engine: "InnoDB", Encoding: "UTF8"}}, nil
 }
