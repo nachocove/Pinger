@@ -22,37 +22,46 @@ const (
 
 var TelemetryEventTypes []TelemetryEventType
 
+func (t TelemetryEventType) String() string {
+	return string(t)
+}
+
 func init() {
-	TelemetryEventTypes = []TelemetryEventType{ TelemetryEventDebug, TelemetryEventInfo, TelemetryEventWarning, TelemetryEventError }
+	TelemetryEventTypes = []TelemetryEventType{TelemetryEventDebug, TelemetryEventInfo, TelemetryEventWarning, TelemetryEventError}
 }
 
 type TelemetryMsg struct {
-	Id         string
-	EventType  TelemetryEventType
-	Timestamp  time.Time
-	UploadedAt time.Time
-	Module     string
-	Message    string
+	Id         string             `db:"id"`
+	EventType  TelemetryEventType `db:"event_type"`
+	Timestamp  time.Time          `db:"timestamp"`
+	UploadedAt time.Time          `db:"-"`
+	Module     string             `db:"module"`
+	Message    string             `db:"message"`
 }
 
 func (msg *TelemetryMsg) prepareForUpload() error {
-	uuid.SwitchFormat(uuid.Clean)
-	msg.Id = uuid.NewV4().String()
 	msg.UploadedAt = time.Now().Round(time.Millisecond).UTC()
 	return nil
 }
 
-func (msg *TelemetryMsg) Upload(location string) error {
-	err := msg.prepareForUpload()
-	if err != nil {
-		return err
-	}
-	// upload here
-	return nil
+type TelemetryMsgMap map[string]interface{}
+
+func (msg *TelemetryMsg) toMap() TelemetryMsgMap {
+	msg.prepareForUpload()
+	msgMap := make(TelemetryMsgMap)
+	msgMap["id"] = msg.Id
+	msgMap["event_type"] = string(msg.EventType)
+	msgMap["timestamp"] = TelemetryTimefromTime(msg.Timestamp)
+	msgMap["uploaded_at"] = TelemetryTimefromTime(msg.UploadedAt)
+	msgMap["module"] = msg.Module
+	msgMap["message"] = msg.Message
+	return msgMap
 }
 
 func NewTelemetryMsg(eventType TelemetryEventType, module, message string) TelemetryMsg {
+	uuid.SwitchFormat(uuid.Clean)
 	return TelemetryMsg{
+		Id:        uuid.NewV4().String(),
 		EventType: eventType,
 		Timestamp: time.Now().Round(time.Millisecond).UTC(),
 		Module:    module,
