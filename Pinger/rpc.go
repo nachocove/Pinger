@@ -106,7 +106,7 @@ func StartPollingRPCServer(config *Configuration, debug, debugSql bool, logger *
 
 	go alertAllDevices()
 
-	logger.Info("Starting RPC server on %s (pinger id %s)", config.Rpc.String(), pingerHostId)
+	logger.Debug("Starting RPC server on %s (pinger id %s)", config.Rpc.String(), pingerHostId)
 	switch {
 	case config.Rpc.Protocol == RPCProtocolHTTP:
 		rpc.HandleHTTP()
