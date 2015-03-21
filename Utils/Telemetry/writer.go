@@ -80,7 +80,7 @@ func (writer *TelemetryWriter) run() {
 	for {
 		select {
 		case msg := <- writer.telemetryCh:
-			enc, err := msg.Encode()
+			enc, err := msg.EncodeMsgPack()
 			if err != nil {
 				writer.Logger.Critical("Could not encode message: %+v", msg)
 				break
