@@ -31,7 +31,7 @@ func TelemetryMsgEventTypeToPack(eventType TelemetryEventType) int64 {
 		return TelemetryMsgPackWarning
 	case eventType == TelemetryEventError:
 		return TelemetryMsgPackError
-	case eventType == TelemetryEventDebug: 
+	case eventType == TelemetryEventDebug:
 		return TelemetryMsgPackDebug
 	}
 	panic(fmt.Sprintf("TelemetryMsgEventTypeToPack: unknown eventType: %v", eventType))
@@ -53,7 +53,7 @@ func TelemetryPackEventTypeToMsg(eventType int64) TelemetryEventType {
 
 type TelemetryMsgPackType map[TelemetryPackKey]interface{}
 
-func (msg *TelemetryMsg) Encode() ([]byte, error) {
+func (msg *TelemetryMsg) EncodeMsgPack() ([]byte, error) {
 	pack := make(TelemetryMsgPackType)
 	pack[TelemetryMsgPackId] = msg.Id
 	pack[TelemetryMsgPackEventType] = TelemetryMsgEventTypeToPack(msg.EventType)
@@ -73,7 +73,7 @@ func (msg *TelemetryMsg) Encode() ([]byte, error) {
 
 }
 
-func (msg *TelemetryMsg) Decode(in []byte) error {
+func (msg *TelemetryMsg) DecodeMsgPack(in []byte) error {
 	pack := make(TelemetryMsgPackType)
 	var h codec.Handle = new(codec.MsgpackHandle)
 	dec := codec.NewDecoderBytes(in, h)
