@@ -1,9 +1,9 @@
 package Utils
 
 import (
-	"log"
 	"runtime"
 	"time"
+	"fmt"
 )
 
 // MemStats various print memory statistics related data and functions
@@ -46,7 +46,7 @@ func (stats *MemStats) PrintIncrementalMemStats() {
 	extra := stats.extraInfo(stats)
 	incrTotalAlloc := int64(stats.Memstats.TotalAlloc) - int64(stats.Basememstats.TotalAlloc)
 	incrAlloc := int64(stats.Memstats.Alloc) - int64(stats.Basememstats.Alloc)
-	log.Printf("Memory: %.2fM InUse: %.2fM IncrMemory: %.2fM IncrInUse: %.2fM %s\n",
+	fmt.Printf("Memory: %.2fM InUse: %.2fM IncrMemory: %.2fM IncrInUse: %.2fM %s\n",
 		float64(stats.Memstats.TotalAlloc)/meg,
 		float64(stats.Memstats.Alloc)/meg,
 		float64(incrTotalAlloc)/meg,
@@ -58,7 +58,7 @@ func (stats *MemStats) PrintIncrementalMemStats() {
 func (stats *MemStats) PrintMemStats() {
 	runtime.ReadMemStats(&stats.Memstats)
 	extra := stats.extraInfo(stats)
-	log.Printf("Memory: %.2fM InUse: %.2fM %s\n", float64(stats.Memstats.TotalAlloc)/meg, float64(stats.Memstats.Alloc)/meg, extra)
+	fmt.Printf("Memory: %.2fM InUse: %.2fM %s\n", float64(stats.Memstats.TotalAlloc)/meg, float64(stats.Memstats.Alloc)/meg, extra)
 }
 
 // PrintMemStatsPeriodic print memory statistics periodically, starting now.
