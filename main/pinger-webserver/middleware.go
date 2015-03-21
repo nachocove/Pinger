@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"net/http/httputil"
 
@@ -19,12 +18,12 @@ const (
 func GetContext(r *http.Request) *Context {
 	val, ok := context.GetOk(r, serverContext)
 	if !ok {
-		log.Fatal("No serverContext in context")
+		panic("No serverContext in context")
 	}
 
 	context, ok := val.(*Context)
 	if !ok {
-		log.Fatal("No string template in context")
+		panic("No string template in context")
 	}
 	if context.Config.Global.DumpRequests {
 		responseBytes, err := httputil.DumpRequest(r, true)
