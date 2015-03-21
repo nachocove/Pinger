@@ -1,4 +1,4 @@
-.PHONY:docker nachobase pinger all test install curl-register curl-defer
+.PHONY:docker nachobase pinger all test install curl-register curl-defer clean
 
 PINGER_HOST ?= localhost:8443
 PINGER_EXAMPLE ?= janvD2
@@ -15,6 +15,8 @@ update-all:
 
 all: install test
 
+clean:
+	go clean ./...
 test:
 	go test ./...
 
