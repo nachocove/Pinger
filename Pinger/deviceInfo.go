@@ -168,7 +168,8 @@ func (di *DeviceInfo) Warning(format string, args ...interface{}) {
 
 func (di *DeviceInfo) cleanup() {
 	di.Debug("Cleaning up DeviceInfo")
-	di.dbm.Delete(di)
+	dlist := [1]*DeviceInfo{di}
+	di.dbm.Delete(dlist)
 	di.ClientId = ""
 	di.ClientContext = ""
 	di.DeviceId = ""
