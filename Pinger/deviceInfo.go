@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"reflect"
 	"regexp"
@@ -49,7 +48,7 @@ const (
 func addDeviceInfoTable(dbmap *gorp.DbMap) error {
 	tMap := dbmap.AddTableWithName(DeviceInfo{}, DeviceTableName)
 	if tMap.SetKeys(true, "Id") == nil {
-		log.Fatalf("Could not create key on DeviceInfo:ID")
+		panic(fmt.Sprintf("Could not create key on %s:ID", DeviceTableName))
 	}
 	cMap := tMap.ColMap("Created")
 	cMap.SetNotNull(true)
@@ -190,12 +189,8 @@ func (di *DeviceInfo) cleanup() {
 }
 
 var pingerHostId string
-var deviceInfoReflection reflect.Type
-var clientIdField reflect.StructField
-var contextField reflect.StructField
-var deviceidField reflect.StructField
-var pingerField reflect.StructField
-
+var getDeviceInfoSql string
+var getAllMyDeviceInfoSql string
 func init() {
 	interfaces, _ := net.Interfaces()
 	for _, inter := range interfaces {
@@ -212,6 +207,11 @@ func init() {
 		break
 	}
 	var ok bool
+	var deviceInfoReflection reflect.Type
+	var clientIdField reflect.StructField
+	var contextField reflect.StructField
+	var deviceidField reflect.StructField
+	var pingerField reflect.StructField
 	deviceInfoReflection = reflect.TypeOf(DeviceInfo{})
 	clientIdField, ok = deviceInfoReflection.FieldByName("ClientId")
 	if ok == false {
@@ -229,16 +229,19 @@ func init() {
 	if ok == false {
 		panic("Could not get Pinger Field information")
 	}
+	getDeviceInfoSql = fmt.Sprintf(
+		"select * from %s where %s=? and %s=? and %s=?",
+		DeviceTableName,
+		clientIdField.Tag.Get("db"), contextField.Tag.Get("db"), deviceidField.Tag.Get("db"))
+	getAllMyDeviceInfoSql = fmt.Sprintf("select * from %s where %s=?",
+		DeviceTableName,
+		pingerField.Tag.Get("db"))
 }
 
 func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *Logging.Logger) (*DeviceInfo, error) {
 	var devices []DeviceInfo
 	var err error
-	_, err = dbm.Select(&devices,
-		fmt.Sprintf(
-			"select * from %s where %s=? and %s=? and %s=?", DeviceTableName,
-			clientIdField.Tag.Get("db"), contextField.Tag.Get("db"), deviceidField.Tag.Get("db")),
-		clientId, clientContext, deviceId)
+	_, err = dbm.Select(&devices, getDeviceInfoSql, clientId, clientContext, deviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -268,10 +271,7 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, lo
 func getAllMyDeviceInfo(dbm *gorp.DbMap, logger *Logging.Logger) ([]DeviceInfo, error) {
 	var devices []DeviceInfo
 	var err error
-	_, err = dbm.Select(
-		&devices,
-		fmt.Sprintf("select * from %s where %s=?", DeviceTableName, pingerField.Tag.Get("db")),
-		pingerHostId)
+	_, err = dbm.Select(&devices, getAllMyDeviceInfoSql, pingerHostId)
 	if err != nil {
 		return nil, err
 	}
