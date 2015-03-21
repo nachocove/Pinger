@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -134,12 +133,12 @@ func GetConfigAndRun() {
 	config := NewConfiguration()
 	err = config.Read(configFile)
 	if err != nil {
-		log.Fatalf("Error reading config file:\n%v\n", err)
+		fmt.Fprintf(os.Stderr, "Error reading config file:\n%v\n", err)
 		os.Exit(1)
 	}
 	err = config.Global.Validate()
 	if err != nil {
-		log.Fatalf("Error validate global config:\n%v\n", err)
+		fmt.Fprintf(os.Stderr, "Error validate global config:\n%v\n", err)
 		os.Exit(1)
 	}
 
@@ -152,9 +151,8 @@ func GetConfigAndRun() {
 	if debug != defaultDebug {
 		config.Global.Debug = debug
 	}
-	debug = debug || config.Global.Debug
 	if config.Server.TemplateDir == "" {
-		log.Fatalf("No template directory specified!")
+		fmt.Fprintf(os.Stderr, "No template directory specified!")
 		os.Exit(1)
 	}
 	var screenLogging = false
@@ -163,9 +161,12 @@ func GetConfigAndRun() {
 		screenLogging = true
 		screenLevel = Logging.DEBUG
 	}
+	// From here on, treat the cfg debug and cli debug the same.
+	// Don't do this before we decide on the screen output above
+	debug = debug || config.Global.Debug
 	logger, err := config.Global.InitLogging(screenLogging, screenLevel, nil, debug)
 	if err != nil {
-		log.Fatalf("Error InitLogging: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error InitLogging: %v\n", err)
 		os.Exit(1)
 	}
 	context := NewContext(
