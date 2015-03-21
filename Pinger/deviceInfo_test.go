@@ -23,7 +23,7 @@ var testAppnumber = "(dev) Foo"
 
 func TestMain(m *testing.M) {
 	var err error
-	logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, true)
+	logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
 	dbmap, err = initDB(&dbconfig, true, true, logger)
 	if err != nil {

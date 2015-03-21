@@ -8,7 +8,7 @@ import (
 
 func TestStats(t *testing.T) {
 	assert := assert.New(t)
-	logger := Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, true)
+	logger := Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 	assert.NotNil(logger)
 	stopCh := make(chan int)
 	statLogger := NewStatLogger(stopCh, logger, false)

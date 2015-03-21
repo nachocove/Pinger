@@ -9,7 +9,7 @@ import (
 
 func TestRpcStart(t *testing.T) {
 	assert := assert.New(t)
-	logger := Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, true)
+	logger := Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 
 	config := NewConfiguration()
 	config.Db.Type = "sqlite"

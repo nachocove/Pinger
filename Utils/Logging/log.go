@@ -2,9 +2,9 @@ package Logging
 
 import (
 	"fmt"
+	"github.com/nachocove/Pinger/Utils/Telemetry"
 	"github.com/op/go-logging"
 	"os"
-	"github.com/nachocove/Pinger/Utils/Telemetry"
 )
 
 type Level logging.Level
@@ -86,7 +86,7 @@ func InitLogging(loggerName string, logFileName string, fileLevel Level, screen 
 		} else {
 			formatStr = normalFormatStr
 		}
-		
+
 		var fileLogger logging.LeveledBackend
 		var screenLogger logging.LeveledBackend
 		format := logging.MustStringFormatter(formatStr)
@@ -96,12 +96,12 @@ func InitLogging(loggerName string, logFileName string, fileLevel Level, screen 
 			screenLogger = logging.AddModuleLevel(logging.NewLogBackend(os.Stdout, "", 0))
 			screenLogger.SetLevel(logging.Level(screenLevel), "")
 		} else {
-			
+
 		}
 		switch {
 		case fileLogger != nil && screenLogger != nil && telemetryWriter != nil:
 			logging.SetBackend(fileLogger, screenLogger, telemetryWriter)
-			
+
 		case fileLogger != nil && screenLogger != nil:
 			logging.SetBackend(fileLogger, screenLogger)
 
