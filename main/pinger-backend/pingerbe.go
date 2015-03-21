@@ -61,7 +61,6 @@ func main() {
 	}
 	var screenLogging = false
 	var screenLevel = Logging.ERROR
-	debug = debug || config.Global.Debug
 	if debug || verbose {
 		screenLogging = true
 		if debug {
@@ -70,6 +69,10 @@ func main() {
 			screenLevel = Logging.INFO
 		}
 	}
+	
+	// From here on, treat the cfg debug and cli debug the same.
+	// Don't do this before we decide on the screen output above
+	debug = debug || config.Global.Debug
 	telemetryWriter, err := Telemetry.NewTelemetryWriter(&config.Telemetry, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Init Telemetry: %s\n", err)
@@ -81,7 +84,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Init Logging: %s\n", err)
 		os.Exit(1)
 	}
-	
+
 	Utils.InitCpuProfileSignal()
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
