@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"compress/gzip"
 )
 
 type TelemetryWriter struct {
@@ -179,12 +180,14 @@ func (writer *TelemetryWriter) createFiles() error {
 			if err != nil {
 				return err
 			}
-			teleFile := fmt.Sprintf("%s/%s-%s.json", writer.fileLocationPrefix, ttype, writeTime.Format(TelemetryTimeZFormat))
+			teleFile := fmt.Sprintf("%s/%s-%s.json.gz", writer.fileLocationPrefix, ttype, writeTime.Format(TelemetryTimeZFormat))
 			fp, err := os.OpenFile(teleFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 			if err != nil {
 				return err
 			}
-			_, err = fp.Write(jsonString)
+			w := gzip.NewWriter(fp)
+			_, err = w.Write(jsonString)
+			w.Close()
 			fp.Close()
 			if err != nil {
 				return err
@@ -213,7 +216,7 @@ func (writer *TelemetryWriter) upload() error {
 			continue
 		}
 		name := entry.Name()
-		if strings.HasSuffix(name, ".json") {
+		if strings.HasSuffix(name, ".json.gz") || strings.HasSuffix(name, ".json") {
 			err := writer.pushToS3(name)
 			if err != nil {
 				return err
