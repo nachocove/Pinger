@@ -95,12 +95,13 @@ func InitLogging(loggerName string, logFileName string, fileLevel Level, screen 
 		if screen {
 			screenLogger = logging.AddModuleLevel(logging.NewLogBackend(os.Stdout, "", 0))
 			screenLogger.SetLevel(logging.Level(screenLevel), "")
-		} else {
-
 		}
 		switch {
 		case fileLogger != nil && screenLogger != nil && telemetryWriter != nil:
 			logging.SetBackend(fileLogger, screenLogger, telemetryWriter)
+
+		case fileLogger != nil && telemetryWriter != nil:
+			logging.SetBackend(fileLogger, telemetryWriter)
 
 		case fileLogger != nil && screenLogger != nil:
 			logging.SetBackend(fileLogger, screenLogger)
