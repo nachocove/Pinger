@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"sync"
 )
 
 type TelemetryWriter struct {
@@ -29,6 +30,9 @@ type TelemetryWriter struct {
 	logger                  *log.Logger
 	hostId                  string
 	includeDebug            bool
+	debug                   bool
+	msgCount                int64
+	mutex sync.Mutex
 }
 
 func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfiguration, debug bool) (*TelemetryWriter, error) {
@@ -43,6 +47,8 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 		logger:             log.New(os.Stderr, "telemetryWriter", log.LstdFlags|log.Lshortfile),
 		hostId:             HostId.HostId(),
 		includeDebug:       config.IncludeDebug,
+		debug:              debug,
+		mutex: sync.Mutex{},
 	}
 	err := writer.makeFileLocationPrefix()
 	if err != nil {
@@ -94,21 +100,33 @@ func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logg
 		eventType = TelemetryEventWarning
 	}
 	if writer.includeDebug || eventType == TelemetryEventWarning || eventType == TelemetryEventError || eventType == TelemetryEventInfo {
+		if writer.debug {
+			writer.logger.Printf("Logger message: %s:%s", rec.Level, rec.Message())
+		}		
 		msg := NewTelemetryMsgFromRecord(eventType, rec)
 		writer.telemetryCh <- msg
+	} else {
+		if writer.debug {
+			writer.logger.Printf("IGNORED Logger message: %s:%s", rec.Level, rec.Message())
+		}		
 	}
 	return nil
 }
 
 func (writer *TelemetryWriter) dbWriter() {
 	for {
-		select {
-		case msg := <-writer.telemetryCh:
-			err := writer.dbmap.Insert(&msg)
-			if err != nil {
-				writer.logger.Printf("Could not write to DB: %v\n", err)
-			}
+		msg := <-writer.telemetryCh
+		err := writer.dbmap.Insert(&msg)
+		if err != nil {
+			writer.logger.Printf("Could not write to DB: %v\n", err)
 		}
+		writer.mutex.Lock()
+		writer.msgCount ++
+		if writer.msgCount > 100 {
+			writer.doUploadNow<-1
+			writer.msgCount = 0
+		}
+		writer.mutex.Unlock()
 	}
 }
 
@@ -189,8 +207,14 @@ func (writer *TelemetryWriter) createFiles() error {
 	}
 	defer func() {
 		if rollback {
+			if writer.debug {
+				writer.logger.Printf("Rollback")
+			}		
 			transaction.Rollback()
 		} else {
+			if writer.debug {
+				writer.logger.Printf("Commit")
+			}		
 			transaction.Commit()
 			writer.lastRead = time.Now().Round(time.Millisecond).UTC()
 		}
@@ -219,6 +243,9 @@ func (writer *TelemetryWriter) createFiles() error {
 			return err
 		}
 		teleFile := fmt.Sprintf("%s/%s--%s.json.gz", writer.fileLocationPrefix, startTime.Format(TelemetryTimeZFormat), endTime.Format(TelemetryTimeZFormat))
+		if writer.debug {
+			writer.logger.Printf("Creating file: %s", teleFile)
+		}		
 		fp, err := os.OpenFile(teleFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 		if err != nil {
 			return err
