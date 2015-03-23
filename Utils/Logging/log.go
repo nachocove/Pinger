@@ -99,7 +99,9 @@ func InitLogging(loggerName string, logFileName string, fileLevel Level, screen 
 			screenLogger.SetLevel(logging.Level(screenLevel), "")
 			loggers = append(loggers, screenLogger)
 		}
-		loggers = append(loggers, telemetryWriter)
+		if telemetryWriter != nil {
+			loggers = append(loggers, telemetryWriter)
+		}
 		logging.SetBackend(loggers...)
 		logging.SetFormatter(format)
 		logger := Logger{
