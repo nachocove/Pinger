@@ -31,7 +31,7 @@ type TelemetryWriter struct {
 }
 
 func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfiguration, debug bool) (*TelemetryWriter, error) {
-	if config.FileLocationPrefix == "" || config.UploadLocationPrefix == "" {
+	if config.FileLocationPrefix == "" {
 		return nil, nil // not an error. Just not configured for telemetry
 	}
 	writer := TelemetryWriter{
@@ -210,24 +210,26 @@ func (writer *TelemetryWriter) createFiles() error {
 }
 
 func (writer *TelemetryWriter) upload() error {
-	// Read all entries in the telemetry directory, look for any json files, and upload them
-	entries, err := ioutil.ReadDir(writer.fileLocationPrefix)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	if writer.uploadLocationPrefixUrl != nil {
+		// Read all entries in the telemetry directory, look for any json files, and upload them
+		entries, err := ioutil.ReadDir(writer.fileLocationPrefix)
+		if err != nil {
+			return err
 		}
-		name := entry.Name()
-		if strings.HasSuffix(name, ".json.gz") || strings.HasSuffix(name, ".json") {
-			err := writer.pushToS3(name)
-			if err != nil {
-				return err
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
 			}
-			err = os.Remove(path.Join(writer.fileLocationPrefix, name))
-			if err != nil {
-				return err
+			name := entry.Name()
+			if strings.HasSuffix(name, ".json.gz") || strings.HasSuffix(name, ".json") {
+				err := writer.pushToS3(name)
+				if err != nil {
+					return err
+				}
+				err = os.Remove(path.Join(writer.fileLocationPrefix, name))
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
