@@ -95,9 +95,6 @@ func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel Logging
 	}
 	loggerName := path.Base(os.Args[0])
 	logger := Logging.InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel, telemetryWriter, debug)
-	if err != nil {
-		return nil, err
-	}
 	return logger, nil
 }
 
