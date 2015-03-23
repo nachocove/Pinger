@@ -14,6 +14,9 @@ func (config *AWSConfiguration) PutFile(bucket, srcFilePath, destFilePath string
 		SecurityToken: "",
 	}
 
+	s3cfg := s3gof3r.DefaultConfig
+	s3cfg.Md5Check = false
+	
 	endpoint := fmt.Sprintf("s3-%s.%s", config.S3RegionName, "amazonaws.com")
 	// Open bucket to put file into
 	s3 := s3gof3r.New(endpoint, k)
@@ -26,7 +29,7 @@ func (config *AWSConfiguration) PutFile(bucket, srcFilePath, destFilePath string
 	}
 
 	// Open a PutWriter for upload
-	w, err := b.PutWriter(destFilePath, nil, nil)
+	w, err := b.PutWriter(destFilePath, nil, s3cfg)
 	if err != nil {
 		return err
 	}
