@@ -3,10 +3,10 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
+	"github.com/nachocove/Pinger/Utils/HostId"
 	"os"
 	"reflect"
 	"time"
-	"github.com/nachocove/Pinger/Utils/HostId"
 )
 
 type PingerInfo struct {

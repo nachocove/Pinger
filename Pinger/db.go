@@ -93,7 +93,7 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger)
 			return nil, fmt.Errorf("Create tables failed: %s", err)
 		}
 	}
-	
+
 	// Add us (if not already there), and start the updater
 	pinger, err := newPingerInfo(dbmap)
 	if err != nil {

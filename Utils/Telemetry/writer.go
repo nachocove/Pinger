@@ -1,10 +1,12 @@
 package Telemetry
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
+	"github.com/nachocove/Pinger/Utils/HostId"
 	"github.com/op/go-logging"
 	"io/ioutil"
 	"log"
@@ -14,8 +16,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-	"compress/gzip"
-	"github.com/nachocove/Pinger/Utils/HostId"
 )
 
 type TelemetryWriter struct {
