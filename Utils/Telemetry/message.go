@@ -14,6 +14,7 @@ type TelemetryMessages interface {
 type TelemetryEventType string
 
 const (
+	TelemetryEventAll     TelemetryEventType = ""  // used in DB lookups
 	TelemetryEventDebug   TelemetryEventType = "DEBUG"
 	TelemetryEventInfo    TelemetryEventType = "INFO"
 	TelemetryEventWarning TelemetryEventType = "WARNING"

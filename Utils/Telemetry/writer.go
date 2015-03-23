@@ -168,40 +168,45 @@ func (writer *TelemetryWriter) createFiles() error {
 		}
 	}()
 
-	writeTime := time.Now().Round(time.Millisecond).UTC()
-	for _, ttype := range TelemetryEventTypes {
-		var messages []TelemetryMsg
-		messages, err = writer.getAllMessagesSince(ttype, writer.lastRead)
+	var messages []TelemetryMsg
+	messages, err = writer.getAllMessagesSince(writer.lastRead, TelemetryEventAll)
+	if err != nil {
+		return err
+	}
+	var msgArray []TelemetryMsgMap
+	if len(messages) > 0 {
+		var startTime, endTime time.Time
+		for _, msg := range messages {
+			switch {
+			case startTime.IsZero() || msg.Timestamp.Before(startTime):
+				startTime = msg.Timestamp
+				
+			case endTime.IsZero() || msg.Timestamp.After(endTime):
+				endTime = msg.Timestamp
+			}
+			msgArray = append(msgArray, msg.toMap())
+		}
+		jsonString, err := json.Marshal(msgArray)
 		if err != nil {
 			return err
 		}
-		var msgArray []TelemetryMsgMap
-		if len(messages) > 0 {
-			for _, msg := range messages {
-				msgArray = append(msgArray, msg.toMap())
-			}
-			jsonString, err := json.Marshal(msgArray)
-			if err != nil {
-				return err
-			}
-			teleFile := fmt.Sprintf("%s/%s-%s.json.gz", writer.fileLocationPrefix, ttype, writeTime.Format(TelemetryTimeZFormat))
-			fp, err := os.OpenFile(teleFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
-			if err != nil {
-				return err
-			}
-			w := gzip.NewWriter(fp)
-			_, err = w.Write(jsonString)
-			w.Close()
-			fp.Close()
-			if err != nil {
-				return err
-			}
+		teleFile := fmt.Sprintf("%s/%s--%s.json.gz", writer.fileLocationPrefix, startTime.Format(TelemetryTimeZFormat), endTime.Format(TelemetryTimeZFormat))
+		fp, err := os.OpenFile(teleFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
+		if err != nil {
+			return err
+		}
+		w := gzip.NewWriter(fp)
+		_, err = w.Write(jsonString)
+		w.Close()
+		fp.Close()
+		if err != nil {
+			return err
+		}
 
-			for _, msg := range messages {
-				_, err = writer.dbmap.Delete(&msg)
-				if err != nil {
-					return err
-				}
+		for _, msg := range messages {
+			_, err = writer.dbmap.Delete(&msg)
+			if err != nil {
+				return err
 			}
 		}
 	}

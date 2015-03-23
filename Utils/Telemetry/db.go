@@ -28,7 +28,9 @@ func (writer *TelemetryWriter) initDb() error {
 	if tMap.SetKeys(false, "Id") == nil {
 		panic(fmt.Sprintf("Could not create key on %s:ID", TelemetryTableName))
 	}
-
+	cMap := tMap.ColMap("EventType")
+	cMap.SetNotNull(true)
+	
 	err = writer.dbmap.CreateTablesIfNotExists()
 	if err != nil {
 		panic(fmt.Sprintf("Create tables failed: %s", err))
@@ -44,6 +46,7 @@ func (t TelemetryEventType) Value() (driver.Value, error) {
 	return string(t), nil
 }
 
+var getAllMessagesSQLwithType string
 var getAllMessagesSQL string
 
 func init() {
@@ -60,12 +63,18 @@ func init() {
 	if ok == false {
 		panic("Could not get EventType Field information")
 	}
-	getAllMessagesSQL = fmt.Sprintf("select * from %s where %s=? and %s>?", TelemetryTableName, eventTypeField.Tag.Get("db"), timestampField.Tag.Get("db"))
+	getAllMessagesSQLwithType = fmt.Sprintf("select * from %s where %s=? and %s>?", TelemetryTableName, eventTypeField.Tag.Get("db"), timestampField.Tag.Get("db"))
+	getAllMessagesSQL = fmt.Sprintf("select * from %s where %s>?", TelemetryTableName, timestampField.Tag.Get("db"))
 }
 
-func (writer *TelemetryWriter) getAllMessagesSince(eventType TelemetryEventType, t time.Time) ([]TelemetryMsg, error) {
+func (writer *TelemetryWriter) getAllMessagesSince(t time.Time, eventType TelemetryEventType) ([]TelemetryMsg, error) {
 	var messages []TelemetryMsg
-	_, err := writer.dbmap.Select(&messages, getAllMessagesSQL, string(eventType), t)
+	var err error
+	if eventType == TelemetryEventAll {
+		_, err = writer.dbmap.Select(&messages, getAllMessagesSQL, t)
+	} else {
+		_, err = writer.dbmap.Select(&messages, getAllMessagesSQLwithType, eventType, t)
+	}
 	if err != nil {
 		return nil, err
 	}
