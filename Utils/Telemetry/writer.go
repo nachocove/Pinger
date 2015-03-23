@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 	"compress/gzip"
+	"github.com/nachocove/Pinger/Utils/HostId"
 )
 
 type TelemetryWriter struct {
@@ -26,6 +27,7 @@ type TelemetryWriter struct {
 	doUploadNow             chan int
 	awsConfig               *AWS.AWSConfiguration
 	logger                  *log.Logger
+	hostId                  string
 }
 
 func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfiguration, debug bool) (*TelemetryWriter, error) {
@@ -38,12 +40,14 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 		doUploadNow:        make(chan int, 5),
 		awsConfig:          awsConfig,
 		logger:             log.New(os.Stderr, "telemetryWriter", log.LstdFlags|log.Lshortfile),
+		hostId:             HostId.HostId(),
 	}
 	if config.UploadLocationPrefix != "" && awsConfig != nil {
 		u, err := url.Parse(config.UploadLocationPrefix)
 		if err != nil {
 			return nil, err
 		}
+		u.Path = path.Join(u.Path, writer.hostId)
 		writer.uploadLocationPrefixUrl = u
 	}
 	err := writer.initDb()

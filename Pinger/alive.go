@@ -1,14 +1,12 @@
 package Pinger
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"github.com/coopernurse/gorp"
-	"net"
 	"os"
 	"reflect"
 	"time"
+	"github.com/nachocove/Pinger/Utils/HostId"
 )
 
 type PingerInfo struct {
@@ -28,20 +26,7 @@ var pingerHostId string
 var getPingerSql string
 
 func init() {
-	interfaces, _ := net.Interfaces()
-	for _, inter := range interfaces {
-		if inter.Name[0:2] == "lo" {
-			continue
-		}
-		if inter.HardwareAddr.String() == "" {
-			continue
-		}
-		hash := sha256.New()
-		hash.Write(inter.HardwareAddr)
-		md := hash.Sum(nil)
-		pingerHostId = hex.EncodeToString(md)
-		break
-	}
+	pingerHostId = HostId.HostId()
 	var pingerInfoReflection reflect.Type
 	var pingerField reflect.StructField
 	var ok bool
