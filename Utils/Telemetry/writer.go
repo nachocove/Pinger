@@ -42,6 +42,10 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 		logger:             log.New(os.Stderr, "telemetryWriter", log.LstdFlags|log.Lshortfile),
 		hostId:             HostId.HostId(),
 	}
+	err := writer.makeFileLocationPrefix()
+	if err != nil {
+		return nil, err
+	}
 	if config.UploadLocationPrefix != "" && awsConfig != nil {
 		u, err := url.Parse(config.UploadLocationPrefix)
 		if err != nil {
@@ -50,7 +54,7 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 		u.Path = path.Join(u.Path, writer.hostId)
 		writer.uploadLocationPrefixUrl = u
 	}
-	err := writer.initDb()
+	err = writer.initDb()
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +142,16 @@ func exists(path string) bool {
 		return false
 	}
 	return false
+}
+
+func (writer *TelemetryWriter) makeFileLocationPrefix() error {
+	if !exists(writer.fileLocationPrefix) {
+		err := os.MkdirAll(writer.fileLocationPrefix, 0700)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (writer *TelemetryWriter) createFilesAndUpload() error {
