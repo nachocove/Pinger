@@ -65,6 +65,16 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 	return &writer, nil
 }
 
+func NewTelemetryMsgFromRecord(eventType TelemetryEventType, rec *logging.Record) TelemetryMsg {
+	return TelemetryMsg{
+		Id:        NewId(),
+		EventType: eventType,
+		Timestamp: rec.Time.Round(time.Millisecond).UTC(),
+		Module:    rec.Module,
+		Message:   rec.Message(),
+	}
+}
+
 func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logging.Record) error {
 	var eventType TelemetryEventType
 	switch {
@@ -84,7 +94,7 @@ func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logg
 		eventType = TelemetryEventWarning
 	}
 	if writer.includeDebug || eventType == TelemetryEventWarning || eventType == TelemetryEventError || eventType == TelemetryEventInfo {
-		msg := NewTelemetryMsg(eventType, "", rec.Formatted(calldepth+1))
+		msg := NewTelemetryMsgFromRecord(eventType, rec)
 		writer.telemetryCh <- msg
 	}
 	return nil

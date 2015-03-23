@@ -47,6 +47,10 @@ func (msg *TelemetryMsg) prepareForUpload() error {
 
 type TelemetryMsgMap map[string]interface{}
 
+func NewId() string {
+	uuid.SwitchFormat(uuid.Clean)
+	return uuid.NewV4().String()
+}
 func (msg *TelemetryMsg) toMap() TelemetryMsgMap {
 	msg.prepareForUpload()
 	msgMap := make(TelemetryMsgMap)
@@ -60,9 +64,8 @@ func (msg *TelemetryMsg) toMap() TelemetryMsgMap {
 }
 
 func NewTelemetryMsg(eventType TelemetryEventType, module, message string) TelemetryMsg {
-	uuid.SwitchFormat(uuid.Clean)
 	return TelemetryMsg{
-		Id:        uuid.NewV4().String(),
+		Id:        NewId(),
 		EventType: eventType,
 		Timestamp: time.Now().Round(time.Millisecond).UTC(),
 		Module:    module,
