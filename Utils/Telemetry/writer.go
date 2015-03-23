@@ -28,6 +28,7 @@ type TelemetryWriter struct {
 	awsConfig               *AWS.AWSConfiguration
 	logger                  *log.Logger
 	hostId                  string
+	includeDebug            bool
 }
 
 func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfiguration, debug bool) (*TelemetryWriter, error) {
@@ -41,6 +42,7 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 		awsConfig:          awsConfig,
 		logger:             log.New(os.Stderr, "telemetryWriter", log.LstdFlags|log.Lshortfile),
 		hostId:             HostId.HostId(),
+		includeDebug:       config.IncludeDebug,
 	}
 	err := writer.makeFileLocationPrefix()
 	if err != nil {
@@ -81,8 +83,10 @@ func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logg
 	default:
 		eventType = TelemetryEventWarning
 	}
-	msg := NewTelemetryMsg(eventType, "", rec.Formatted(calldepth+1))
-	writer.telemetryCh <- msg
+	if writer.includeDebug || eventType == TelemetryEventWarning || eventType == TelemetryEventError || eventType == TelemetryEventInfo {
+		msg := NewTelemetryMsg(eventType, "", rec.Formatted(calldepth+1))
+		writer.telemetryCh <- msg
+	}
 	return nil
 }
 
@@ -194,7 +198,7 @@ func (writer *TelemetryWriter) createFiles() error {
 			switch {
 			case startTime.IsZero() || msg.Timestamp.Before(startTime):
 				startTime = msg.Timestamp
-				
+
 			case endTime.IsZero() || msg.Timestamp.After(endTime):
 				endTime = msg.Timestamp
 			}
