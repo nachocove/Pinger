@@ -25,6 +25,10 @@ type AWSConfiguration struct {
 
 	CognitoIdentityRegionName string
 	CognitoIdentityPoolID     string
+
+	S3RegionName string
+
+	awsCreds aws.CredentialsProvider
 }
 
 func (config *AWSConfiguration) Validate() error {
@@ -37,14 +41,18 @@ func (config *AWSConfiguration) Validate() error {
 	if config.CognitoIdentityRegionName == "" {
 		config.CognitoIdentityRegionName = config.RegionName
 	}
+	if config.S3RegionName == "" {
+		config.S3RegionName = config.RegionName
+	}
+	token := ""
+	creds := aws.Creds(config.AccessKey, config.SecretKey, token)
+	config.awsCreds = creds
 	return nil
 }
 
 func (config *AWSConfiguration) getSNSSession() (*sns.SNS, error) {
 	// TODO See about caching the sessions
-	token := ""
-	creds := aws.Creds(config.AccessKey, config.SecretKey, token)
-	snsSession := sns.New(creds, config.SnsRegionName, nil)
+	snsSession := sns.New(config.awsCreds, config.SnsRegionName, nil)
 	return snsSession, nil
 }
 
@@ -154,9 +162,7 @@ func (config *AWSConfiguration) SendPushNotification(endpointArn, message string
 
 func (config *AWSConfiguration) getCognitoIdentitySession() (*cognitoidentity.CognitoIdentity, error) {
 	// TODO See about caching the sessions
-	token := ""
-	creds := aws.Creds(config.AccessKey, config.SecretKey, token)
-	cognitoSession := cognitoidentity.New(creds, config.CognitoIdentityRegionName, nil)
+	cognitoSession := cognitoidentity.New(config.awsCreds, config.CognitoIdentityRegionName, nil)
 	return cognitoSession, nil
 }
 

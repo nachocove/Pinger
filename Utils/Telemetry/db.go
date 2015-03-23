@@ -16,7 +16,7 @@ func (writer *TelemetryWriter) initDb() error {
 	dbFile := fmt.Sprintf("%s/%s", writer.fileLocationPrefix, "telemetry.db")
 	db, err := sql.Open("sqlite3", dbFile)
 	if err != nil {
-		return fmt.Errorf("Failed to open sqlite3 DB: %s\n%v", dbFile, err)
+		panic(fmt.Sprintf("Failed to open sqlite3 DB: %s\n%v", dbFile, err))
 	}
 	err = db.Ping()
 	if err != nil {

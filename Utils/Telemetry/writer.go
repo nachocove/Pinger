@@ -4,32 +4,46 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/coopernurse/gorp"
+	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/op/go-logging"
 	"io/ioutil"
+	"log"
+	"net/url"
 	"os"
+	"path"
 	"runtime"
 	"strings"
 	"time"
 )
 
 type TelemetryWriter struct {
-	fileLocationPrefix   string
-	uploadLocationPrefix string
-	dbmap                *gorp.DbMap
-	lastRead             time.Time
-	telemetryCh          chan TelemetryMsg
-	doUploadNow          chan int
+	fileLocationPrefix      string
+	uploadLocationPrefixUrl *url.URL
+	dbmap                   *gorp.DbMap
+	lastRead                time.Time
+	telemetryCh             chan TelemetryMsg
+	doUploadNow             chan int
+	awsConfig               *AWS.AWSConfiguration
+	logger                  *log.Logger
 }
 
-func NewTelemetryWriter(config *TelemetryConfiguration, debug bool) (*TelemetryWriter, error) {
+func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfiguration, debug bool) (*TelemetryWriter, error) {
 	if config.FileLocationPrefix == "" || config.UploadLocationPrefix == "" {
 		return nil, nil // not an error. Just not configured for telemetry
 	}
 	writer := TelemetryWriter{
-		fileLocationPrefix:   config.FileLocationPrefix,
-		uploadLocationPrefix: config.UploadLocationPrefix,
-		telemetryCh:          make(chan TelemetryMsg, 1024),
-		doUploadNow:          make(chan int, 5),
+		fileLocationPrefix: config.FileLocationPrefix,
+		telemetryCh:        make(chan TelemetryMsg, 1024),
+		doUploadNow:        make(chan int, 5),
+		awsConfig:          awsConfig,
+		logger:             log.New(os.Stderr, "telemetryWriter", log.LstdFlags|log.Lshortfile),
+	}
+	if config.UploadLocationPrefix != "" && awsConfig != nil {
+		u, err := url.Parse(config.UploadLocationPrefix)
+		if err != nil {
+			return nil, err
+		}
+		writer.uploadLocationPrefixUrl = u
 	}
 	err := writer.initDb()
 	if err != nil {
@@ -69,7 +83,7 @@ func (writer *TelemetryWriter) dbWriter() {
 		case msg := <-writer.telemetryCh:
 			err := writer.dbmap.Insert(&msg)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Could not write to DB: %v\n", err)
+				writer.logger.Printf("Could not write to DB: %v\n", err)
 			}
 		}
 	}
@@ -84,29 +98,29 @@ func (writer *TelemetryWriter) uploader() {
 		case <-ticker.C:
 			err := writer.createFilesAndUpload()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Could not createFilesAndUpload: %v\n", err)
+				writer.logger.Printf("Could not createFilesAndUpload: %v\n", err)
 			}
 
 		case <-writer.doUploadNow:
 			err := writer.createFilesAndUpload()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Could not createFilesAndUpload: %v\n", err)
+				writer.logger.Printf("Could not createFilesAndUpload: %v\n", err)
 			}
 
 		case <-longRangerTicker.C:
 			err := writer.upload()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Could not upload files: %v\n", err)
+				writer.logger.Printf("Could not upload files: %v\n", err)
 			}
 		}
 	}
 }
 
-func recoverCrash() {
+func recoverCrash(logger *log.Logger) {
 	if err := recover(); err != nil {
 		stack := make([]byte, 8*1024)
 		stack = stack[:runtime.Stack(stack, false)]
-		fmt.Fprintf(os.Stderr, "Error: %s\nStack: %s", err, stack)
+		logger.Printf("Error: %s\nStack: %s", err, stack)
 	}
 }
 
@@ -134,7 +148,7 @@ func (writer *TelemetryWriter) createFilesAndUpload() error {
 }
 
 func (writer *TelemetryWriter) createFiles() error {
-	defer recoverCrash()
+	defer recoverCrash(writer.logger)
 	var rollback = true
 	transaction, err := writer.dbmap.Begin()
 	if err != nil {
@@ -204,7 +218,10 @@ func (writer *TelemetryWriter) upload() error {
 			if err != nil {
 				return err
 			}
-			os.Remove(name)
+			err = os.Remove(path.Join(writer.fileLocationPrefix, name))
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -73,7 +73,7 @@ func main() {
 	// From here on, treat the cfg debug and cli debug the same.
 	// Don't do this before we decide on the screen output above
 	debug = debug || config.Global.Debug
-	telemetryWriter, err := Telemetry.NewTelemetryWriter(&config.Telemetry, debug)
+	telemetryWriter, err := Telemetry.NewTelemetryWriter(&config.Telemetry, &config.Aws, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Init Telemetry: %s\n", err)
 		os.Exit(1)
