@@ -89,26 +89,18 @@ func InitLogging(loggerName string, logFileName string, fileLevel Level, screen 
 
 		var fileLogger logging.LeveledBackend
 		var screenLogger logging.LeveledBackend
+		var loggers = make([]logging.Backend, 0, 3)
 		format := logging.MustStringFormatter(formatStr)
 		fileLogger = logging.AddModuleLevel(logging.NewLogBackend(logFile, "", 0))
 		fileLogger.SetLevel(logging.Level(fileLevel), "")
+		loggers = append(loggers, fileLogger)
 		if screen {
 			screenLogger = logging.AddModuleLevel(logging.NewLogBackend(os.Stdout, "", 0))
 			screenLogger.SetLevel(logging.Level(screenLevel), "")
+			loggers = append(loggers, screenLogger)
 		}
-		switch {
-		case fileLogger != nil && screenLogger != nil && telemetryWriter != nil:
-			logging.SetBackend(fileLogger, screenLogger, telemetryWriter)
-
-		case fileLogger != nil && telemetryWriter != nil:
-			logging.SetBackend(fileLogger, telemetryWriter)
-
-		case fileLogger != nil && screenLogger != nil:
-			logging.SetBackend(fileLogger, screenLogger)
-
-		default:
-			logging.SetBackend(fileLogger)
-		}
+		loggers = append(loggers, telemetryWriter)
+		logging.SetBackend(loggers...)
 		logging.SetFormatter(format)
 		logger := Logger{
 			logger: logging.MustGetLogger(loggerName),
