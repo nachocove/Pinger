@@ -32,6 +32,9 @@ func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse)
 		if e != nil {
 			err = e
 		}
+		if err != nil {
+			t.logger.Error("%s", err.Error())
+		}
 	}()
 	t.logger.Debug("%s: Received StartPoll request", args.getLogPrefix())
 	pollMapKey := t.pollMapKey(args.MailInfo.ClientId, args.MailInfo.ClientContext, args.MailInfo.DeviceId)
@@ -40,9 +43,10 @@ func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse)
 	client, ok := t.pollMap[pollMapKey]
 	if ok == true {
 		if client == nil {
-			return fmt.Errorf("%s: Could not find poll session in map", args.getLogPrefix())
+			err = fmt.Errorf("%s: Could not find poll session in map", args.getLogPrefix())
+			return err
 		}
-		err := updateLastContact(t.dbm, args.MailInfo.ClientId, args.MailInfo.ClientContext, args.MailInfo.DeviceId, t.logger)
+		err = updateLastContact(t.dbm, args.MailInfo.ClientId, args.MailInfo.ClientContext, args.MailInfo.DeviceId, t.logger)
 		if err != nil {
 			reply.Message = err.Error()
 			reply.Code = PollingReplyError
@@ -130,6 +134,9 @@ func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) (err e
 		if e != nil {
 			err = e
 		}
+		if err != nil {
+			t.logger.Error("%s", err.Error())
+		}
 	}()
 	t.logger.Debug("%s: Received stopPoll request", args.getLogPrefix())
 	pollMapKey := t.pollMapKey(args.ClientId, args.ClientContext, args.DeviceId)
@@ -201,6 +208,9 @@ func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) (err
 		e := Utils.RecoverCrash(t.logger)
 		if e != nil {
 			err = e
+		}
+		if err != nil {
+			t.logger.Error("%s", err.Error())
 		}
 	}()
 	t.logger.Debug("%s: Received deferPoll request", args.getLogPrefix())
