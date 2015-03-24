@@ -43,7 +43,7 @@ func addPingerInfoTable(dbmap *gorp.DbMap) {
 	if tMap.SetKeys(false, "Pinger") == nil {
 		panic(fmt.Sprintf("Could not create key on %s:Pinger", PingerTableName))
 	}
-	tMap.SetVersionCol("Id")
+	//tMap.SetVersionCol("Id")
 	cMap := tMap.ColMap("Created")
 	cMap.SetNotNull(true)
 
