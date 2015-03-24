@@ -1,7 +1,6 @@
 package Pinger
 
 import (
-	"fmt"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -25,5 +24,8 @@ func TestRpcStart(t *testing.T) {
 	reply := StartPollingResponse{}
 
 	err = poll.Start(&args, &reply)
-	assert.NotNil(err, fmt.Sprintf("Did not get error from poll.Start. DeviceInfo save should have failed"))
+	assert.NoError(err)
+	assert.Equal(PollingReplyError, reply.Code)
+	assert.Empty(reply.Token)
+	assert.NotEmpty(reply.Message)
 }
