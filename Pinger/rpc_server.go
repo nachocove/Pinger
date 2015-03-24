@@ -85,7 +85,9 @@ func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse)
 	}
 	err = validateClientID(args.MailInfo.ClientId)
 	if err != nil {
-		return err
+		reply.Message = err.Error()
+		reply.Code = PollingReplyError
+		return nil
 	}
 
 	di, err := newDeviceInfoPI(t.dbm, args.MailInfo, t.logger)
