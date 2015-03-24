@@ -177,11 +177,11 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		status:    MailClientStatusInitialized,
 	}
 	client.logger.SetCallDepth(1)
-	client.Debug("Validating clientID")
 	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, pi.ClientContext, pi.DeviceId, client.logger)
 	if err != nil {
 		return nil, err
 	}
+	client.Debug("Validating client info")
 	err = deviceInfo.validateClient()
 	if err != nil {
 		return nil, err
