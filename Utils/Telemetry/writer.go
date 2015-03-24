@@ -104,15 +104,8 @@ func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logg
 		eventType = telemetryEventWarning
 	}
 	if writer.includeDebug || eventType == telemetryEventWarning || eventType == telemetryEventError || eventType == telemetryEventInfo {
-		if writer.debug {
-			writer.logger.Printf("Logger message: %s:%s", rec.Level, rec.Message())
-		}
 		msg := newTelemetryMsgFromRecord(eventType, rec)
 		writer.telemetryCh <- msg
-	} else {
-		if writer.debug {
-			writer.logger.Printf("IGNORED Logger message: %s:%s", rec.Level, rec.Message())
-		}
 	}
 	return nil
 }
