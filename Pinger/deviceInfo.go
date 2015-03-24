@@ -467,6 +467,17 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 	return err
 }
 
+func (di *DeviceInfo) customerData() string {
+	customMap := make(map[string]string)
+	customMap["deviceId"] = di.DeviceId
+	customMap["clientId"] = di.ClientId
+	customJson, err := json.Marshal(customMap)
+	if err != nil {
+		return ""
+	}
+	return string(customJson)
+}
+
 func (di *DeviceInfo) registerAws() error {
 	if di.AWSEndpointArn != "" {
 		panic("No need to call register again. Call validate")
@@ -487,7 +498,7 @@ func (di *DeviceInfo) registerAws() error {
 		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
 	}
 
-	arn, registerErr := DefaultPollingContext.config.Aws.RegisterEndpointArn(di.PushService, pushToken, di.ClientId)
+	arn, registerErr := DefaultPollingContext.config.Aws.RegisterEndpointArn(di.PushService, pushToken, di.customerData())
 	if registerErr != nil {
 		re, err := regexp.Compile("^.*Endpoint (?P<arn>arn:aws:sns:[^ ]+) already exists.*$")
 		if err != nil {
@@ -500,7 +511,7 @@ func (di *DeviceInfo) registerAws() error {
 			if err != nil {
 				return err
 			}
-			attributes["CustomUserData"] = di.ClientId
+			attributes["CustomUserData"] = di.customerData()
 			err = DefaultPollingContext.config.Aws.SetEndpointAttributes(arn, attributes)
 			if err != nil {
 				return err
