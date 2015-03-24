@@ -21,14 +21,9 @@ const (
 	TelemetryEventError   TelemetryEventType = "ERROR"
 )
 
-var TelemetryEventTypes []TelemetryEventType
 
 func (t TelemetryEventType) String() string {
 	return string(t)
-}
-
-func init() {
-	TelemetryEventTypes = []TelemetryEventType{TelemetryEventDebug, TelemetryEventInfo, TelemetryEventWarning, TelemetryEventError}
 }
 
 type TelemetryMsg struct {
