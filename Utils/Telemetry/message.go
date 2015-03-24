@@ -5,62 +5,65 @@ import (
 	"time"
 )
 
-type TelemetryMessages interface {
-	Encode() ([]byte, error)
-	Decode([]byte) error
-	PrepareForUpload() error
-	Upload(location string) error
-}
-type TelemetryEventType string
+// telemetryEventType The telemetry event type
+type telemetryEventType string
 
 const (
-	TelemetryEventAll     TelemetryEventType = ""  // used in DB lookups
-	TelemetryEventDebug   TelemetryEventType = "DEBUG"
-	TelemetryEventInfo    TelemetryEventType = "INFO"
-	TelemetryEventWarning TelemetryEventType = "WARN"
-	TelemetryEventError   TelemetryEventType = "ERROR"
+	// telemetryEventAll used in DB lookups only. Can not be used as a DB entry
+	telemetryEventAll     telemetryEventType = ""  //
+	// telemetryEventDebug A Debug entry
+	telemetryEventDebug   telemetryEventType = "DEBUG"
+	// telemetryEventInfo an Info entry
+	telemetryEventInfo    telemetryEventType = "INFO"
+	// telemetryEventWarning a Warn entry
+	telemetryEventWarning telemetryEventType = "WARN"
+	// telemetryEventError an Error entry
+	telemetryEventError   telemetryEventType = "ERROR"
 )
 
 
-func (t TelemetryEventType) String() string {
+// String convert the custom type to a string.
+func (t telemetryEventType) String() string {
 	return string(t)
 }
 
-type TelemetryMsg struct {
+// telemetryMsg a telemetry message entry. Also used to generate the DB table
+type telemetryMsg struct {
 	Id         string             `db:"id"`
-	EventType  TelemetryEventType `db:"event_type"`
+	EventType  telemetryEventType `db:"event_type"`
 	Timestamp  time.Time          `db:"timestamp"`
 	UploadedAt time.Time          `db:"-"`
 	Module     string             `db:"module"`
 	Message    string             `db:"message"`
 }
 
-func (msg *TelemetryMsg) prepareForUpload() error {
+func (msg *telemetryMsg) prepareForUpload() error {
 	msg.UploadedAt = time.Now().Round(time.Millisecond).UTC()
 	return nil
 }
 
-type TelemetryMsgMap map[string]interface{}
+type telemetryMsgMap map[string]interface{}
 
-func NewId() string {
+func newId() string {
 	uuid.SwitchFormat(uuid.Clean)
 	return uuid.NewV4().String()
 }
-func (msg *TelemetryMsg) toMap() TelemetryMsgMap {
+func (msg *telemetryMsg) toMap() telemetryMsgMap {
 	msg.prepareForUpload()
-	msgMap := make(TelemetryMsgMap)
+	msgMap := make(telemetryMsgMap)
 	msgMap["id"] = msg.Id
 	msgMap["event_type"] = string(msg.EventType)
-	msgMap["timestamp"] = TelemetryTimefromTime(msg.Timestamp)
-	msgMap["uploaded_at"] = TelemetryTimefromTime(msg.UploadedAt)
+	msgMap["timestamp"] = telemetryTimefromTime(msg.Timestamp)
+	msgMap["uploaded_at"] = telemetryTimefromTime(msg.UploadedAt)
 	msgMap["module"] = msg.Module
 	msgMap["message"] = msg.Message
 	return msgMap
 }
 
-func NewTelemetryMsg(eventType TelemetryEventType, module, message string) TelemetryMsg {
-	return TelemetryMsg{
-		Id:        NewId(),
+// NewTelemetryMsg Create a new telemetry message instance
+func NewTelemetryMsg(eventType telemetryEventType, module, message string) telemetryMsg {
+	return telemetryMsg{
+		Id:        newId(),
 		EventType: eventType,
 		Timestamp: time.Now().Round(time.Millisecond).UTC(),
 		Module:    module,

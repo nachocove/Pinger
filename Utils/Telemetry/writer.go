@@ -19,12 +19,14 @@ import (
 	"time"
 )
 
+// TelemetryWriter The telemetry writer functionality. Comprises a few goroutines for writing to the DB, extracting
+// into files, pushing to telemetry (s3) etc.
 type TelemetryWriter struct {
 	fileLocationPrefix      string
 	uploadLocationPrefixUrl *url.URL
 	dbmap                   *gorp.DbMap
 	lastRead                time.Time
-	telemetryCh             chan TelemetryMsg
+	telemetryCh             chan telemetryMsg
 	doUploadNow             chan int
 	awsConfig               *AWS.AWSConfiguration
 	logger                  *log.Logger
@@ -35,13 +37,14 @@ type TelemetryWriter struct {
 	mutex                   sync.Mutex
 }
 
+// NewTelemetryWriter create a new TelemetryWriter instance
 func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfiguration, debug bool) (*TelemetryWriter, error) {
 	if config.FileLocationPrefix == "" {
 		return nil, nil // not an error. Just not configured for telemetry
 	}
 	writer := TelemetryWriter{
 		fileLocationPrefix: config.FileLocationPrefix,
-		telemetryCh:        make(chan TelemetryMsg, 1024),
+		telemetryCh:        make(chan telemetryMsg, 1024),
 		doUploadNow:        make(chan int, 5),
 		awsConfig:          awsConfig,
 		logger:             log.New(os.Stderr, "telemetryWriter", log.LstdFlags|log.Lshortfile),
@@ -71,9 +74,9 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 	return &writer, nil
 }
 
-func NewTelemetryMsgFromRecord(eventType TelemetryEventType, rec *logging.Record) TelemetryMsg {
-	return TelemetryMsg{
-		Id:        NewId(),
+func newTelemetryMsgFromRecord(eventType telemetryEventType, rec *logging.Record) telemetryMsg {
+	return telemetryMsg{
+		Id:        newId(),
 		EventType: eventType,
 		Timestamp: rec.Time.Round(time.Millisecond).UTC(),
 		Module:    rec.Module,
@@ -81,29 +84,30 @@ func NewTelemetryMsgFromRecord(eventType TelemetryEventType, rec *logging.Record
 	}
 }
 
+// Log Implements the logging Interface so this can be used as a logger backend.
 func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logging.Record) error {
-	var eventType TelemetryEventType
+	var eventType telemetryEventType
 	switch {
 	case level == logging.DEBUG:
-		eventType = TelemetryEventDebug
+		eventType = telemetryEventDebug
 
 	case level == logging.INFO:
-		eventType = TelemetryEventInfo
+		eventType = telemetryEventInfo
 
 	case level == logging.ERROR:
-		eventType = TelemetryEventError
+		eventType = telemetryEventError
 
 	case level == logging.WARNING:
-		eventType = TelemetryEventWarning
+		eventType = telemetryEventWarning
 
 	default:
-		eventType = TelemetryEventWarning
+		eventType = telemetryEventWarning
 	}
-	if writer.includeDebug || eventType == TelemetryEventWarning || eventType == TelemetryEventError || eventType == TelemetryEventInfo {
+	if writer.includeDebug || eventType == telemetryEventWarning || eventType == telemetryEventError || eventType == telemetryEventInfo {
 		if writer.debug {
 			writer.logger.Printf("Logger message: %s:%s", rec.Level, rec.Message())
 		}
-		msg := NewTelemetryMsgFromRecord(eventType, rec)
+		msg := newTelemetryMsgFromRecord(eventType, rec)
 		writer.telemetryCh <- msg
 	} else {
 		if writer.debug {
@@ -113,6 +117,8 @@ func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logg
 	return nil
 }
 
+// dbWriter the Goroutine responsible for reading from the channel and writing to the DB.
+// this avoids any contention to the DB. This is the only place we write to the DB.
 func (writer *TelemetryWriter) dbWriter() {
 	for {
 		msg := <-writer.telemetryCh
@@ -130,6 +136,11 @@ func (writer *TelemetryWriter) dbWriter() {
 	}
 }
 
+// uploader the goroutine responsible for pulling data out
+// of the DB and into file and from files into S3/telemetry/
+// It uses:
+//  - a timer (10 minutes) to push up files every 10 minutes (reset on 'do it now')
+//  - a 'do it now' channel, which external entities can trigger to 'do it now'
 func (writer *TelemetryWriter) uploader() {
 	// dump any DB entries and upload any files left on the file system
 	err := writer.createFilesAndUpload()
@@ -137,28 +148,23 @@ func (writer *TelemetryWriter) uploader() {
 		writer.logger.Printf("Could not upload files: %v\n", err)
 	}
 
-	ticker := time.NewTicker(time.Duration(10) * time.Minute)
-	longRangerTicker := time.NewTicker(time.Duration(1) * time.Hour)
-
+	writeTimeout := time.Duration(10) * time.Minute
+	writeTimer := time.NewTimer(writeTimeout)
 	for {
 		select {
-		case <-ticker.C:
+		case <-writeTimer.C:
 			err := writer.createFilesAndUpload()
 			if err != nil {
 				writer.logger.Printf("Could not createFilesAndUpload: %v\n", err)
 			}
+			writeTimer.Reset(writeTimeout)
 
 		case <-writer.doUploadNow:
 			err := writer.createFilesAndUpload()
 			if err != nil {
 				writer.logger.Printf("Could not createFilesAndUpload: %v\n", err)
 			}
-
-		case <-longRangerTicker.C:
-			err := writer.upload()
-			if err != nil {
-				writer.logger.Printf("Could not upload files: %v\n", err)
-			}
+			writeTimer.Reset(writeTimeout)
 		}
 	}
 }
@@ -204,6 +210,8 @@ func (writer *TelemetryWriter) createFilesAndUpload() error {
 	return nil
 }
 
+// createFiles responsible for pulling data out of the DB and writing it to files.
+// It does not write to the DB and does not talk to s3
 func (writer *TelemetryWriter) createFiles() error {
 	defer recoverCrash(writer.logger)
 	var rollback = true
@@ -226,12 +234,12 @@ func (writer *TelemetryWriter) createFiles() error {
 		}
 	}()
 
-	var messages []TelemetryMsg
-	messages, err = writer.getAllMessagesSince(writer.lastRead, TelemetryEventAll)
+	var messages []telemetryMsg
+	messages, err = writer.getAllMessagesSince(writer.lastRead, telemetryEventAll)
 	if err != nil {
 		return err
 	}
-	var msgArray []TelemetryMsgMap
+	var msgArray []telemetryMsgMap
 	if len(messages) > 0 {
 		var startTime, endTime time.Time
 		for _, msg := range messages {
@@ -248,7 +256,10 @@ func (writer *TelemetryWriter) createFiles() error {
 		if err != nil {
 			return err
 		}
-		teleFile := fmt.Sprintf("%s/%s--%s.json.gz", writer.fileLocationPrefix, startTime.Format(TelemetryTimeZFormat), endTime.Format(TelemetryTimeZFormat))
+		teleFile := fmt.Sprintf("%s/%s--%s.json.gz",
+			writer.fileLocationPrefix,
+			startTime.Format(telemetryTimeZFormat),
+			endTime.Format(telemetryTimeZFormat))
 		if writer.debug {
 			writer.logger.Printf("Creating file: %s", teleFile)
 		}
@@ -275,6 +286,7 @@ func (writer *TelemetryWriter) createFiles() error {
 	return nil
 }
 
+// upload upload any files found to s3
 func (writer *TelemetryWriter) upload() error {
 	if writer.uploadLocationPrefixUrl != nil {
 		// Read all entries in the telemetry directory, look for any json files, and upload them

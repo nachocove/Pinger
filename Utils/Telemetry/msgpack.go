@@ -5,62 +5,62 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
-type TelemetryPackKey int
+type telemetryPackKey int
 
 const (
-	TelemetryMsgPackId         TelemetryPackKey = 0
-	TelemetryMsgPackEventType  TelemetryPackKey = 1
-	TelemetryMsgPackTimestamp  TelemetryPackKey = 2
-	TelemetryMsgPackUploadedAt TelemetryPackKey = 3
-	TelemetryMsgPackModule     TelemetryPackKey = 4
-	TelemetryMsgPackMessage    TelemetryPackKey = 5
+	telemetryMsgPackId         telemetryPackKey = 0
+	telemetryMsgPackEventType  telemetryPackKey = 1
+	telemetryMsgPackTimestamp  telemetryPackKey = 2
+	telemetryMsgPackUploadedAt telemetryPackKey = 3
+	telemetryMsgPackModule     telemetryPackKey = 4
+	telemetryMsgPackMessage    telemetryPackKey = 5
 )
 
 const (
-	TelemetryMsgPackInfo    int64 = 1
-	TelemetryMsgPackWarning int64 = 2
-	TelemetryMsgPackError   int64 = 3
-	TelemetryMsgPackDebug   int64 = 4
+	telemetryMsgPackInfo    int64 = 1
+	telemetryMsgPackWarning int64 = 2
+	telemetryMsgPackError   int64 = 3
+	telemetryMsgPackDebug   int64 = 4
 )
 
-func TelemetryMsgEventTypeToPack(eventType TelemetryEventType) int64 {
+func telemetryMsgEventTypeToPack(eventType telemetryEventType) int64 {
 	switch {
-	case eventType == TelemetryEventInfo:
-		return TelemetryMsgPackInfo
-	case eventType == TelemetryEventWarning:
-		return TelemetryMsgPackWarning
-	case eventType == TelemetryEventError:
-		return TelemetryMsgPackError
-	case eventType == TelemetryEventDebug:
-		return TelemetryMsgPackDebug
+	case eventType == telemetryEventInfo:
+		return telemetryMsgPackInfo
+	case eventType == telemetryEventWarning:
+		return telemetryMsgPackWarning
+	case eventType == telemetryEventError:
+		return telemetryMsgPackError
+	case eventType == telemetryEventDebug:
+		return telemetryMsgPackDebug
 	}
-	panic(fmt.Sprintf("TelemetryMsgEventTypeToPack: unknown eventType: %v", eventType))
+	panic(fmt.Sprintf("telemetryMsgEventTypeToPack: unknown eventType: %v", eventType))
 }
 
-func TelemetryPackEventTypeToMsg(eventType int64) TelemetryEventType {
+func telemetryPackEventTypeToMsg(eventType int64) telemetryEventType {
 	switch {
-	case eventType == TelemetryMsgPackInfo:
-		return TelemetryEventInfo
-	case eventType == TelemetryMsgPackWarning:
-		return TelemetryEventWarning
-	case eventType == TelemetryMsgPackError:
-		return TelemetryEventError
-	case eventType == TelemetryMsgPackDebug:
-		return TelemetryEventDebug
+	case eventType == telemetryMsgPackInfo:
+		return telemetryEventInfo
+	case eventType == telemetryMsgPackWarning:
+		return telemetryEventWarning
+	case eventType == telemetryMsgPackError:
+		return telemetryEventError
+	case eventType == telemetryMsgPackDebug:
+		return telemetryEventDebug
 	}
-	panic(fmt.Sprintf("TelemetryPackEventTypeToMsg: unknown eventType: %v", eventType))
+	panic(fmt.Sprintf("telemetryPackEventTypeToMsg: unknown eventType: %v", eventType))
 }
 
-type TelemetryMsgPackType map[TelemetryPackKey]interface{}
+type telemetryMsgPackType map[telemetryPackKey]interface{}
 
-func (msg *TelemetryMsg) EncodeMsgPack() ([]byte, error) {
-	pack := make(TelemetryMsgPackType)
-	pack[TelemetryMsgPackId] = msg.Id
-	pack[TelemetryMsgPackEventType] = TelemetryMsgEventTypeToPack(msg.EventType)
-	pack[TelemetryMsgPackTimestamp] = TelemetryTimefromTime(msg.Timestamp)
-	pack[TelemetryMsgPackUploadedAt] = TelemetryTimefromTime(msg.UploadedAt)
-	pack[TelemetryMsgPackModule] = msg.Module
-	pack[TelemetryMsgPackMessage] = msg.Message
+func (msg *telemetryMsg) encodeMsgPack() ([]byte, error) {
+	pack := make(telemetryMsgPackType)
+	pack[telemetryMsgPackId] = msg.Id
+	pack[telemetryMsgPackEventType] = telemetryMsgEventTypeToPack(msg.EventType)
+	pack[telemetryMsgPackTimestamp] = telemetryTimefromTime(msg.Timestamp)
+	pack[telemetryMsgPackUploadedAt] = telemetryTimefromTime(msg.UploadedAt)
+	pack[telemetryMsgPackModule] = msg.Module
+	pack[telemetryMsgPackMessage] = msg.Message
 
 	buffer := make([]byte, 0, 64)
 	var h codec.Handle = new(codec.MsgpackHandle)
@@ -73,19 +73,19 @@ func (msg *TelemetryMsg) EncodeMsgPack() ([]byte, error) {
 
 }
 
-func (msg *TelemetryMsg) DecodeMsgPack(in []byte) error {
-	pack := make(TelemetryMsgPackType)
+func (msg *telemetryMsg) decodeMsgPack(in []byte) error {
+	pack := make(telemetryMsgPackType)
 	var h codec.Handle = new(codec.MsgpackHandle)
 	dec := codec.NewDecoderBytes(in, h)
 	err := dec.Decode(&pack)
 	if err != nil {
 		return err
 	}
-	msg.Id = string(pack[TelemetryMsgPackId].([]byte))
-	msg.EventType = TelemetryPackEventTypeToMsg(pack[TelemetryMsgPackEventType].(int64))
-	msg.Timestamp = TimeFromTelemetryTime(TelemetryMsgPackTime(pack[TelemetryMsgPackTimestamp].(uint64)))
-	msg.UploadedAt = TimeFromTelemetryTime(TelemetryMsgPackTime(pack[TelemetryMsgPackUploadedAt].(uint64)))
-	msg.Module = string(pack[TelemetryMsgPackModule].([]byte))
-	msg.Message = string(pack[TelemetryMsgPackMessage].([]byte))
+	msg.Id = string(pack[telemetryMsgPackId].([]byte))
+	msg.EventType = telemetryPackEventTypeToMsg(pack[telemetryMsgPackEventType].(int64))
+	msg.Timestamp = telemetryTime(pack[telemetryMsgPackTimestamp].(uint64)).time()
+	msg.UploadedAt = telemetryTime(pack[telemetryMsgPackUploadedAt].(uint64)).time()
+	msg.Module = string(pack[telemetryMsgPackModule].([]byte))
+	msg.Message = string(pack[telemetryMsgPackMessage].([]byte))
 	return nil
 }

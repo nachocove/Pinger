@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const TelemetryTableName string = "log"
+const telemetryTableName string = "log"
 
 func (writer *TelemetryWriter) initDb() error {
 	dbFile := fmt.Sprintf("%s/%s", writer.fileLocationPrefix, "telemetry.db")
@@ -24,9 +24,9 @@ func (writer *TelemetryWriter) initDb() error {
 	}
 	writer.dbmap = &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}
 
-	tMap := writer.dbmap.AddTableWithName(TelemetryMsg{}, TelemetryTableName)
+	tMap := writer.dbmap.AddTableWithName(telemetryMsg{}, telemetryTableName)
 	if tMap.SetKeys(false, "Id") == nil {
-		panic(fmt.Sprintf("Could not create key on %s:ID", TelemetryTableName))
+		panic(fmt.Sprintf("Could not create key on %s:ID", telemetryTableName))
 	}
 	cMap := tMap.ColMap("EventType")
 	cMap.SetNotNull(true)
@@ -38,11 +38,11 @@ func (writer *TelemetryWriter) initDb() error {
 	return nil
 }
 
-func (t *TelemetryEventType) Scan(value interface{}) error {
-	*t = TelemetryEventType(string(value.([]uint8)))
+func (t *telemetryEventType) Scan(value interface{}) error {
+	*t = telemetryEventType(string(value.([]uint8)))
 	return nil
 }
-func (t TelemetryEventType) Value() (driver.Value, error) {
+func (t telemetryEventType) Value() (driver.Value, error) {
 	return string(t), nil
 }
 
@@ -54,7 +54,7 @@ func init() {
 	var timestampField reflect.StructField
 	var eventTypeField reflect.StructField
 	var ok bool
-	telemetryMsgReflection = reflect.TypeOf(TelemetryMsg{})
+	telemetryMsgReflection = reflect.TypeOf(telemetryMsg{})
 	timestampField, ok = telemetryMsgReflection.FieldByName("Timestamp")
 	if ok == false {
 		panic("Could not get Timestamp Field information")
@@ -63,14 +63,14 @@ func init() {
 	if ok == false {
 		panic("Could not get EventType Field information")
 	}
-	getAllMessagesSQLwithType = fmt.Sprintf("select * from %s where %s=? and %s>?", TelemetryTableName, eventTypeField.Tag.Get("db"), timestampField.Tag.Get("db"))
-	getAllMessagesSQL = fmt.Sprintf("select * from %s where %s>?", TelemetryTableName, timestampField.Tag.Get("db"))
+	getAllMessagesSQLwithType = fmt.Sprintf("select * from %s where %s=? and %s>?", telemetryTableName, eventTypeField.Tag.Get("db"), timestampField.Tag.Get("db"))
+	getAllMessagesSQL = fmt.Sprintf("select * from %s where %s>?", telemetryTableName, timestampField.Tag.Get("db"))
 }
 
-func (writer *TelemetryWriter) getAllMessagesSince(t time.Time, eventType TelemetryEventType) ([]TelemetryMsg, error) {
-	var messages []TelemetryMsg
+func (writer *TelemetryWriter) getAllMessagesSince(t time.Time, eventType telemetryEventType) ([]telemetryMsg, error) {
+	var messages []telemetryMsg
 	var err error
-	if eventType == TelemetryEventAll {
+	if eventType == telemetryEventAll {
 		_, err = writer.dbmap.Select(&messages, getAllMessagesSQL, t)
 	} else {
 		_, err = writer.dbmap.Select(&messages, getAllMessagesSQLwithType, eventType, t)
