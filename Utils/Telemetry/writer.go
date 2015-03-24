@@ -221,14 +221,8 @@ func (writer *TelemetryWriter) createFiles() error {
 	}
 	defer func() {
 		if rollback {
-			if writer.debug {
-				writer.logger.Printf("Rollback")
-			}
 			transaction.Rollback()
 		} else {
-			if writer.debug {
-				writer.logger.Printf("Commit")
-			}
 			transaction.Commit()
 			writer.lastRead = time.Now().Round(time.Millisecond).UTC()
 		}
