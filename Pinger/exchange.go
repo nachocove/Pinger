@@ -155,6 +155,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	response, err := ex.httpClient.Do(ex.request)
 	ex.request = nil // unsave it. We're done with it.
 	if ex.cancelled == true {
+		ex.Debug("request cancelled. Exiting.")
 		return
 	}
 	if err != nil {
@@ -163,6 +164,8 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		// memory leakage in this case
 		if strings.Contains(err.Error(), "use of closed network connection") == false {
 			ex.Warning("httpClient.Do failed: %s", err.Error())
+		} else {
+			ex.Debug("%s", err.Error())
 		}
 		responseCh <- retryResponse
 		return
@@ -185,6 +188,8 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	if err != nil {
 		if err != io.EOF {
 			ex.Error("Failed ro read response: %s", err.Error())
+		} else {
+			ex.Debug("EOF from body read")
 		}
 		responseCh <- retryResponse
 		return
