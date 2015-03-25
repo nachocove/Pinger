@@ -10,17 +10,16 @@ type telemetryEventType string
 
 const (
 	// telemetryEventAll used in DB lookups only. Can not be used as a DB entry
-	telemetryEventAll     telemetryEventType = ""  //
+	telemetryEventAll telemetryEventType = ""
 	// telemetryEventDebug A Debug entry
-	telemetryEventDebug   telemetryEventType = "DEBUG"
+	telemetryEventDebug telemetryEventType = "DEBUG"
 	// telemetryEventInfo an Info entry
-	telemetryEventInfo    telemetryEventType = "INFO"
+	telemetryEventInfo telemetryEventType = "INFO"
 	// telemetryEventWarning a Warn entry
 	telemetryEventWarning telemetryEventType = "WARN"
 	// telemetryEventError an Error entry
-	telemetryEventError   telemetryEventType = "ERROR"
+	telemetryEventError telemetryEventType = "ERROR"
 )
-
 
 // String convert the custom type to a string.
 func (t telemetryEventType) String() string {

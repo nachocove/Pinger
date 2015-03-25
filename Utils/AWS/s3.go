@@ -16,7 +16,7 @@ func (config *AWSConfiguration) PutFile(bucket, srcFilePath, destFilePath string
 
 	s3cfg := s3gof3r.DefaultConfig
 	s3cfg.Md5Check = false
-	
+
 	endpoint := fmt.Sprintf("s3-%s.%s", config.S3RegionName, "amazonaws.com")
 	// Open bucket to put file into
 	s3 := s3gof3r.New(endpoint, k)

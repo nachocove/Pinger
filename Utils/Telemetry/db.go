@@ -30,7 +30,7 @@ func (writer *TelemetryWriter) initDb() error {
 	}
 	cMap := tMap.ColMap("EventType")
 	cMap.SetNotNull(true)
-	
+
 	err = writer.dbmap.CreateTablesIfNotExists()
 	if err != nil {
 		panic(fmt.Sprintf("Create tables failed: %s", err))
