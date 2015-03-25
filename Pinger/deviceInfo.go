@@ -132,6 +132,17 @@ func (di *DeviceInfo) validate() error {
 	if di.DeviceId == "" {
 		return errors.New("DeviceId can not be empty")
 	}
+	if di.PushService == "" {
+		return errors.New("PushService can not be empty")
+	} else {
+		matched, err := regexp.MatchString("(APNS|GCM)", di.PushService)
+		if err != nil {
+			return err
+		}
+		if matched == false {
+			return fmt.Errorf("PushService %s is not known", di.PushService)
+		}
+	}
 	if di.Platform == "" {
 		return errors.New("Platform can not be empty")
 	} else {
@@ -566,7 +577,7 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 		return err
 	}
 	di.Debug("Sending push message to AWS: %s", pushMessage)
-	err = DefaultPollingContext.config.Aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
+	err = globals.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
 	if err == nil {
 		err = di.updateLastContactRequest()
 	}
@@ -604,7 +615,7 @@ func (di *DeviceInfo) registerAws() error {
 		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
 	}
 
-	arn, registerErr := DefaultPollingContext.config.Aws.RegisterEndpointArn(di.PushService, pushToken, di.customerData())
+	arn, registerErr := globals.aws.RegisterEndpointArn(di.PushService, pushToken, di.customerData())
 	if registerErr != nil {
 		re, err := regexp.Compile("^.*Endpoint (?P<arn>arn:aws:sns:[^ ]+) already exists.*$")
 		if err != nil {
@@ -613,12 +624,12 @@ func (di *DeviceInfo) registerAws() error {
 		if re.MatchString(registerErr.Error()) == true {
 			arn := re.ReplaceAllString(registerErr.Error(), fmt.Sprintf("${%s}", re.SubexpNames()[1]))
 			di.Warning("Previously registered as %s. Updating.", arn)
-			attributes, err := DefaultPollingContext.config.Aws.GetEndpointAttributes(arn)
+			attributes, err := globals.aws.GetEndpointAttributes(arn)
 			if err != nil {
 				return err
 			}
 			attributes["CustomUserData"] = di.customerData()
-			err = DefaultPollingContext.config.Aws.SetEndpointAttributes(arn, attributes)
+			err = globals.aws.SetEndpointAttributes(arn, attributes)
 			if err != nil {
 				return err
 			}
@@ -639,7 +650,7 @@ func (di *DeviceInfo) validateAws() error {
 	if di.AWSEndpointArn == "" {
 		panic("Can't call validate before register")
 	}
-	attributes, err := DefaultPollingContext.config.Aws.ValidateEndpointArn(di.AWSEndpointArn)
+	attributes, err := globals.aws.ValidateEndpointArn(di.AWSEndpointArn)
 	if err != nil {
 		return err
 	}
@@ -677,7 +688,7 @@ func (di *DeviceInfo) validateAws() error {
 	if pushToken != attributes["Token"] {
 		// need to update the token with aws
 		attributes["Token"] = pushToken
-		err := DefaultPollingContext.config.Aws.SetEndpointAttributes(di.AWSEndpointArn, attributes)
+		err := globals.aws.SetEndpointAttributes(di.AWSEndpointArn, attributes)
 		if err != nil {
 			return err
 		}
@@ -694,7 +705,7 @@ func (di *DeviceInfo) validateClient() error {
 		di.Debug("Registering %s:%s with AWS.", di.PushService, di.PushToken)
 		err := di.registerAws()
 		if err != nil {
-			if DefaultPollingContext.config.Global.IgnorePushFailure == false {
+			if globals.config.IgnorePushFailure == false {
 				return err
 			} else {
 				di.Warning("Registering %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
@@ -712,7 +723,7 @@ func (di *DeviceInfo) validateClient() error {
 		// mark it as enabled again. Possibly...
 		err := di.validateAws()
 		if err != nil {
-			if DefaultPollingContext.config.Global.IgnorePushFailure == false {
+			if globals.config.IgnorePushFailure == false {
 				return err
 			} else {
 				di.Warning("Validating %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
@@ -724,17 +735,17 @@ func (di *DeviceInfo) validateClient() error {
 	return nil
 }
 
-func alertAllDevices() error {
-	devices, err := getAllMyDeviceInfo(DefaultPollingContext.dbm, DefaultPollingContext.logger)
+func alertAllDevices(dbm *gorp.DbMap, logger *Logging.Logger) error {
+	devices, err := getAllMyDeviceInfo(dbm, logger)
 	if err != nil {
 		return err
 	}
 	count := 0
 	for _, di := range devices {
-		DefaultPollingContext.logger.Info("%s: sending PingerNotificationRegister to device", di.getLogPrefix())
+		logger.Info("%s: sending PingerNotificationRegister to device", di.getLogPrefix())
 		err = di.push(PingerNotificationRegister)
 		if err != nil {
-			DefaultPollingContext.logger.Warning("%s: Could not send push: %s", di.getLogPrefix(), err.Error())
+			logger.Warning("%s: Could not send push: %s", di.getLogPrefix(), err.Error())
 		} else {
 			count++
 		}

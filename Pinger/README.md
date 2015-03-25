@@ -31,3 +31,14 @@ client.go
 My initial attempt at a go connection server. For each connection accepted, it launches 2-3 go routines. Go does not support a select on sockets. Instead, it has a select on channels. So one goroutine waits for input on the net.Conn connection (blocking) and feeds the incoming data channel. The main per-connection goroutine listens on the incoming data channel and simply echo's back what it received. It also listens on the outgoing data channel, and sends whatever it receives to the remote end. Additionally, it listens on a command channel (for things like 'Stop the go routine') and also a 'timer channel' which tells us when a timer has expired.
 
 NOT USED by the backend currently (this could change): The exchange backend uses HTTP functions provided by go. I still need to figure out how to manage those more efficiently, keep then open (like websockets?) and reopen when necessary (currently a single connection is created, we wait for data, and then a new one is created).
+
+"Class" Hierarchy
+=================
+
+Go doesn't have classes as such, so I use the term lightly. 
+
+```
+BackendPolling (interface)
+   -> MailClientContextType (interface)
+      -> MailClient (interface)
+```

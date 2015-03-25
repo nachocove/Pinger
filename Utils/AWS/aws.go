@@ -1,204 +1,26 @@
 package AWS
 
 import (
-	"encoding/base64"
-	"encoding/hex"
-	"errors"
-	"fmt"
 	"github.com/awslabs/aws-sdk-go/aws"
-	cognitoidentity "github.com/awslabs/aws-sdk-go/gen/cognito/identity"
-	"github.com/awslabs/aws-sdk-go/gen/sns"
-	"strings"
 )
 
 const (
 	PushServiceAPNS = "APNS"
 )
 
-type AWSConfiguration struct {
-	RegionName string
-	AccessKey  string
-	SecretKey  string
+type AWSHandler interface {
+	RegisterEndpointArn(service, token, customerData string) (string, error)
+	GetEndpointAttributes(endpointArn string) (map[string]string, error)
+	SetEndpointAttributes(endpointArn string, attributes map[string]string) error
+	DeleteEndpointArn(endpointArn string) error
+	ValidateEndpointArn(endpointArn string) (map[string]string, error)
+	SendPushNotification(endpointArn, message string) error
+	ValidateCognitoID(clientId string) error
+	PutFile(bucket, srcFilePath, destFilePath string) error
+}
 
-	SnsRegionName     string
-	SnsIOSPlatformArn string
-
-	CognitoIdentityRegionName string
-	CognitoIdentityPoolID     string
-
-	S3RegionName string
-
+// AWSHandle is the collection of AWS related information
+type AWSHandle struct {
+	AWSConfiguration
 	awsCreds aws.CredentialsProvider
-}
-
-func (config *AWSConfiguration) Validate() error {
-	if config.AccessKey == "" || config.SecretKey == "" || config.RegionName == "" {
-		return errors.New("aws section must be filled in")
-	}
-	if config.SnsRegionName == "" {
-		config.SnsRegionName = config.RegionName
-	}
-	if config.CognitoIdentityRegionName == "" {
-		config.CognitoIdentityRegionName = config.RegionName
-	}
-	if config.S3RegionName == "" {
-		config.S3RegionName = config.RegionName
-	}
-	token := ""
-	creds := aws.Creds(config.AccessKey, config.SecretKey, token)
-	config.awsCreds = creds
-	return nil
-}
-
-func (config *AWSConfiguration) getSNSSession() (*sns.SNS, error) {
-	// TODO See about caching the sessions
-	snsSession := sns.New(config.awsCreds, config.SnsRegionName, nil)
-	return snsSession, nil
-}
-
-func (config *AWSConfiguration) RegisterEndpointArn(service, token, customerData string) (string, error) {
-	var platformArn string
-	if strings.EqualFold(service, PushServiceAPNS) {
-		platformArn = config.SnsIOSPlatformArn
-	} else {
-		return "", fmt.Errorf("Unsupported platform service %s", service)
-	}
-	options := sns.CreatePlatformEndpointInput{
-		Attributes:             nil,
-		PlatformApplicationARN: aws.StringValue(&platformArn),
-		CustomUserData:         aws.StringValue(&customerData),
-		Token:                  aws.StringValue(&token),
-	}
-	snsSession, err := config.getSNSSession()
-	if err != nil {
-		return "", err
-	}
-	response, err := snsSession.CreatePlatformEndpoint(&options)
-	if err != nil {
-		return "", err
-	}
-	return *response.EndpointARN, nil
-}
-
-func (config *AWSConfiguration) GetEndpointAttributes(endpointArn string) (map[string]string, error) {
-	options := sns.GetEndpointAttributesInput{
-		EndpointARN: aws.StringValue(&endpointArn),
-	}
-	snsSession, err := config.getSNSSession()
-	if err != nil {
-		return nil, err
-	}
-	response, err := snsSession.GetEndpointAttributes(&options)
-	if err != nil {
-		return nil, err
-	}
-	return response.Attributes, nil
-}
-
-func (config *AWSConfiguration) SetEndpointAttributes(endpointArn string, attributes map[string]string) error {
-	options := sns.SetEndpointAttributesInput{
-		EndpointARN: aws.StringValue(&endpointArn),
-		Attributes:  attributes,
-	}
-	snsSession, err := config.getSNSSession()
-	if err != nil {
-		return err
-	}
-	err = snsSession.SetEndpointAttributes(&options)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (config *AWSConfiguration) deleteEndpointArn(endpointArn string) error {
-	options := sns.DeleteEndpointInput{
-		EndpointARN: aws.StringValue(&endpointArn),
-	}
-	snsSession, err := config.getSNSSession()
-	if err != nil {
-		return err
-	}
-	err = snsSession.DeleteEndpoint(&options)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (config *AWSConfiguration) ValidateEndpointArn(endpointArn string) (map[string]string, error) {
-	snsSession, err := config.getSNSSession()
-	if err != nil {
-		return nil, err
-	}
-	input := sns.GetEndpointAttributesInput{EndpointARN: aws.StringValue(&endpointArn)}
-	response, err := snsSession.GetEndpointAttributes(&input)
-	if err != nil {
-		return nil, err
-	}
-	return response.Attributes, nil
-}
-
-func (config *AWSConfiguration) SendPushNotification(endpointArn, message string) error {
-	snsSession, err := config.getSNSSession()
-	if err != nil {
-		return err
-	}
-	messageType := "json"
-	input := sns.PublishInput{
-		Message:          aws.StringValue(&message),
-		MessageStructure: aws.StringValue(&messageType),
-		TargetARN:        aws.StringValue(&endpointArn),
-	}
-	response, err := snsSession.Publish(&input)
-	if err != nil {
-		return err
-	}
-	if string(*response.MessageID) == "" {
-		return errors.New("Empty messageID. This means the message was not sent.")
-	}
-	return nil
-}
-
-func (config *AWSConfiguration) getCognitoIdentitySession() (*cognitoidentity.CognitoIdentity, error) {
-	// TODO See about caching the sessions
-	cognitoSession := cognitoidentity.New(config.awsCreds, config.CognitoIdentityRegionName, nil)
-	return cognitoSession, nil
-}
-
-func (config *AWSConfiguration) ValidateCognitoID(clientId string) error {
-	cognitoSession, err := config.getCognitoIdentitySession()
-	if err != nil {
-		return err
-	}
-	input := cognitoidentity.DescribeIdentityInput{IdentityID: aws.StringValue(&clientId)}
-	response, err := cognitoSession.DescribeIdentity(&input)
-	if err != nil {
-		return err
-	}
-	if string(*response.IdentityID) == "" {
-		return errors.New("No IdentityId returned.")
-	}
-	return nil
-}
-
-func DecodeAPNSPushToken(token string) (string, error) {
-	if len(token) == 64 {
-		// see if the string decodes, in which case it's probably already passed to us in hex
-		_, err := hex.DecodeString(token)
-		if err == nil {
-			return token, nil
-		}
-	} else {
-		tokenBytes, err := base64.StdEncoding.DecodeString(token)
-		if err != nil {
-			return "", err
-		}
-		tokenstring := hex.EncodeToString(tokenBytes)
-		if len(tokenstring) != 64 {
-			return "", fmt.Errorf("Decoded token is not 64 bytes long")
-		}
-		return tokenstring, nil
-	}
-	return "", fmt.Errorf("Could not determine push token format: %s", token)
 }

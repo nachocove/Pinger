@@ -135,7 +135,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
 
-	if DefaultPollingContext.config.Global.DumpRequests {
+	if globals.config.DumpRequests {
 		requestBytes, err := httputil.DumpRequestOut(req, true)
 		if err != nil {
 			ex.Error("DumpRequest error; %v", err)
@@ -209,7 +209,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 
 	ex.Debug("reply WBXML %s", base64.StdEncoding.EncodeToString(responseBytes))
 
-	if DefaultPollingContext.config.Global.DumpRequests || response.StatusCode >= 500 {
+	if globals.config.DumpRequests || response.StatusCode >= 500 {
 		headerBytes, _ := httputil.DumpResponse(response, false)
 		if err != nil {
 			ex.Error("Could not dump response %+v", response)
@@ -365,7 +365,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				ex.Debug("Sending push message for new mail")
 				err = ex.parent.di.push(PingerNotificationNewMail) // You've got mail!
 				if err != nil {
-					if DefaultPollingContext.config.Global.IgnorePushFailure == false {
+					if globals.config.IgnorePushFailure == false {
 						ex.parent.sendError(err)
 						return
 					} else {

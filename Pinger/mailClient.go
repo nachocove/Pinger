@@ -2,7 +2,6 @@ package Pinger
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"github.com/coopernurse/gorp"
@@ -12,8 +11,37 @@ import (
 	"path"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
+
+type MailClientContextType interface {
+	deferPoll(timeout int64) error
+	stop() error
+	validateStopToken(token string) bool
+	updateLastContact() error
+	Status() (MailClientStatus, error)
+	Action(action PingerCommand) error
+	getStopToken() string
+	getSessionInfo() (*ClientSessionInfo, error)
+}
+
+type MailClientContext struct {
+	MailClientContextType
+	mailClient MailClient // a mail client with the MailClient interface
+	stopToken  string
+	logger     *Logging.Logger
+	errCh      chan error
+	stopAllCh  chan int // closed when client is exiting, so that any sub-routine can exit
+	exitCh     chan int // used by MailClient{} to signal it has exited
+	command    chan PingerCommand
+	lastError  error
+	stats      *Utils.StatLogger
+	di         *DeviceInfo
+	pi         *MailPingInformation
+	wg         sync.WaitGroup
+	status     MailClientStatus
+}
 
 type MailClient interface {
 	LongPoll(stopCh, exitCh chan int)
@@ -59,96 +87,6 @@ const (
 	DefaultMaxPollTimeout int64 = 2 * 24 * 60 * 60 * 1000 // 2 days in milliseconds
 )
 
-// MailPingInformation the bag of information we get from the client. None of this is saved in the DB.
-type MailPingInformation struct {
-	ClientId              string
-	ClientContext         string
-	DeviceId              string
-	Platform              string
-	MailServerUrl         string
-	MailServerCredentials struct {
-		Username string
-		Password string
-	}
-	Protocol               string
-	HttpHeaders            map[string]string // optional
-	RequestData            []byte
-	ExpectedReply          []byte
-	NoChangeReply          []byte
-	CommandTerminator      []byte // used by imap
-	CommandAcknowledgement []byte // used by imap
-	ResponseTimeout        int64  // in milliseconds
-	WaitBeforeUse          int64  // in milliseconds
-	PushToken              string // platform dependent push token
-	PushService            string // APNS, AWS, GCM, etc.
-	MaxPollTimeout         int64  // max polling lifetime in milliseconds. Default 2 days.
-	OSVersion              string
-	AppBuildVersion        string
-	AppBuildNumber         string
-
-	logPrefix string
-}
-
-func (pi *MailPingInformation) String() string {
-	return fmt.Sprintf("%s: NoChangeReply:%s, RequestData:%s, ExpectedReply:%s",
-		pi.getLogPrefix(),
-		base64.StdEncoding.EncodeToString(pi.NoChangeReply),
-		base64.StdEncoding.EncodeToString(pi.RequestData),
-		base64.StdEncoding.EncodeToString(pi.ExpectedReply))
-}
-
-func (pi *MailPingInformation) cleanup() {
-	pi.ClientId = ""
-	pi.ClientContext = ""
-	pi.DeviceId = ""
-	pi.Platform = ""
-	pi.MailServerUrl = ""
-	pi.MailServerCredentials.Password = ""
-	pi.MailServerCredentials.Username = ""
-	pi.Protocol = ""
-	for k := range pi.HttpHeaders {
-		delete(pi.HttpHeaders, k)
-	}
-	pi.RequestData = nil
-	pi.ExpectedReply = nil
-	pi.NoChangeReply = nil
-	pi.CommandTerminator = nil
-	pi.CommandAcknowledgement = nil
-	pi.PushToken = ""
-	pi.PushService = ""
-	pi.OSVersion = ""
-	pi.AppBuildNumber = ""
-	pi.AppBuildVersion = ""
-}
-
-// Validate validate the structure/information to make sure required information exists.
-func (pi *MailPingInformation) Validate() bool {
-	if pi.ClientId == "" || pi.MailServerUrl == "" {
-		return false
-	}
-	switch {
-	case pi.Protocol == MailClientActiveSync:
-		if len(pi.RequestData) <= 0 || len(pi.HttpHeaders) <= 0 {
-			return false
-		}
-	case pi.Protocol == MailClientIMAP:
-		// not yet supported
-		return false
-
-	default:
-		// unknown protocols are never supported
-		return false
-	}
-	return true
-}
-
-func (pi *MailPingInformation) getLogPrefix() string {
-	if pi.logPrefix == "" {
-		pi.logPrefix = fmt.Sprintf("%s:%s:%s", pi.DeviceId, pi.ClientId, pi.ClientContext)
-	}
-	return pi.logPrefix
-}
-
 func NewMailClientContext(dbm *gorp.DbMap, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
 		logger:    logger.Copy(),
@@ -165,6 +103,9 @@ func NewMailClientContext(dbm *gorp.DbMap, pi *MailPingInformation, debug, doSta
 	di, err := newDeviceInfoPI(dbm, pi, logger)
 	if err != nil {
 		return nil, err
+	}
+	if di == nil {
+		panic("Could not create device info")
 	}
 	client.Debug("Validating client info")
 	err = di.validateClient()

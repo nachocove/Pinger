@@ -35,7 +35,6 @@ func (s *RPCServerTester) SetupSuite() {
 
 	testingBackend := &TestingBackend{BackendPolling{
 		dbm:         s.dbmap,
-		config:      config,
 		logger:      s.logger,
 		loggerLevel: -1,
 		debug:       true,

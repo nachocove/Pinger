@@ -12,7 +12,7 @@ func (writer *TelemetryWriter) pushToS3(fileName string) error {
 		if writer.debug {
 			writer.logger.Printf("Uploading %s to s3://%s%s", srcPath, bucket, destPath)
 		}
-		err := writer.awsConfig.PutFile(bucket, srcPath, destPath)
+		err := writer.aws.PutFile(bucket, srcPath, destPath)
 		if err != nil {
 			return err
 		}

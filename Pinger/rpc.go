@@ -70,11 +70,13 @@ func StartPollingRPCServer(config *Configuration, debug, debugSql bool, logger *
 	if err != nil {
 		return err
 	}
+	setGlobal(&config.Global, pollingAPI.aws)
+	
 	log.SetOutput(ioutil.Discard) // rpc.Register logs a warning for ToggleDebug, which we don't want.
 
 	rpc.Register(pollingAPI)
 
-	go alertAllDevices()
+	go alertAllDevices(pollingAPI.dbm, pollingAPI.logger)
 
 	logger.Debug("Starting RPC server on %s (pinger id %s)", config.Rpc.String(), pingerHostId)
 	switch {

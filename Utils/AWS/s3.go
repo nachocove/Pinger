@@ -7,17 +7,17 @@ import (
 	"os"
 )
 
-func (config *AWSConfiguration) PutFile(bucket, srcFilePath, destFilePath string) error {
+func (ah *AWSHandle) PutFile(bucket, srcFilePath, destFilePath string) error {
 	k := s3gof3r.Keys{
-		AccessKey:     config.AccessKey,
-		SecretKey:     config.SecretKey,
+		AccessKey:     ah.AccessKey,
+		SecretKey:     ah.SecretKey,
 		SecurityToken: "",
 	}
 
 	s3cfg := s3gof3r.DefaultConfig
 	s3cfg.Md5Check = false
 
-	endpoint := fmt.Sprintf("s3-%s.%s", config.S3RegionName, "amazonaws.com")
+	endpoint := fmt.Sprintf("s3-%s.%s", ah.S3RegionName, "amazonaws.com")
 	// Open bucket to put file into
 	s3 := s3gof3r.New(endpoint, k)
 	b := s3.Bucket(bucket)

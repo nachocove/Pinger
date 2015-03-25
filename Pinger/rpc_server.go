@@ -3,20 +3,18 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
-	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
+	"github.com/nachocove/Pinger/Utils/AWS"
 )
 
 type BackendPolling struct {
 	dbm         *gorp.DbMap
-	config      *Configuration
 	logger      *Logging.Logger
 	loggerLevel Logging.Level
 	debug       bool
 	pollMap     pollMapType
+	aws *AWS.AWSHandle
 }
-
-var DefaultPollingContext *BackendPolling
 
 func NewBackendPolling(config *Configuration, debug, debugSql bool, logger *Logging.Logger) (*BackendPolling, error) {
 	dbm, err := initDB(&config.Db, true, debugSql, logger)
@@ -25,15 +23,13 @@ func NewBackendPolling(config *Configuration, debug, debugSql bool, logger *Logg
 	}
 	backend := &BackendPolling{
 		dbm:         dbm,
-		config:      config,
 		logger:      logger,
 		loggerLevel: -1,
 		debug:       debug,
 		pollMap:     make(pollMapType),
+		aws: config.Aws.NewHandle(),
 	}
-	DefaultPollingContext = backend
-	Utils.AddDebugToggleSignal(DefaultPollingContext)
-	return DefaultPollingContext, nil
+	return backend, nil
 }
 
 func (t *BackendPolling) newMailClientContext(pi *MailPingInformation, doStats bool) (MailClientContextType, error) {
@@ -44,7 +40,7 @@ func (t *BackendPolling) validateClientID(clientID string) error {
 	if clientID == "" {
 		return fmt.Errorf("Empty client ID is not valid")
 	}
-	return DefaultPollingContext.config.Aws.ValidateCognitoID(clientID)
+	return t.aws.ValidateCognitoID(clientID)
 }
 
 func (t *BackendPolling) ToggleDebug() {

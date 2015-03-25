@@ -5,6 +5,7 @@ import (
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -17,6 +18,7 @@ type deviceInfoTester struct {
 	testDeviceId      string
 	testPushToken     string
 	testPushService   string
+	testMailProtocol  string
 	testPlatform      string
 	testOSVersion     string
 	testAppVersion    string
@@ -34,8 +36,8 @@ func (s *deviceInfoTester) SetupSuite() {
 	s.testClientId = "sometestClientId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"
-	s.testPushToken = "sometestpushToken"
-	s.testPushService = "sometestpushService"
+	s.testPushToken = "AEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEF"
+	s.testPushService = "APNS"
 	s.testPlatform = "ios"
 	s.testOSVersion = "8.1"
 	s.testAppVersion = "0.9"
@@ -69,7 +71,7 @@ func (s *deviceInfoTester) TestDeviceInfoValidate() {
 		s.testAppnumber,
 		s.logger)
 	s.NoError(err)
-	s.NotNil(di)
+	require.NotNil(s.T(), di)
 
 	err = di.validate()
 	s.NoError(err)
@@ -97,6 +99,15 @@ func (s *deviceInfoTester) TestDeviceInfoValidate() {
 	err = di.validate()
 	s.EqualError(err, "Platform foo is not known")
 	di.Platform = s.testPlatform
+
+	di.PushService = ""
+	err = di.validate()
+	s.EqualError(err, "PushService can not be empty")
+
+	di.PushService = "foo"
+	err = di.validate()
+	s.EqualError(err, "PushService foo is not known")
+	di.PushService = s.testPushService
 }
 
 func (s *deviceInfoTester) TestDeviceInfoCleanup() {
@@ -113,7 +124,7 @@ func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 		s.testAppnumber,
 		s.logger)
 	s.NoError(err)
-	s.NotNil(di)
+	require.NotNil(s.T(), di)
 
 	di.insert(s.dbmap)
 
@@ -161,7 +172,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 		s.testAppnumber,
 		s.logger)
 	s.NoError(err)
-	s.NotNil(di)
+	require.NotNil(s.T(), di)
 
 	s.Equal(s.testClientId, di.ClientId)
 	s.Equal(s.testClientContext, di.ClientContext)
@@ -230,6 +241,8 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 		s.testAppnumber,
 		s.logger)
 	s.NoError(err)
+	require.NotNil(s.T(), di)
+
 	err = di.insert(s.dbmap)
 	s.NoError(err)
 
@@ -296,7 +309,7 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 		s.testAppnumber,
 		s.logger)
 	s.NoError(err)
-	s.NotNil(di)
+	require.NotNil(s.T(), di)
 
 	err = di.insert(s.dbmap)
 	s.NoError(err)

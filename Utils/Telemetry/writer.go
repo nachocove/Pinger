@@ -28,7 +28,7 @@ type TelemetryWriter struct {
 	lastRead                time.Time
 	telemetryCh             chan telemetryMsg
 	doUploadNow             chan int
-	awsConfig               *AWS.AWSConfiguration
+	aws                     AWS.AWSHandler
 	logger                  *log.Logger
 	hostId                  string
 	includeDebug            bool
@@ -46,7 +46,7 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 		fileLocationPrefix: config.FileLocationPrefix,
 		telemetryCh:        make(chan telemetryMsg, 1024),
 		doUploadNow:        make(chan int, 5),
-		awsConfig:          awsConfig,
+		aws:                awsConfig.NewHandle(),
 		logger:             log.New(os.Stderr, "telemetryWriter", log.LstdFlags|log.Lshortfile),
 		hostId:             HostId.HostId(),
 		includeDebug:       config.IncludeDebug,
