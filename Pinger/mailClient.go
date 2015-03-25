@@ -234,7 +234,7 @@ func (client *MailClientContext) start() {
 
 		case <-deferTimer.C:
 			// defer timer has timed out. Now it's time to do something
-			client.Debug("DeferTimer expired. Starting Polling.")
+			client.Info("DeferTimer expired. Starting Polling.")
 			maxPollTimer.Reset(maxPollTime)
 			// launch the longpoll and wait for it to exit
 			longPollStopCh = make(chan int)
@@ -245,13 +245,13 @@ func (client *MailClientContext) start() {
 		case <-client.exitCh:
 			// the mailClient.LongPoll has indicated that it has exited. Clean up.
 			client.status = MailClientStatusStopped
-			client.Debug("LongPoll exited. Stopping.")
+			client.Info("LongPoll exited. Stopping.")
 			client.Action(PingerStop)
 
 		case err := <-client.errCh:
 			// the mailClient.LongPoll has thrown an error. note it.
 			client.status = MailClientStatusError
-			client.Debug("Error thrown. Stopping.")
+			client.Warning("Error thrown. Stopping.")
 			client.lastError = err
 
 		case cmd := <-client.command:

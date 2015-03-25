@@ -120,7 +120,7 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			logger.Error("%s", err.Error())
 		}
 	}()
-	logger.Debug("%s: Received StartPoll request", args.getLogPrefix())
+	logger.Info("%s: Received StartPoll request", args.getLogPrefix())
 	pollMapKey := args.pollMapKey()
 	reply.Code = PollingReplyOK
 	var client MailClientContextType
@@ -224,7 +224,7 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 			logger.Error("%s", err.Error())
 		}
 	}()
-	logger.Debug("%s: Received stopPoll request", args.getLogPrefix())
+	logger.Info("%s: Received stopPoll request", args.getLogPrefix())
 	pollMapKey := args.pollMapKey()
 	client, ok := (*pollMap)[pollMapKey]
 	if ok == false {
@@ -303,7 +303,7 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			logger.Error("%s", err.Error())
 		}
 	}()
-	logger.Debug("%s: Received deferPoll request", args.getLogPrefix())
+	logger.Info("%s: Received deferPoll request", args.getLogPrefix())
 	pollMapKey := args.pollMapKey()
 	client, ok := (*pollMap)[pollMapKey]
 	if ok == false {
