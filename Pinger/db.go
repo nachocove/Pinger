@@ -75,7 +75,8 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger)
 	}
 
 	if debug {
-		l := &DBLogger{logger: logger}
+		l := &DBLogger{logger: logger.Copy()}
+		l.logger.SetCallDepth(6)
 		dbmap.TraceOn("[gorp]", l)
 	}
 
