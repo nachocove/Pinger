@@ -83,6 +83,7 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger)
 	// map tables
 	///////////////
 	addDeviceInfoTable(dbmap)
+	addDeviceContactTable(dbmap)
 	addPingerInfoTable(dbmap)
 
 	if init {

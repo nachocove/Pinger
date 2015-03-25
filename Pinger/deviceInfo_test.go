@@ -4,277 +4,323 @@ import (
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
-	"github.com/stretchr/testify/assert"
-	"os"
+	"github.com/stretchr/testify/suite"
 	"testing"
 )
 
-var dbmap *gorp.DbMap
-var logger *Logging.Logger
-var testClientID = "clientID"
-var testClientContext = "clientContext"
-var testDeviceId = "NCHOXfherekgrgr"
-var testPushToken = "pushToken"
-var testPushService = "pushService"
-var testPlatform = "ios"
-var testOSVersion = "8.1"
-var testAppVersion = "0.9"
-var testAppnumber = "(dev) Foo"
+type deviceInfoTester struct {
+	suite.Suite
+	dbmap             *gorp.DbMap
+	logger            *Logging.Logger
+	testClientId      string
+	testClientContext string
+	testDeviceId      string
+	testPushToken     string
+	testPushService   string
+	testPlatform      string
+	testOSVersion     string
+	testAppVersion    string
+	testAppnumber     string
+}
 
-func TestMain(m *testing.M) {
+func (s *deviceInfoTester) SetupSuite() {
 	var err error
-	logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
+	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
-	dbmap, err = initDB(&dbconfig, true, true, logger)
+	s.dbmap, err = initDB(&dbconfig, true, true, s.logger)
 	if err != nil {
 		panic("Could not create DB")
 	}
-	os.Exit(m.Run())
+	s.testClientId = "sometestClientId"
+	s.testClientContext = "sometestclientContext"
+	s.testDeviceId = "NCHOXfherekgrgr"
+	s.testPushToken = "sometestpushToken"
+	s.testPushService = "sometestpushService"
+	s.testPlatform = "ios"
+	s.testOSVersion = "8.1"
+	s.testAppVersion = "0.9"
+	s.testAppnumber = "(dev) Foo"
 }
 
-func TestDeviceInfoValidate(t *testing.T) {
+func (s *deviceInfoTester) SetupTest() {
+	s.dbmap.TruncateTables()
+}
+
+func (s *deviceInfoTester) TearDownTest() {
+}
+
+func TestDeviceInfo(t *testing.T) {
+	s := new(deviceInfoTester)
+	suite.Run(t, s)
+}
+
+func (s *deviceInfoTester) TestDeviceInfoValidate() {
 	var err error
 
-	assert := assert.New(t)
-
 	di, err := newDeviceInfo(
-		testClientID,
-		testClientContext,
-		testDeviceId,
-		testPushToken,
-		testPushService,
-		testPlatform,
-		testOSVersion,
-		testAppVersion,
-		testAppnumber,
-		logger)
-	assert.NoError(err)
-	assert.NotNil(di)
+		s.testClientId,
+		s.testClientContext,
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppnumber,
+		s.logger)
+	s.NoError(err)
+	s.NotNil(di)
 
 	err = di.validate()
-	assert.NoError(err)
+	s.NoError(err)
 
 	di.ClientId = ""
 	err = di.validate()
-	assert.EqualError(err, "ClientID can not be empty")
-	di.ClientId = testClientID
+	s.EqualError(err, "ClientID can not be empty")
+	di.ClientId = s.testClientId
 
 	di.ClientContext = ""
 	err = di.validate()
-	assert.EqualError(err, "ClientContext can not be empty")
-	di.ClientContext = testClientContext
+	s.EqualError(err, "ClientContext can not be empty")
+	di.ClientContext = s.testClientContext
 
 	di.DeviceId = ""
 	err = di.validate()
-	assert.EqualError(err, "DeviceId can not be empty")
-	di.DeviceId = testDeviceId
+	s.EqualError(err, "DeviceId can not be empty")
+	di.DeviceId = s.testDeviceId
 
 	di.Platform = ""
 	err = di.validate()
-	assert.EqualError(err, "Platform can not be empty")
+	s.EqualError(err, "Platform can not be empty")
 
 	di.Platform = "foo"
 	err = di.validate()
-	assert.EqualError(err, "Platform foo is not known")
-	di.Platform = testPlatform
-
-	di.cleanup()
+	s.EqualError(err, "Platform foo is not known")
+	di.Platform = s.testPlatform
 }
 
-func TestDeviceInfoCleanup(t *testing.T) {
+func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 	var err error
-
-	assert := assert.New(t)
-
 	di, err := newDeviceInfo(
-		testClientID,
-		testClientContext,
-		testDeviceId,
-		testPushToken,
-		testPushService,
-		testPlatform,
-		testOSVersion,
-		testAppVersion,
-		testAppnumber,
-		logger)
-	assert.NoError(err)
-	assert.NotNil(di)
+		s.testClientId,
+		s.testClientContext,
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppnumber,
+		s.logger)
+	s.NoError(err)
+	s.NotNil(di)
+
+	di.insert(s.dbmap)
 
 	di.cleanup()
-	assert.Equal("", di.ClientId)
-	assert.Equal("", di.ClientContext)
-	assert.Equal("", di.DeviceId)
-	assert.Equal("", di.PushToken)
-	assert.Equal("", di.PushService)
-	assert.Equal("", di.Platform)
-	assert.Equal("", di.OSVersion)
-	assert.Equal("", di.AppBuildNumber)
-	assert.Equal("", di.AppBuildVersion)
-	assert.Equal(0, di.Id)
+	s.Equal("", di.ClientId)
+	s.Equal("", di.ClientContext)
+	s.Equal("", di.DeviceId)
+	s.Equal("", di.PushToken)
+	s.Equal("", di.PushService)
+	s.Equal("", di.Platform)
+	s.Equal("", di.OSVersion)
+	s.Equal("", di.AppBuildNumber)
+	s.Equal("", di.AppBuildVersion)
+	s.Equal(0, di.Id)
 }
 
-func TestDeviceInfoCreate(t *testing.T) {
+func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	var err error
-
-	assert := assert.New(t)
-
-	deviceList, err := getAllMyDeviceInfo(dbmap, logger)
-	assert.Equal(len(deviceList), 0)
+	deviceList, err := getAllMyDeviceInfo(s.dbmap, s.logger)
+	s.Equal(len(deviceList), 0)
 
 	di, err := newDeviceInfo(
-		testClientID,
+		s.testClientId,
 		"",
-		testDeviceId,
-		testPushToken,
-		testPushService,
-		testPlatform,
-		testOSVersion,
-		testAppVersion,
-		testAppnumber,
-		logger)
-	assert.Error(err, "ClientContext can not be empty")
-	assert.Nil(di)
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppnumber,
+		s.logger)
+	s.Error(err, "ClientContext can not be empty")
+	s.Nil(di)
 
 	di, err = newDeviceInfo(
-		testClientID,
-		testClientContext,
-		testDeviceId,
-		testPushToken,
-		testPushService,
-		testPlatform,
-		testOSVersion,
-		testAppVersion,
-		testAppnumber,
-		logger)
-	assert.NoError(err)
-	assert.NotNil(di)
+		s.testClientId,
+		s.testClientContext,
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppnumber,
+		s.logger)
+	s.NoError(err)
+	s.NotNil(di)
 
-	assert.Equal(testClientID, di.ClientId)
-	assert.Equal(testClientContext, di.ClientContext)
-	assert.Equal(testDeviceId, di.DeviceId)
-	assert.Equal(testPushToken, di.PushToken)
-	assert.Equal(testPushService, di.PushService)
-	assert.Equal(testPlatform, di.Platform)
-	assert.Equal(testOSVersion, di.OSVersion)
-	assert.Equal(testAppVersion, di.AppBuildVersion)
-	assert.Equal(testAppnumber, di.AppBuildNumber)
+	s.Equal(s.testClientId, di.ClientId)
+	s.Equal(s.testClientContext, di.ClientContext)
+	s.Equal(s.testDeviceId, di.DeviceId)
+	s.Equal(s.testPushToken, di.PushToken)
+	s.Equal(s.testPushService, di.PushService)
+	s.Equal(s.testPlatform, di.Platform)
+	s.Equal(s.testOSVersion, di.OSVersion)
+	s.Equal(s.testAppVersion, di.AppBuildVersion)
+	s.Equal(s.testAppnumber, di.AppBuildNumber)
 
-	assert.Equal(0, di.Id)
-	assert.Empty(di.Pinger)
-	assert.Equal(0, di.Created)
-	assert.Equal(0, di.Updated)
-	assert.Equal(0, di.LastContact)
-	assert.Equal(0, di.LastContactRequest)
-	assert.Empty(di.AWSEndpointArn)
+	s.Equal(0, di.Id)
+	s.Empty(di.Pinger)
+	s.Equal(0, di.Created)
+	s.Equal(0, di.Updated)
+	s.Empty(di.AWSEndpointArn)
 
-	deviceList, err = getAllMyDeviceInfo(dbmap, logger)
-	assert.Equal(0, len(deviceList))
+	di.dbm = s.dbmap
+	lastContact, lastContactRequest, err := di.getContactInfo(false)
+	s.Error(err)
+	s.Equal(0, lastContact)
+	s.Equal(0, lastContactRequest)
 
-	diInDb, err := getDeviceInfo(dbmap, testClientID, testClientContext, testDeviceId, logger)
-	assert.NoError(err)
-	assert.Nil(diInDb)
+	deviceList, err = getAllMyDeviceInfo(s.dbmap, s.logger)
+	s.Equal(0, len(deviceList))
 
-	err = di.insert(dbmap)
-	assert.Equal(1, di.Id)
-	assert.NoError(err)
-	assert.NotEmpty(di.Pinger)
-	assert.True(di.Created > 0)
-	assert.True(di.Updated > 0)
-	assert.True(di.LastContact > 0)
-	assert.Equal(0, di.LastContactRequest)
-	assert.Empty(di.AWSEndpointArn)
+	diInDb, err := getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	s.NoError(err)
+	s.Nil(diInDb)
 
-	assert.Equal(pingerHostId, di.Pinger)
+	err = di.insert(s.dbmap)
+	s.NoError(err)
+	s.NotEmpty(di.Pinger)
+	s.True(di.Created > 0)
+	s.True(di.Updated > 0)
+	s.Empty(di.AWSEndpointArn)
+	lastContact, lastContactRequest, err = di.getContactInfo(false)
+	s.NoError(err)
+	s.True(lastContact > 0)
+	s.Equal(0, lastContactRequest)
 
-	diInDb, err = getDeviceInfo(dbmap, testClientID, testClientContext, testDeviceId, logger)
-	assert.NoError(err)
-	assert.NotNil(diInDb)
-	assert.Equal(di.Id, diInDb.Id)
+	s.Equal(pingerHostId, di.Pinger)
 
-	deviceList, err = getAllMyDeviceInfo(dbmap, logger)
-	assert.NoError(err)
-	assert.Equal(1, len(deviceList))
+	diInDb, err = getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	s.NoError(err)
+	s.NotNil(diInDb)
+	s.Equal(di.Id, diInDb.Id)
+
+	deviceList, err = getAllMyDeviceInfo(s.dbmap, s.logger)
+	s.NoError(err)
+	s.Equal(1, len(deviceList))
+	s.NotNil(di.dbm)
 	di.cleanup()
 }
 
-func TestDeviceInfoUpdate(t *testing.T) {
-	assert := assert.New(t)
+func (s *deviceInfoTester) TestDeviceInfoUpdate() {
+	di, err := newDeviceInfo(
+		s.testClientId,
+		s.testClientContext,
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppnumber,
+		s.logger)
+	s.NoError(err)
+	err = di.insert(s.dbmap)
+	s.NoError(err)
 
-	deviceList, err := getAllMyDeviceInfo(dbmap, logger)
-	assert.NoError(err)
-	assert.Equal(1, len(deviceList))
-	di := &deviceList[0]
-	assert.NotNil(di.dbm)
+	di, err = getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	s.NoError(err)
+	s.NotNil(di)
+
+	di2, err := getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	s.NoError(err)
+	s.NotNil(di2)
+	s.Equal(di.Id, di2.Id)
 
 	di.AWSEndpointArn = "some endpoint"
 	_, err = di.update()
-	assert.NoError(err)
-	assert.NotEmpty(di.AWSEndpointArn)
+	s.NoError(err)
+	s.NotEmpty(di.AWSEndpointArn)
+
+	di.AWSEndpointArn = "some other endpoint"
+	_, err = di.update()
+	s.NoError(err)
+	s.NotEmpty(di.AWSEndpointArn)
+
+	di2.AWSEndpointArn = "yet another endpoint"
+	s.Panics(func() { di2.update() })
 
 	changed, err := di.updateDeviceInfo(di.ClientContext, di.DeviceId, di.PushService, di.PushToken,
 		di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
-	assert.NoError(err)
-	assert.False(changed)
-	assert.NotEmpty(di.AWSEndpointArn)
+	s.NoError(err)
+	s.False(changed)
+	s.NotEmpty(di.AWSEndpointArn)
 
 	newToken := "some updated token"
 	changed, err = di.updateDeviceInfo(di.ClientContext, di.DeviceId, di.PushService, newToken,
 		di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
-	assert.NoError(err)
-	assert.True(changed)
-	assert.Equal(newToken, di.PushToken)
-	assert.Empty(di.AWSEndpointArn)
+	s.NoError(err)
+	s.True(changed)
+	s.Equal(newToken, di.PushToken)
+	s.Empty(di.AWSEndpointArn)
 
-	assert.True(di.LastContact > 0)
-	lastContext := di.LastContact
-	err = updateLastContact(dbmap, di.ClientId, di.ClientContext, di.DeviceId, logger)
-	assert.NoError(err)
+	lastContact, _, err := di.getContactInfo(false)
+	s.NoError(err)
+	err = di.updateLastContact()
+	s.NoError(err)
 
-	di, err = getDeviceInfo(dbmap, di.ClientId, di.ClientContext, di.DeviceId, logger)
-	assert.NoError(err)
-	assert.NotNil(di)
+	lastContact2, _, err := di.getContactInfo(false)
+	s.NoError(err)
 
-	assert.True(di.LastContact > lastContext)
+	s.True(lastContact2 > lastContact)
 	di.cleanup()
 }
 
-func TestDeviceInfoDelete(t *testing.T) {
+func (s *deviceInfoTester) TestDeviceInfoDelete() {
 	var err error
 
-	assert := assert.New(t)
-
 	di, err := newDeviceInfo(
-		testClientID,
-		testClientContext,
-		testDeviceId,
-		testPushToken,
-		testPushService,
-		testPlatform,
-		testOSVersion,
-		testAppVersion,
-		testAppnumber,
-		logger)
-	assert.NoError(err)
-	assert.NotNil(di)
+		s.testClientId,
+		s.testClientContext,
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppnumber,
+		s.logger)
+	s.NoError(err)
+	s.NotNil(di)
+
+	err = di.insert(s.dbmap)
+	s.NoError(err)
+	di, err = getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	s.NoError(err)
+	s.NotNil(di)
 
 	di.cleanup()
 
 	di = nil
 
-	di, err = getDeviceInfo(dbmap, testClientID, testClientContext, testDeviceId, logger)
-	assert.NoError(err)
-	assert.NotNil(di)
+	di, err = getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	s.NoError(err)
+	s.Nil(di)
 }
 
-func TestDevicePushMessageCreate(t *testing.T) {
-	assert := assert.New(t)
+func (s *deviceInfoTester) TestDevicePushMessageCreate() {
 	di := DeviceInfo{Platform: "ios", PushService: AWS.PushServiceAPNS, ClientContext: "FOO"}
 	var days_28 int64 = 2419200
 
 	message, err := di.pushMessage(PingerNotificationRegister, days_28)
-	assert.NoError(err)
-	assert.NotEmpty(message)
-	assert.Equal(
+	s.NoError(err)
+	s.NotEmpty(message)
+	s.Equal(
 		"{\"APNS\":\"{\\\"aps\\\":{\\\"content-available\\\":1,\\\"sound\\\":\\\"silent.wav\\\"},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"APNS_SANDBOX\":\"{\\\"aps\\\":{\\\"content-available\\\":1,\\\"sound\\\":\\\"silent.wav\\\"},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"collapse_key\\\":\\\"10e23d6b0b515fbff01dff49948afebea929a763\\\",\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}},\\\"delay_while_idle\\\":false,\\\"time_to_live\\\":2419200}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
 		message)
 }

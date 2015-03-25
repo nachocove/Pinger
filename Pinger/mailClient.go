@@ -5,13 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/twinj/uuid"
 	"path"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -149,23 +149,7 @@ func (pi *MailPingInformation) getLogPrefix() string {
 	return pi.logPrefix
 }
 
-type MailClientContext struct {
-	mailClient MailClient // a mail client with the MailClient interface
-	stopToken  string
-	logger     *Logging.Logger
-	errCh      chan error
-	stopAllCh  chan int // closed when client is exiting, so that any sub-routine can exit
-	exitCh     chan int // used by MailClient{} to signal it has exited
-	command    chan PingerCommand
-	lastError  error
-	stats      *Utils.StatLogger
-	di         *DeviceInfo
-	pi         *MailPingInformation
-	wg         sync.WaitGroup
-	status     MailClientStatus
-}
-
-func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
+func NewMailClientContext(dbm *gorp.DbMap, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
 		logger:    logger.Copy(),
 		errCh:     make(chan error),
@@ -177,16 +161,17 @@ func NewMailClientContext(pi *MailPingInformation, di *DeviceInfo, debug, doStat
 		status:    MailClientStatusInitialized,
 	}
 	client.logger.SetCallDepth(1)
-	deviceInfo, err := getDeviceInfo(DefaultPollingContext.dbm, pi.ClientId, pi.ClientContext, pi.DeviceId, client.logger)
+
+	di, err := newDeviceInfoPI(dbm, pi, logger)
 	if err != nil {
 		return nil, err
 	}
 	client.Debug("Validating client info")
-	err = deviceInfo.validateClient()
+	err = di.validateClient()
 	if err != nil {
 		return nil, err
 	}
-	client.di = deviceInfo
+	client.di = di
 	if doStats {
 		client.stats = Utils.NewStatLogger(client.stopAllCh, logger, false)
 	}
@@ -385,4 +370,50 @@ func (client *MailClientContext) deferPoll(timeout int64) error {
 		return client.Action(PingerDefer)
 	}
 	return fmt.Errorf("Client has stopped. Can not defer")
+}
+
+func (client *MailClientContext) updateLastContact() error {
+	return client.di.updateLastContact()
+}
+
+func (client *MailClientContext) getStopToken() string {
+	return client.stopToken
+}
+
+type ClientSessionInfo struct {
+	ClientId      string
+	ClientContext string
+	DeviceId      string
+	Status        MailClientStatus
+	Url           string
+	Error         string
+}
+
+func (client *MailClientContext) sessionInfo() *ClientSessionInfo {
+	status, err := client.Status()
+	info := ClientSessionInfo{
+		ClientId:      client.pi.ClientId,
+		ClientContext: client.pi.ClientContext,
+		DeviceId:      client.pi.DeviceId,
+		Status:        status,
+		Url:           client.pi.MailServerUrl,
+	}
+	if err != nil {
+		info.Error = err.Error()
+	}
+	return &info
+}
+
+func (client *MailClientContext) getSessionInfo() (*ClientSessionInfo, error) {
+	switch {
+	case client.pi == nil:
+		return nil, fmt.Errorf("entry has no pi")
+
+	case client.mailClient == nil:
+		return nil, fmt.Errorf("Entry has no active client")
+
+	case client.pi.ClientId == "" || client.pi.ClientContext == "" || client.pi.DeviceId == "":
+		return nil, fmt.Errorf("entry has been cleaned up.")
+	}
+	return client.sessionInfo(), nil
 }
