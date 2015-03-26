@@ -60,15 +60,11 @@ func getPingerInfo() *PingerInfo {
 	return nil
 }
 func (pinger *PingerInfo) Updater(minutes int) {
-	err := pinger.UpdateEntry() // update now, then every 10 minutes
-	if err != nil {
-		panic("Could not update entry")
-	}
 	d := time.Duration(minutes) * time.Minute
 	ticker := time.NewTicker(d)
 	for {
 		<-ticker.C
-		err = pinger.UpdateEntry()
+		err := pinger.UpdateEntry()
 		if err != nil {
 			panic("Could not update entry")
 		}

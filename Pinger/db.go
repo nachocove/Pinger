@@ -96,11 +96,6 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger)
 		}
 	}
 
-	// Add us (if not already there)
-	_, err = newPingerInfo(dbmap, logger.Copy())
-	if err != nil {
-		return nil, err
-	}
 	return dbmap, nil
 }
 
