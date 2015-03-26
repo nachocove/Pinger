@@ -16,8 +16,8 @@ type BackendPolling struct {
 	aws         *AWS.AWSHandle
 }
 
-func NewBackendPolling(config *Configuration, debug, debugSql bool, logger *Logging.Logger) (*BackendPolling, error) {
-	dbm, err := initDB(&config.Db, true, debugSql, logger)
+func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger) (*BackendPolling, error) {
+	dbm, err := initDB(&config.Db, true, logger)
 	if err != nil {
 		return nil, err
 	}

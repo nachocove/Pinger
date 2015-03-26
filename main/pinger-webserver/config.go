@@ -1,7 +1,6 @@
 package main
 
 import (
-	"code.google.com/p/gcfg"
 	"flag"
 	"fmt"
 	"github.com/codegangsta/negroni"
@@ -10,125 +9,11 @@ import (
 	"github.com/nachocove/Pinger/Pinger"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
-	"net"
 	"net/http"
 	"os"
 	"path"
 	"runtime"
-	"strings"
 )
-
-// TODO Need to combine the configs into one, since there's shared settings. Just
-//  have a webserver section and a backend section for daemon-specific stuff.
-// Tricky: Need to be able to override some of the Global stuff per daemon
-//  (like DumpRequests)
-
-const (
-	defaultPort           = 443
-	defaultBindAddress    = "0.0.0.0"
-	defaultTemplateDir    = "templates"
-	defaultDebugging      = false
-	defaultServerCertFile = ""
-	defaultServerKeyFile  = ""
-	defaultNonTLSPort     = 80
-	defaultDevelopment    = false
-	defaultDebug          = false
-)
-
-// ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
-type ServerConfiguration struct {
-	Port             int
-	BindAddress      string
-	TemplateDir      string
-	ServerCertFile   string
-	ServerKeyFile    string
-	NonTlsPort       int      `gcfg:"non-tls-port"`
-	SessionSecret    string   `gcfg:"session-secret"`
-	AliveCheckIPList []string `gcfg:"alive-check-ip"`
-	AliveCheckToken  []string `gcfg:"alive-check-token"`
-	
-	aliveCheckCidrList []*net.IPNet `gcfg:"-"`
-}
-
-func (cfg *ServerConfiguration) validate() error {
-	badIP := make([]string, 0, 5)
-	for _, cidr := range cfg.AliveCheckIPList {
-		_, ipnet, err := net.ParseCIDR(cidr)
-		if err != nil {
-			badIP = append(badIP, err.Error())	
-		} else {
-			cfg.aliveCheckCidrList = append(cfg.aliveCheckCidrList, ipnet)
-		}
-	}
-	if len(badIP) > 0 {
-		return fmt.Errorf("alive-check-ip: %s", strings.Join(badIP, ", "))
-	}
-	return nil
-}
-
-func (cfg *ServerConfiguration) checkIPListString() string {
-	return strings.Join(cfg.AliveCheckIPList, ", ")
-}
-
-func (cfg *ServerConfiguration) checkIP(ip net.IP) bool {
-	foundMatch := false
-	if len(cfg.aliveCheckCidrList) == 0 {
-		foundMatch = true
-	} else {
-		for _, ipnet := range cfg.aliveCheckCidrList {
-			if ipnet.Contains(ip) {
-				foundMatch = true
-				break
-			}
-		}
-	}
-	return foundMatch
-}
-
-func (cfg *ServerConfiguration) checkToken(token string) bool {
-	foundMatch := false
-	for _, tok := range cfg.AliveCheckToken {
-		if strings.EqualFold(tok, token) {
-			foundMatch = true
-			break
-		}
-	}
-	return foundMatch
-}
-
-
-
-// Configuration - The top level configuration structure.
-type Configuration struct {
-	Server ServerConfiguration
-	Global Pinger.GlobalConfiguration
-	Rpc    Pinger.RPCServerConfiguration
-}
-
-func (config *Configuration) Read(filename string) error {
-	err := gcfg.ReadFileInto(config, filename)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func NewConfiguration() *Configuration {
-	config := &Configuration{
-		Global: *Pinger.NewGlobalConfiguration(),
-		Server: ServerConfiguration{
-			Port:           defaultPort,
-			BindAddress:    defaultBindAddress,
-			TemplateDir:    defaultTemplateDir,
-			ServerCertFile: defaultServerCertFile,
-			ServerKeyFile:  defaultServerKeyFile,
-			NonTlsPort:     defaultNonTLSPort,
-			SessionSecret:  "",
-		},
-		Rpc: Pinger.NewRPCServerConfiguration(),
-	}
-	return config
-}
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "USAGE: %s [args]\n Args:\n", path.Base(os.Args[0]))
@@ -136,14 +21,14 @@ func usage() {
 }
 
 type Context struct {
-	Config       *Configuration
+	Config       *Pinger.Configuration
 	Logger       *Logging.Logger
 	loggerLevel  Logging.Level
 	SessionStore *sessions.CookieStore
 }
 
 func NewContext(
-	config *Configuration,
+	config *Pinger.Configuration,
 	logger *Logging.Logger,
 	rpcConnectString string,
 	sessionStore *sessions.CookieStore) *Context {
@@ -168,10 +53,10 @@ func GetConfigAndRun() {
 	var err error
 	var printErrors bool
 
-	flag.IntVar(&port, "p", defaultPort, "The port to bind to")
-	flag.StringVar(&bindAddress, "host", defaultBindAddress, "The IP address to bind to")
+	flag.IntVar(&port, "p", Pinger.DefaultPort, "The port to bind to")
+	flag.StringVar(&bindAddress, "host", Pinger.DefaultBindAddress, "The IP address to bind to")
 	flag.StringVar(&configFile, "c", "", "Configuration file")
-	flag.BoolVar(&debug, "d", defaultDebug, "Debug")
+	flag.BoolVar(&debug, "d", Pinger.DefaultDebugging, "Debug")
 	flag.BoolVar(&printErrors, "print-errors", false, "Print Error messages")
 	flag.Usage = usage
 	flag.Parse()
@@ -184,30 +69,24 @@ func GetConfigAndRun() {
 		usage()
 		os.Exit(1)
 	}
-	config := NewConfiguration()
-	err = config.Read(configFile)
+	config, err := Pinger.ReadConfig(configFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading config file:\n%v\n", err)
 		os.Exit(1)
 	}
-	err = config.Global.Validate()
+	err = config.Logging.Validate()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error validate global config:\n%v\n", err)
 		os.Exit(1)
 	}
-	err = config.Server.validate()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error validate server config:\n%v\n", err)
-		os.Exit(1)
-	}
-	if port != defaultPort {
+	if port != Pinger.DefaultPort {
 		config.Server.Port = port
 	}
-	if bindAddress != defaultBindAddress {
+	if bindAddress != Pinger.DefaultBindAddress {
 		config.Server.BindAddress = bindAddress
 	}
-	if debug != defaultDebug {
-		config.Global.Debug = debug
+	if debug != Pinger.DefaultDebugging {
+		config.Server.Debug = debug
 	}
 	if config.Server.TemplateDir == "" {
 		fmt.Fprintf(os.Stderr, "No template directory specified!")
@@ -221,8 +100,8 @@ func GetConfigAndRun() {
 	}
 	// From here on, treat the cfg debug and cli debug the same.
 	// Don't do this before we decide on the screen output above
-	debug = debug || config.Global.Debug
-	logger, err := config.Global.InitLogging(screenLogging, screenLevel, nil, debug)
+	debug = debug || config.Server.Debug
+	logger, err := config.Logging.InitLogging(screenLogging, screenLevel, nil, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error InitLogging: %v\n", err)
 		os.Exit(1)
@@ -251,7 +130,7 @@ var httpsRouter = mux.NewRouter()
 func (context *Context) run() error {
 	config := context.Config
 	httpsMiddlewares := negroni.New(
-		Utils.NewRecovery("Pinger-web", config.Global.Debug),
+		Utils.NewRecovery("Pinger-web", config.Server.Debug),
 		Utils.NewLogger(context.Logger),
 		Utils.NewStatic("/public", "/static", ""),
 		NewContextMiddleWare(context))
@@ -263,7 +142,7 @@ func (context *Context) run() error {
 	// start the server on the non-tls port to redirect
 	go func() {
 		httpMiddlewares := negroni.New(
-			Utils.NewRecovery("Pinger-web", config.Global.Debug),
+			Utils.NewRecovery("Pinger-web", config.Server.Debug),
 			Utils.NewLogger(context.Logger),
 			Utils.NewRedirectMiddleware("", config.Server.Port),
 		)

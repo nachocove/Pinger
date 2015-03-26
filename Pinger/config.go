@@ -11,22 +11,35 @@ import (
 )
 
 type Configuration struct {
-	Global    GlobalConfiguration
+	Logging   LoggingConfiguration
 	Aws       AWS.AWSConfiguration
 	Db        DBConfiguration
 	Rpc       RPCServerConfiguration
 	Telemetry Telemetry.TelemetryConfiguration
+	Backend   BackendConfiguration
+	Server    ServerConfiguration
 }
 
-type GlobalConfiguration struct {
+type BackendConfiguration struct {
+	Debug             bool
 	DumpRequests      bool
 	IgnorePushFailure bool
-	LogDir            string
-	LogFileName       string
-	LogFileLevel      string
-	Debug             bool
-	DebugSql          bool
 	PingerUpdater     int `gcfg:"pinger-updater"`
+}
+
+func NewBackendConfiguration() *BackendConfiguration {
+	return &BackendConfiguration{
+		Debug:             defaultDebug,
+		DumpRequests:      defaultDumpRequests,
+		IgnorePushFailure: defaultIgnorePushFailure,
+		PingerUpdater:     defaultPingerUpdater,
+	}
+}
+
+type LoggingConfiguration struct {
+	LogDir       string
+	LogFileName  string
+	LogFileLevel string
 
 	// private
 	logFileLevel Logging.Level
@@ -43,28 +56,32 @@ const (
 	defaultPingerUpdater     = 0
 )
 
-func NewGlobalConfiguration() *GlobalConfiguration {
-	return &GlobalConfiguration{
-		DumpRequests:      defaultDumpRequests,
-		IgnorePushFailure: defaultIgnorePushFailure,
-		LogDir:            defaultLogDir,
-		LogFileName:       defaultLogFileName,
-		LogFileLevel:      defaultLogFileLevel,
-		Debug:             defaultDebug,
-		DebugSql:          defaultDebugSql,
-		PingerUpdater:     defaultPingerUpdater,
+func NewLoggingConfiguration() *LoggingConfiguration {
+	return &LoggingConfiguration{
+		LogDir:       defaultLogDir,
+		LogFileName:  defaultLogFileName,
+		LogFileLevel: defaultLogFileLevel,
 	}
 }
 
 func NewConfiguration() *Configuration {
 	config := &Configuration{
-		Global:    *NewGlobalConfiguration(),
+		Logging:   *NewLoggingConfiguration(),
 		Aws:       AWS.AWSConfiguration{},
 		Db:        DBConfiguration{},
 		Rpc:       NewRPCServerConfiguration(),
 		Telemetry: Telemetry.TelemetryConfiguration{},
+		Server:    *NewServerConfiguration(),
 	}
 	return config
+}
+
+func (config *Configuration) Read(filename string) error {
+	err := gcfg.ReadFileInto(config, filename)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func exists(path string) bool {
@@ -78,28 +95,28 @@ func exists(path string) bool {
 	return false
 }
 
-func (gconfig *GlobalConfiguration) Validate() error {
-	if gconfig.LogFileName == "" {
-		gconfig.LogFileName = fmt.Sprintf("%s.log", path.Base(os.Args[0]))
+func (cfg *LoggingConfiguration) Validate() error {
+	if cfg.LogFileName == "" {
+		cfg.LogFileName = fmt.Sprintf("%s.log", path.Base(os.Args[0]))
 	}
-	level, err := Logging.LogLevel(gconfig.LogFileLevel)
+	level, err := Logging.LogLevel(cfg.LogFileLevel)
 	if err != nil {
 		return err
 	}
-	gconfig.logFileLevel = level
+	cfg.logFileLevel = level
 	return nil
 }
 
-func (gconfig *GlobalConfiguration) InitLogging(screen bool, screenLevel Logging.Level, telemetryWriter *Telemetry.TelemetryWriter, debug bool) (*Logging.Logger, error) {
-	err := gconfig.Validate()
+func (cfg *LoggingConfiguration) InitLogging(screen bool, screenLevel Logging.Level, telemetryWriter *Telemetry.TelemetryWriter, debug bool) (*Logging.Logger, error) {
+	err := cfg.Validate()
 	if err != nil {
 		return nil, err
 	}
-	if !exists(gconfig.LogDir) {
-		return nil, fmt.Errorf("Logging directory %s does not exist.", gconfig.LogDir)
+	if !exists(cfg.LogDir) {
+		return nil, fmt.Errorf("Logging directory %s does not exist.", cfg.LogDir)
 	}
 	loggerName := path.Base(os.Args[0])
-	logger := Logging.InitLogging(loggerName, path.Join(gconfig.LogDir, gconfig.LogFileName), gconfig.logFileLevel, screen, screenLevel, telemetryWriter, debug)
+	logger := Logging.InitLogging(loggerName, path.Join(cfg.LogDir, cfg.LogFileName), cfg.logFileLevel, screen, screenLevel, telemetryWriter, debug)
 	return logger, nil
 }
 
@@ -109,7 +126,7 @@ func ReadConfig(filename string) (*Configuration, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = config.Global.Validate()
+	err = config.Logging.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +137,11 @@ func ReadConfig(filename string) (*Configuration, error) {
 	err = config.Db.Validate()
 	if err != nil {
 		return nil, err
+	}
+	err = config.Server.validate()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error validate server config:\n%v\n", err)
+		os.Exit(1)
 	}
 	return config, nil
 }

@@ -25,7 +25,7 @@ func GetContext(r *http.Request) *Context {
 	if !ok {
 		panic("No string template in context")
 	}
-	if context.Config.Global.DumpRequests {
+	if context.Config.Server.DumpRequests {
 		responseBytes, err := httputil.DumpRequest(r, true)
 		if err != nil {
 			context.Logger.Error("Could not dump request %+v", r)

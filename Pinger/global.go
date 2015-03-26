@@ -5,15 +5,15 @@ import (
 )
 
 type globalStuff struct {
-	config      *GlobalConfiguration	
-	aws         AWS.AWSHandler
+	config *BackendConfiguration
+	aws    AWS.AWSHandler
 }
 
 var globals *globalStuff
 
-func setGlobal(config *GlobalConfiguration, aws AWS.AWSHandler) {
+func setGlobal(config *BackendConfiguration, aws AWS.AWSHandler) {
 	if globals != nil {
 		panic("Can not set globals multiple times")
 	}
 	globals = &globalStuff{aws: aws, config: config}
-}	
+}

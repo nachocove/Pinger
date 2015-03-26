@@ -72,14 +72,14 @@ func main() {
 
 	// From here on, treat the cfg debug and cli debug the same.
 	// Don't do this before we decide on the screen output above
-	debug = debug || config.Global.Debug
+	debug = debug || config.Backend.Debug
 	telemetryWriter, err := Telemetry.NewTelemetryWriter(&config.Telemetry, &config.Aws, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Init Telemetry: %s\n", err)
 		os.Exit(1)
 	}
 
-	logger, err = config.Global.InitLogging(screenLogging, screenLevel, telemetryWriter, debug)
+	logger, err = config.Logging.InitLogging(screenLogging, screenLevel, telemetryWriter, debug)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Init Logging: %s\n", err)
 		os.Exit(1)
@@ -106,7 +106,7 @@ func main() {
 	}
 
 	logger.Info("Started %v", os.Args)
-	err = Pinger.StartPollingRPCServer(config, debug, config.Global.DebugSql, logger)
+	err = Pinger.StartPollingRPCServer(config, debug, logger)
 	if err != nil {
 		panic(err.Error())
 	}

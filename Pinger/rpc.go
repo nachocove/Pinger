@@ -65,12 +65,12 @@ type BackendPoller interface {
 
 type pollMapType map[string]MailClientContextType
 
-func StartPollingRPCServer(config *Configuration, debug, debugSql bool, logger *Logging.Logger) error {
-	pollingAPI, err := NewBackendPolling(config, debug, debugSql, logger)
+func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Logger) error {
+	pollingAPI, err := NewBackendPolling(config, true, logger)
 	if err != nil {
 		return err
 	}
-	setGlobal(&config.Global, pollingAPI.aws)
+	setGlobal(&config.Backend, pollingAPI.aws)
 
 	log.SetOutput(ioutil.Discard) // rpc.Register logs a warning for ToggleDebug, which we don't want.
 
@@ -78,12 +78,12 @@ func StartPollingRPCServer(config *Configuration, debug, debugSql bool, logger *
 
 	go alertAllDevices(pollingAPI.dbm, pollingAPI.logger)
 
-	if config.Global.PingerUpdater > 0 {
+	if config.Backend.PingerUpdater > 0 {
 		pinger, err := newPingerInfo(pollingAPI.dbm, logger)
 		if err != nil {
 			return err
 		}
-		go pinger.Updater(config.Global.PingerUpdater)
+		go pinger.Updater(config.Backend.PingerUpdater)
 	}
 
 	logger.Debug("Starting RPC server on %s (pinger id %s)", config.Rpc.String(), pingerHostId)

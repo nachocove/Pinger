@@ -21,6 +21,7 @@ type DBConfiguration struct {
 	Username    string
 	Password    string
 	Certificate string // for SSL protected communication with the DB
+	DebugSql    bool
 }
 
 func (dbconfig *DBConfiguration) Validate() error {
@@ -50,7 +51,7 @@ func (dbl DBLogger) Printf(format string, v ...interface{}) {
 	dbl.logger.Debug(format, v...)
 }
 
-func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger) (*gorp.DbMap, error) {
+func initDB(dbconfig *DBConfiguration, init bool, logger *Logging.Logger) (*gorp.DbMap, error) {
 	var dbmap *gorp.DbMap
 	err := dbconfig.Validate()
 	if err != nil {
@@ -74,7 +75,7 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger)
 		return nil, errors.New("Could not get dbmap")
 	}
 
-	if debug {
+	if dbconfig.DebugSql {
 		l := &DBLogger{logger: logger.Copy()}
 		l.logger.SetCallDepth(6)
 		dbmap.TraceOn("[gorp]", l)

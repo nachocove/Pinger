@@ -47,13 +47,13 @@ func aliveCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "NO TOKEN", http.StatusBadRequest)
 		return
 	}
-	if !context.Config.Server.checkToken(token) {
+	if !context.Config.Server.CheckToken(token) {
 		context.Logger.Error("tokens do not match")
 		http.Error(w, "TOKEN MISMATCH", http.StatusBadRequest)
 		return
 	}
-	if !context.Config.Server.checkIP(remoteIP) {
-		context.Logger.Error("remote address did not match any valid IPrange from the list %s", context.Config.Server.checkIPListString())
+	if !context.Config.Server.CheckIP(remoteIP) {
+		context.Logger.Error("remote address did not match any valid IPrange from the list %s", context.Config.Server.CheckIPListString())
 		http.Error(w, "BAD IP", http.StatusBadRequest)
 		return
 	}
