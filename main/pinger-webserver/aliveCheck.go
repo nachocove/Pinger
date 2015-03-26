@@ -23,19 +23,19 @@ func aliveCheck(w http.ResponseWriter, r *http.Request) {
 	ipParts := strings.Split(r.RemoteAddr, ":")
 	if len(ipParts) < 1 {
 		context.Logger.Error("Could not split remote address %s", r.RemoteAddr)
-		http.Error(w, "UNKNOWN METHOD", http.StatusBadRequest)
+		http.Error(w, "INTERNAL ERROR", http.StatusInternalServerError)
 		return
 	}
 	remoteIP := net.ParseIP(ipParts[0])
 	if remoteIP == nil {
 		context.Logger.Error("Could not parse remote address %s", r.RemoteAddr)
-		http.Error(w, "UNKNOWN METHOD", http.StatusBadRequest)
+		http.Error(w, "INTERNAL ERROR", http.StatusInternalServerError)
 		return
 	}
 	err := r.ParseForm()
 	if err != nil {
 		context.Logger.Warning("Could not parse form")
-		http.Error(w, "UNKNOWN METHOD", http.StatusBadRequest)
+		http.Error(w, "INTERNAL ERROR", http.StatusInternalServerError)
 		return
 	}
 	token := r.FormValue("Token")
@@ -44,17 +44,17 @@ func aliveCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	if token == "" {
 		context.Logger.Warning("No token provided")
-		http.Error(w, "NO TOKEN", http.StatusBadRequest)
+		http.Error(w, "NO TOKEN", http.StatusForbidden)
 		return
 	}
 	if !context.Config.Server.CheckToken(token) {
 		context.Logger.Error("tokens do not match")
-		http.Error(w, "TOKEN MISMATCH", http.StatusBadRequest)
+		http.Error(w, "TOKEN MISMATCH", http.StatusForbidden)
 		return
 	}
 	if !context.Config.Server.CheckIP(remoteIP) {
 		context.Logger.Error("remote address did not match any valid IPrange from the list %s", context.Config.Server.CheckIPListString())
-		http.Error(w, "BAD IP", http.StatusBadRequest)
+		http.Error(w, "BAD IP", http.StatusForbidden)
 		return
 	}
 	reply, err := Pinger.AliveCheck(context.Config.Rpc.ConnectString())
