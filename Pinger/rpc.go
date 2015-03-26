@@ -79,7 +79,7 @@ func StartPollingRPCServer(config *Configuration, debug, debugSql bool, logger *
 	go alertAllDevices(pollingAPI.dbm, pollingAPI.logger)
 
 	if config.Global.PingerUpdater > 0 {
-		pinger, err := newPingerInfo(pollingAPI.dbm)
+		pinger, err := newPingerInfo(pollingAPI.dbm, logger)
 		if err != nil {
 			return err
 		}
@@ -435,7 +435,7 @@ func RPCAliveCheck(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args 
 	if globals.config.PingerUpdater > 0 {
 		logger.Warning("Running both auto-updater and a remote Alive Check")
 	}
-	_, err = newPingerInfo(dbm) // this updates the timestamp
+	_, err = newPingerInfo(dbm, logger) // this updates the timestamp
 	if err != nil {
 		return err
 	}

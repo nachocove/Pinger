@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/HostId"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"reflect"
 	"time"
 )
@@ -14,7 +15,8 @@ type PingerInfo struct {
 	Created int64  `db:"created"`
 	Updated int64  `db:"updated"`
 
-	dbm *gorp.DbMap `db:"-"`
+	dbm    *gorp.DbMap     `db:"-"`
+	logger *Logging.Logger `db:"-"`
 }
 
 const (
@@ -82,6 +84,7 @@ func (pinger *PingerInfo) UpdateEntry() error {
 	if n <= 0 {
 		return fmt.Errorf("%d rows updated. That's not right.", n)
 	}
+	pinger.logger.Info("%s: Pinger marked as alive", pinger.Pinger)
 	return nil
 }
 
@@ -102,7 +105,7 @@ func (pinger *PingerInfo) PreInsert(s gorp.SqlExecutor) error {
 	return nil
 }
 
-func newPingerInfo(dbm *gorp.DbMap) (*PingerInfo, error) {
+func newPingerInfo(dbm *gorp.DbMap, logger *Logging.Logger) (*PingerInfo, error) {
 	obj, err := dbm.Get(&PingerInfo{}, pingerHostId)
 	if err != nil {
 		return nil, err
@@ -111,6 +114,7 @@ func newPingerInfo(dbm *gorp.DbMap) (*PingerInfo, error) {
 	if obj != nil {
 		pinger = obj.(*PingerInfo)
 		pinger.dbm = dbm
+		pinger.logger = logger
 		err = pinger.UpdateEntry()
 		if err != nil {
 			return nil, err
@@ -119,6 +123,7 @@ func newPingerInfo(dbm *gorp.DbMap) (*PingerInfo, error) {
 		pinger = &PingerInfo{Pinger: pingerHostId}
 		dbm.Insert(pinger)
 		pinger.dbm = dbm
+		pinger.logger = logger
 	}
 	return pinger, nil
 }
