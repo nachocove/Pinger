@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/HostId"
-	"os"
 	"reflect"
 	"time"
 )
@@ -58,26 +57,37 @@ func addPingerInfoTable(dbmap *gorp.DbMap) {
 func getPingerInfo() *PingerInfo {
 	return nil
 }
-func (pinger *PingerInfo) Updater() {
-	pinger.UpdateEntry() // update now, then every 10 minutes
-	ticker := time.NewTicker(time.Duration(10) * time.Minute)
+func (pinger *PingerInfo) Updater(minutes int) {
+	err := pinger.UpdateEntry() // update now, then every 10 minutes
+	if err != nil {
+		panic("Could not update entry")
+	}
+	d := time.Duration(minutes) * time.Minute
+	ticker := time.NewTicker(d)
 	for {
 		<-ticker.C
-		pinger.UpdateEntry()
+		err = pinger.UpdateEntry()
+		if err != nil {
+			panic("Could not update entry")
+		}
 	}
 }
 
-func (pinger *PingerInfo) UpdateEntry() {
+func (pinger *PingerInfo) UpdateEntry() error {
 	pinger.Updated = time.Now().UnixNano()
-	_, err := pinger.update()
+	n, err := pinger.update()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not update pinger info")
+		return err
 	}
+	if n <= 0 {
+		return fmt.Errorf("%d rows updated. That's not right.", n)
+	}
+	return nil
 }
 
 func (pinger *PingerInfo) update() (int64, error) {
 	if pinger.dbm == nil {
-		panic("Can not update device info without having fetched it")
+		panic("Can not update pinger info without having fetched it")
 	}
 	n, err := pinger.dbm.Update(pinger)
 	if err != nil {
@@ -100,10 +110,15 @@ func newPingerInfo(dbm *gorp.DbMap) (*PingerInfo, error) {
 	var pinger *PingerInfo
 	if obj != nil {
 		pinger = obj.(*PingerInfo)
+		pinger.dbm = dbm
+		err = pinger.UpdateEntry()
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		pinger = &PingerInfo{Pinger: pingerHostId}
 		dbm.Insert(pinger)
+		pinger.dbm = dbm
 	}
-	pinger.dbm = dbm
 	return pinger, nil
 }

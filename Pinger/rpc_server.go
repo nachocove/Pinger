@@ -3,8 +3,8 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
-	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils/AWS"
+	"github.com/nachocove/Pinger/Utils/Logging"
 )
 
 type BackendPolling struct {
@@ -13,7 +13,7 @@ type BackendPolling struct {
 	loggerLevel Logging.Level
 	debug       bool
 	pollMap     pollMapType
-	aws *AWS.AWSHandle
+	aws         *AWS.AWSHandle
 }
 
 func NewBackendPolling(config *Configuration, debug, debugSql bool, logger *Logging.Logger) (*BackendPolling, error) {
@@ -27,7 +27,7 @@ func NewBackendPolling(config *Configuration, debug, debugSql bool, logger *Logg
 		loggerLevel: -1,
 		debug:       debug,
 		pollMap:     make(pollMapType),
-		aws: config.Aws.NewHandle(),
+		aws:         config.Aws.NewHandle(),
 	}
 	return backend, nil
 }
@@ -61,5 +61,9 @@ func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) (err
 }
 
 func (t *BackendPolling) FindActiveSessions(args *FindSessionsArgs, reply *FindSessionsResponse) (err error) {
-	return RPCFindActiveSessions(&t.pollMap, args, reply, t.logger)
+	return RPCFindActiveSessions(t, &t.pollMap, t.dbm, args, reply, t.logger)
+}
+
+func (t *BackendPolling) AliveCheck(args *AliveCheckArgs, reply *AliveCheckResponse) (err error) {
+	return RPCAliveCheck(t, &t.pollMap, t.dbm, args, reply, t.logger)
 }

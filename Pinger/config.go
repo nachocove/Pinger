@@ -26,19 +26,10 @@ type GlobalConfiguration struct {
 	LogFileLevel      string
 	Debug             bool
 	DebugSql          bool
+	PingerUpdater     int `gcfg:"pinger-updater"`
 
 	// private
 	logFileLevel Logging.Level
-}
-
-func NewGlobalConfiguration() *GlobalConfiguration {
-	return &GlobalConfiguration{
-		Debug:        defaultDebug,
-		DebugSql:     defaultDebugSql,
-		LogDir:       defaultLogDir,
-		LogFileName:  defaultLogFileName,
-		LogFileLevel: defaultLogFileLevel,
-	}
 }
 
 const (
@@ -49,7 +40,21 @@ const (
 	defaultLogDir            = "./log"
 	defaultLogFileName       = ""
 	defaultLogFileLevel      = "INFO"
+	defaultPingerUpdater     = 0
 )
+
+func NewGlobalConfiguration() *GlobalConfiguration {
+	return &GlobalConfiguration{
+		DumpRequests:      defaultDumpRequests,
+		IgnorePushFailure: defaultIgnorePushFailure,
+		LogDir:            defaultLogDir,
+		LogFileName:       defaultLogFileName,
+		LogFileLevel:      defaultLogFileLevel,
+		Debug:             defaultDebug,
+		DebugSql:          defaultDebugSql,
+		PingerUpdater:     defaultPingerUpdater,
+	}
+}
 
 func NewConfiguration() *Configuration {
 	config := &Configuration{

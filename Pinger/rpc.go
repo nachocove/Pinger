@@ -71,12 +71,20 @@ func StartPollingRPCServer(config *Configuration, debug, debugSql bool, logger *
 		return err
 	}
 	setGlobal(&config.Global, pollingAPI.aws)
-	
+
 	log.SetOutput(ioutil.Discard) // rpc.Register logs a warning for ToggleDebug, which we don't want.
 
 	rpc.Register(pollingAPI)
 
 	go alertAllDevices(pollingAPI.dbm, pollingAPI.logger)
+
+	if config.Global.PingerUpdater > 0 {
+		pinger, err := newPingerInfo(pollingAPI.dbm)
+		if err != nil {
+			return err
+		}
+		go pinger.Updater(config.Global.PingerUpdater)
+	}
 
 	logger.Debug("Starting RPC server on %s (pinger id %s)", config.Rpc.String(), pingerHostId)
 	switch {
@@ -366,14 +374,14 @@ func (fs *FindSessionsArgs) getLogPrefix() string {
 	return fs.logPrefix
 }
 
-func RPCFindActiveSessions(pollMap *pollMapType, args *FindSessionsArgs, reply *FindSessionsResponse, logger *Logging.Logger) (err error) {
+func RPCFindActiveSessions(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *FindSessionsArgs, reply *FindSessionsResponse, logger *Logging.Logger) (err error) {
 	defer func() {
 		e := Utils.RecoverCrash(logger)
 		if e != nil {
 			err = e
 		}
 	}()
-	logger.Debug("Received findActiveSessions request with options %s", args.getLogPrefix())
+	logger.Info("Received findActiveSessions request with options %s", args.getLogPrefix())
 	for key, poll := range *pollMap {
 		if args.MaxSessions > 0 && len(reply.SessionInfos) >= args.MaxSessions {
 			logger.Debug("Max sessions read (%d). Stopping search.", len(reply.SessionInfos))
@@ -406,4 +414,32 @@ func RPCFindActiveSessions(pollMap *pollMapType, args *FindSessionsArgs, reply *
 	reply.Message = ""
 	return nil
 
+}
+
+type AliveCheckArgs struct {
+}
+
+type AliveCheckResponse struct {
+	Code    int
+	Message string
+}
+
+func RPCAliveCheck(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *AliveCheckArgs, reply *AliveCheckResponse, logger *Logging.Logger) (err error) {
+	defer func() {
+		e := Utils.RecoverCrash(logger)
+		if e != nil {
+			err = e
+		}
+	}()
+	logger.Info("Received aliveCheck request")
+	if globals.config.PingerUpdater > 0 {
+		logger.Warning("Running both auto-updater and a remote Alive Check")
+	}
+	_, err = newPingerInfo(dbm) // this updates the timestamp
+	if err != nil {
+		return err
+	}
+	reply.Code = PollingReplyOK
+	reply.Message = ""
+	return nil
 }

@@ -106,3 +106,16 @@ func findActiveSessions(rpcClient *rpc.Client, clientId, clientContext, deviceId
 	}
 	return &reply, nil
 }
+
+func AliveCheck(rpcserver string) (*AliveCheckResponse, error) {
+	client, err := getRpcClient(rpcserver)
+	if err != nil {
+		return nil, err
+	}
+	var reply AliveCheckResponse
+	err = client.Call("BackendPolling.AliveCheck", &AliveCheckArgs{}, &reply)
+	if err != nil {
+		return nil, err
+	}
+	return &reply, nil
+}

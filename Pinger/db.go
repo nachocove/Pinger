@@ -96,13 +96,11 @@ func initDB(dbconfig *DBConfiguration, init, debug bool, logger *Logging.Logger)
 		}
 	}
 
-	// Add us (if not already there), and start the updater
-	pinger, err := newPingerInfo(dbmap)
+	// Add us (if not already there)
+	_, err = newPingerInfo(dbmap)
 	if err != nil {
 		return nil, err
 	}
-	go pinger.Updater()
-
 	return dbmap, nil
 }
 
