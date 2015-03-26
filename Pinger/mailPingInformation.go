@@ -96,4 +96,3 @@ func (pi *MailPingInformation) getLogPrefix() string {
 	}
 	return pi.logPrefix
 }
-

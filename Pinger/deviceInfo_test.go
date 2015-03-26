@@ -4,8 +4,8 @@ import (
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
-	"github.com/stretchr/testify/suite"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"testing"
 )
 

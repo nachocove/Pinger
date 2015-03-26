@@ -1,8 +1,8 @@
 package AWS
 
 import (
-	"github.com/awslabs/aws-sdk-go/aws"
 	"fmt"
+	"github.com/awslabs/aws-sdk-go/aws"
 )
 
 // AWSConfiguration is used by Pinger/config.go to read the aws config section
@@ -39,4 +39,3 @@ func (config *AWSConfiguration) Validate() error {
 	}
 	return nil
 }
-

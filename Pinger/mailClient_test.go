@@ -18,7 +18,7 @@ type mailClientTester struct {
 	testPlatform      string
 	testPushToken     string
 	testPushService   string
-	testProtocol  string
+	testProtocol      string
 }
 
 func (s *mailClientTester) SetupSuite() {
@@ -153,7 +153,7 @@ func (s *mailClientTester) TestMailClient() {
 	client, err = NewMailClientContext(s.dbmap, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
-	
+
 	s.Equal(fmt.Sprintf("%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testClientId, s.testClientContext, "Foo"), err.Error())
 	pi = &MailPingInformation{
 		ClientId:      s.testClientId,
