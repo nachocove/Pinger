@@ -29,7 +29,7 @@ func (s *deviceInfoTester) SetupSuite() {
 	var err error
 	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
-	s.dbmap, err = initDB(&dbconfig, true, true, s.logger)
+	s.dbmap, err = initDB(&dbconfig, true, s.logger)
 	if err != nil {
 		panic("Could not create DB")
 	}

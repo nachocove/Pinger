@@ -22,35 +22,39 @@ import (
 
 // ExchangeClient A client with type exchange.
 type ExchangeClient struct {
-	transport  *http.Transport
-	request    *http.Request
 	debug      bool
 	logger     *Logging.Logger
-	parent     *MailClientContext
+	pi         *MailPingInformation
+	di         *DeviceInfo
+	wg         *sync.WaitGroup
+	errCh      chan error
+	exitCh     chan int
+	transport  *http.Transport
+	request    *http.Request
+	mutex      *sync.Mutex
 	httpClient *http.Client
 	cancelled  bool
-	mutex      *sync.Mutex
 }
 
 // NewExchangeClient set up a new exchange client
-func NewExchangeClient(parent *MailClientContext, debug bool, logger *Logging.Logger) (*ExchangeClient, error) {
+func NewExchangeClient(di *DeviceInfo, pi *MailPingInformation, wg *sync.WaitGroup, errCh chan error, exitCh chan int, debug bool, logger *Logging.Logger) (*ExchangeClient, error) {
 	ex := &ExchangeClient{
-		parent:    parent,
 		debug:     debug,
 		logger:    logger.Copy(),
-		cancelled: false,
+		pi:        pi,
+		di:        di,
+		wg:        wg,
+		errCh:     errCh,
+		exitCh:    exitCh,
 		mutex:     &sync.Mutex{},
+		cancelled: false,
 	}
 	ex.logger.SetCallDepth(1)
 	return ex, nil
 }
 
 func (ex *ExchangeClient) getLogPrefix() (prefix string) {
-	if ex.parent != nil && ex.parent.di != nil {
-		prefix = ex.parent.di.getLogPrefix() + "/ActiveSync"
-	} else {
-		prefix = ""
-	}
+	prefix = ex.pi.getLogPrefix() + "/ActiveSync"
 	return
 }
 
@@ -71,13 +75,17 @@ func (ex *ExchangeClient) Warning(format string, args ...interface{}) {
 }
 
 func (ex *ExchangeClient) maxResponseSize() (size int) {
-	if ex.parent.pi.ExpectedReply != nil {
-		size = len(ex.parent.pi.ExpectedReply)
+	if ex.pi.ExpectedReply != nil {
+		size = len(ex.pi.ExpectedReply)
 	}
-	if ex.parent.pi.NoChangeReply != nil && len(ex.parent.pi.NoChangeReply) > size {
-		size = len(ex.parent.pi.NoChangeReply)
+	if ex.pi.NoChangeReply != nil && len(ex.pi.NoChangeReply) > size {
+		size = len(ex.pi.NoChangeReply)
 	}
 	return
+}
+
+func (ex *ExchangeClient) sendError(err error) {
+	sendError(ex.errCh, err, ex.logger)
 }
 
 var retryResponse *http.Response
@@ -91,14 +99,14 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	unlockMutex := true
 	defer func() {
 		ex.Debug("Exiting doRequestResponse")
-		ex.parent.wg.Done()
+		ex.wg.Done()
 		if unlockMutex {
 			ex.mutex.Unlock()
 		}
 	}()
 
 	var err error
-	if ex == nil || ex.parent == nil || ex.parent.pi == nil {
+	if ex == nil || ex.pi == nil {
 		if ex.logger != nil {
 			ex.Warning("doRequestResponse called but structures cleaned up")
 		}
@@ -107,14 +115,14 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	if ex.request != nil {
 		panic("Doing doRequestResponse with an active request in process!!")
 	}
-	requestBody := bytes.NewReader(ex.parent.pi.RequestData)
-	ex.Debug("request WBXML %s", base64.StdEncoding.EncodeToString(ex.parent.pi.RequestData))
-	req, err := http.NewRequest("POST", ex.parent.pi.MailServerUrl, requestBody)
+	requestBody := bytes.NewReader(ex.pi.RequestData)
+	ex.Debug("request WBXML %s", base64.StdEncoding.EncodeToString(ex.pi.RequestData))
+	req, err := http.NewRequest("POST", ex.pi.MailServerUrl, requestBody)
 	if err != nil {
 		errCh <- fmt.Errorf("Failed to create request: %s", err.Error())
 		return
 	}
-	for k, v := range ex.parent.pi.HttpHeaders {
+	for k, v := range ex.pi.HttpHeaders {
 		if k == "Accept-Encoding" {
 			// ignore this. It could mess us up.
 			continue
@@ -144,8 +152,8 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		}
 	}
 
-	if ex.parent.pi.MailServerCredentials.Username != "" && ex.parent.pi.MailServerCredentials.Password != "" {
-		req.SetBasicAuth(ex.parent.pi.MailServerCredentials.Username, ex.parent.pi.MailServerCredentials.Password)
+	if ex.pi.MailServerCredentials.Username != "" && ex.pi.MailServerCredentials.Password != "" {
+		req.SetBasicAuth(ex.pi.MailServerCredentials.Username, ex.pi.MailServerCredentials.Password)
 	}
 	ex.request = req // save it so we can cancel it in another routine
 	ex.mutex.Unlock()
@@ -194,7 +202,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		responseCh <- retryResponse
 		return
 	}
-	if n < toRead && n != len(ex.parent.pi.ExpectedReply) && n != len(ex.parent.pi.NoChangeReply) {
+	if n < toRead && n != len(ex.pi.ExpectedReply) && n != len(ex.pi.NoChangeReply) {
 		ex.Warning("Read less than expected: %d < %d", n, toRead)
 	}
 
@@ -231,7 +239,7 @@ func (ex *ExchangeClient) exponentialBackoff(sleepTime int) int {
 
 func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	defer Utils.RecoverCrash(ex.logger)
-	defer ex.parent.wg.Done()
+	defer ex.wg.Done()
 	askedToStop := false
 	defer func(prefixStr string) {
 		ex.mutex.Lock()
@@ -250,7 +258,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 		}
 	}(ex.getLogPrefix())
 
-	reqTimeout := ex.parent.pi.ResponseTimeout
+	reqTimeout := ex.pi.ResponseTimeout
 	reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 	ex.transport = &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: ex.debug},
@@ -262,7 +270,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	if proxy != "" {
 		proxyUrl, err := url.Parse(proxy)
 		if err != nil {
-			ex.parent.sendError(err)
+			ex.sendError(err)
 			return
 		}
 		ex.transport.Proxy = http.ProxyURL(proxyUrl)
@@ -275,14 +283,14 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	if useCookieJar {
 		cookieJar, err := cookiejar.New(nil)
 		if err != nil {
-			ex.parent.sendError(err)
+			ex.sendError(err)
 			return
 		}
 		ex.httpClient.Jar = cookieJar
 	}
-	ex.Debug("New HTTP Client with timeout %s %s", ex.transport.ResponseHeaderTimeout, ex.parent.pi.MailServerUrl)
+	ex.Debug("New HTTP Client with timeout %s %s", ex.transport.ResponseHeaderTimeout, ex.pi.MailServerUrl)
 	sleepTime := 0
-	tooFastResponse := (time.Duration(ex.parent.pi.ResponseTimeout) * time.Millisecond) / 4
+	tooFastResponse := (time.Duration(ex.pi.ResponseTimeout) * time.Millisecond) / 4
 	ex.Debug("TooFast timeout set to %s", tooFastResponse)
 	var responseCh chan *http.Response
 	var errCh chan error
@@ -302,13 +310,13 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 		responseCh = make(chan *http.Response)
 
 		timeSent := time.Now()
-		ex.parent.wg.Add(1)
+		ex.wg.Add(1)
 		ex.cancelled = false
 		go ex.doRequestResponse(responseCh, errCh)
 		ex.Debug("Waiting for response")
 		select {
 		case err := <-errCh:
-			ex.parent.sendError(err)
+			ex.sendError(err)
 			return
 
 		case response := <-responseCh:
@@ -320,13 +328,13 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 			// the response body tends to be pretty short. Let's just read it all.
 			responseBody, err := ioutil.ReadAll(response.Body)
 			if err != nil {
-				ex.parent.sendError(err)
+				ex.sendError(err)
 				response.Body.Close() // attempt to close. Ignore any errors.
 				return
 			}
 			err = response.Body.Close()
 			if err != nil {
-				ex.parent.sendError(err)
+				ex.sendError(err)
 				return
 			}
 			switch {
@@ -335,7 +343,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				case response.StatusCode == 401:
 					// ask the client to re-register, since nothing we could do would fix this
 					ex.Warning("401 response. Telling client to re-register")
-					err = ex.parent.di.push(PingerNotificationRegister)
+					err = ex.di.push(PingerNotificationRegister)
 					if err != nil {
 						// don't bother with this error. The real/main error is the http status. Just log it.
 						ex.Error("Push failed but ignored: %s", err.Error())
@@ -347,7 +355,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 					sleepTime = ex.exponentialBackoff(sleepTime)
 					ex.Warning("Response Status %s. Back to polling", response.Status)
 				}
-			case ex.parent.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.parent.pi.NoChangeReply) == 0:
+			case ex.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.pi.NoChangeReply) == 0:
 				// go back to polling
 				ex.Debug("Reply matched NoChangeReply. Back to polling")
 				if time.Since(timeSent) <= tooFastResponse {
@@ -357,16 +365,16 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 					sleepTime = 0 // good reply. Reset any exponential backoff stuff.
 				}
 
-			case ex.parent.pi.ExpectedReply == nil || bytes.Compare(responseBody, ex.parent.pi.ExpectedReply) == 0:
+			case ex.pi.ExpectedReply == nil || bytes.Compare(responseBody, ex.pi.ExpectedReply) == 0:
 				// there's new mail!
-				if ex.parent.pi.ExpectedReply != nil {
+				if ex.pi.ExpectedReply != nil {
 					ex.Debug("Reply matched ExpectedReply")
 				}
 				ex.Debug("Sending push message for new mail")
-				err = ex.parent.di.push(PingerNotificationNewMail) // You've got mail!
+				err = ex.di.push(PingerNotificationNewMail) // You've got mail!
 				if err != nil {
 					if globals.config.IgnorePushFailure == false {
-						ex.parent.sendError(err)
+						ex.sendError(err)
 						return
 					} else {
 						ex.Warning("Push failed but ignored: %s", err.Error())
@@ -379,7 +387,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				sleepTime = ex.exponentialBackoff(sleepTime)
 			}
 
-		case <-ex.parent.stopAllCh: // parent will close this, at which point this will trigger.
+		case <-ex.exitCh: // parent will close this, at which point this will trigger.
 			ex.Debug("Was told to stop (allStop). Stopping")
 			askedToStop = true
 			return
@@ -394,7 +402,8 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 
 // SelfDelete Used to zero out the structure and let garbage collection reap the empty stuff.
 func (ex *ExchangeClient) Cleanup() {
-	ex.parent = nil
+	ex.pi.cleanup()
+	ex.pi = nil
 	if ex.transport != nil {
 		ex.transport.CloseIdleConnections()
 	}

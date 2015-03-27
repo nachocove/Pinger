@@ -24,7 +24,7 @@ func (s *RPCServerTester) SetupSuite() {
 	var err error
 	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
-	s.dbmap, err = initDB(&dbconfig, true, true, s.logger)
+	s.dbmap, err = initDB(&dbconfig, true, s.logger)
 	if err != nil {
 		panic("Could not create DB")
 	}
@@ -92,7 +92,7 @@ func (t *TestingBackend) Defer(args *DeferPollArgs, reply *PollingResponse) (err
 }
 
 func (t *TestingBackend) FindActiveSessions(args *FindSessionsArgs, reply *FindSessionsResponse) (err error) {
-	return RPCFindActiveSessions(&t.pollMap, args, reply, t.logger)
+	return RPCFindActiveSessions(t, &t.pollMap, t.dbm, args, reply, t.logger)
 }
 
 func (s *RPCServerTester) TestRPCStartPoll() {

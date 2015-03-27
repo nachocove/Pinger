@@ -20,7 +20,7 @@ var registerPath string = "/register"
 var fakeUrl string = "http://mypinger.com"
 var fakeRegisterUrl string = fakeUrl + registerPath
 var pingerConfig *Pinger.Configuration
-var config *Configuration
+var config *Pinger.Configuration
 var registerJson string = "{\"ClientContext\": \"12345\", \"DeviceId\": \"NchoDC28E565X072CX46B1XBF205\", \"WaitBeforeUse\": 3000, \"MailServerCredentials\": {\"Username\": \"janv\", \"Password\": \"Password1\"}, \"ClientId\": \"us-east-1:0005d365-c8ea-470f-8a61-a7f44f145efb\", \"Platform\": \"ios\", \"RequestData\": \"AwFqAAANRUgDNjAwAAFJSksDNgABTANFbWFpbAABAUpLAzIAAUwDQ2FsZW5kYXIAAQEBAQ==\", \"PushService\": \"APNS\", \"ResponseTimeout\": 600000, \"ExpectedReply\": \"\", \"PushToken\": \"AEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEF\", \"MailServerUrl\": \"https://mail.d2.officeburrito.com/Microsoft-Server-ActiveSync?Cmd=Ping&User=janv@d2.officeburrito.com&DeviceId=NchoDC28E565X072CX46B1XBF205&DeviceType=iPad\", \"HttpHeaders\": {\"MS-ASProtocolVersion\": \"14.1\", \"User-Agent\":\"Apple-iPad3C1/1202.466\", \"Content-Length\":\"52\",\"Content-Type\":\"application/vnd.ms-sync.wbxml\"}, \"NoChangeReply\": \"AwFqAAANRUcDMQABAQ==\", \"Protocol\": \"ActiveSync\", \"OSVersion\": \"8.1\", \"AppBuildVersion\": \"0.9\", \"AppBuildNumber\": \"[dev]janv@nachocove.com\"}"
 var rpcTestPort = 40800
 
@@ -39,7 +39,8 @@ func TestMain(m *testing.M) {
 
 	mx = mux.NewRouter()
 	mx.HandleFunc(registerPath, registerDevice)
-	config = &Configuration{Rpc: rpcConfig}
+	config = Pinger.NewConfiguration()
+	config.Rpc = rpcConfig
 	n = negroni.New(NewContextMiddleWare(&Context{Logger: logger, Config: config}))
 	n.UseHandler(mx)
 
@@ -49,7 +50,7 @@ func TestMain(m *testing.M) {
 }
 
 func startRpc(config *Pinger.Configuration) {
-	err := Pinger.StartPollingRPCServer(pingerConfig, true, false, logger)
+	err := Pinger.StartPollingRPCServer(pingerConfig, true, logger)
 	if err != nil {
 		panic(err)
 	}

@@ -27,25 +27,38 @@ type MailClientContextType interface {
 }
 
 type MailClientContext struct {
-	MailClientContextType
-	mailClient MailClient // a mail client with the MailClient interface
-	stopToken  string
-	logger     *Logging.Logger
-	errCh      chan error
-	stopAllCh  chan int // closed when client is exiting, so that any sub-routine can exit
-	exitCh     chan int // used by MailClient{} to signal it has exited
-	command    chan PingerCommand
-	lastError  error
-	stats      *Utils.StatLogger
-	di         *DeviceInfo
-	pi         *MailPingInformation
-	wg         sync.WaitGroup
-	status     MailClientStatus
+	mailClient     MailClient // a mail client with the MailClient interface
+	stopToken      string
+	logger         *Logging.Logger
+	errCh          chan error
+	stopAllCh      chan int // closed when client is exiting, so that any sub-routine can exit
+	exitCh         chan int // used by MailClient{} to signal it has exited
+	command        chan PingerCommand
+	lastError      error
+	stats          *Utils.StatLogger
+	di             *DeviceInfo
+	ClientId       string
+	ClientContext  string
+	DeviceId       string
+	Protocol       string
+	WaitBeforeUse  int64 // in milliseconds
+	MaxPollTimeout int64 // max polling lifetime in milliseconds. Default 2 days.
+	wg             sync.WaitGroup
+	status         MailClientStatus
+	logPrefix      string
+}
+
+func (client *MailClientContext) getLogPrefix() string {
+	if client.logPrefix == "" {
+		client.logPrefix = fmt.Sprintf("%s:%s:%s", client.DeviceId, client.ClientId, client.ClientContext)
+	}
+	return client.logPrefix
 }
 
 type MailClient interface {
 	LongPoll(stopCh, exitCh chan int)
 	Cleanup()
+	sendError(err error)
 }
 
 const (
@@ -89,14 +102,19 @@ const (
 
 func NewMailClientContext(dbm *gorp.DbMap, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
-		logger:    logger.Copy(),
-		errCh:     make(chan error),
-		stopAllCh: make(chan int),
-		exitCh:    make(chan int),
-		command:   make(chan PingerCommand, 10),
-		stats:     nil,
-		pi:        pi,
-		status:    MailClientStatusInitialized,
+		logger:         logger.Copy(),
+		errCh:          make(chan error),
+		stopAllCh:      make(chan int),
+		exitCh:         make(chan int),
+		command:        make(chan PingerCommand, 10),
+		stats:          nil,
+		status:         MailClientStatusInitialized,
+		ClientId:       pi.ClientId,
+		ClientContext:  pi.ClientContext,
+		DeviceId:       pi.DeviceId,
+		Protocol:       pi.Protocol,
+		WaitBeforeUse:  pi.WaitBeforeUse,
+		MaxPollTimeout: pi.MaxPollTimeout,
 	}
 	client.logger.SetCallDepth(1)
 
@@ -119,19 +137,19 @@ func NewMailClientContext(dbm *gorp.DbMap, pi *MailPingInformation, debug, doSta
 	var mailclient MailClient
 
 	switch {
-	case strings.EqualFold(client.pi.Protocol, MailClientActiveSync):
-		mailclient, err = NewExchangeClient(client, debug, client.logger)
+	case strings.EqualFold(client.Protocol, MailClientActiveSync):
+		mailclient, err = NewExchangeClient(di, pi, &client.wg, client.errCh, client.stopAllCh, debug, logger)
 		if err != nil {
 			return nil, err
 		}
-		//	case strings.EqualFold(client.pi.Protocol, MailClientIMAP):
+		//	case strings.EqualFold(client.Protocol, MailClientIMAP):
 		//		mailclient, err = NewIMAPClient(client, debug, client.logger)
 		//		if err != nil {
 		//			return nil, err
 		//		}
 	default:
-		client.Error("Unsupported Mail Protocol %s", client.pi.Protocol)
-		return nil, fmt.Errorf("%s: Unsupported Mail Protocol %s", pi.getLogPrefix(), client.pi.Protocol)
+		client.Error("Unsupported Mail Protocol %s", client.Protocol)
+		return nil, fmt.Errorf("%s: Unsupported Mail Protocol %s", pi.getLogPrefix(), client.Protocol)
 	}
 
 	if mailclient == nil {
@@ -146,19 +164,19 @@ func NewMailClientContext(dbm *gorp.DbMap, pi *MailPingInformation, debug, doSta
 }
 
 func (client *MailClientContext) Debug(format string, args ...interface{}) {
-	client.logger.Debug(fmt.Sprintf("%s: %s", client.pi.getLogPrefix(), format), args...)
+	client.logger.Debug(fmt.Sprintf("%s: %s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Info(format string, args ...interface{}) {
-	client.logger.Info(fmt.Sprintf("%s: %s", client.pi.getLogPrefix(), format), args...)
+	client.logger.Info(fmt.Sprintf("%s: %s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Error(format string, args ...interface{}) {
-	client.logger.Error(fmt.Sprintf("%s: %s", client.pi.getLogPrefix(), format), args...)
+	client.logger.Error(fmt.Sprintf("%s: %s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Warning(format string, args ...interface{}) {
-	client.logger.Warning(fmt.Sprintf("%s: %s", client.pi.getLogPrefix(), format), args...)
+	client.logger.Warning(fmt.Sprintf("%s: %s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Status() (MailClientStatus, error) {
@@ -170,14 +188,6 @@ func (client *MailClientContext) Status() (MailClientStatus, error) {
 
 func (client *MailClientContext) cleanup() {
 	client.Debug("Cleaning up MailClientContext struct")
-	if client.pi != nil {
-		client.pi.cleanup()
-		client.pi = nil
-	}
-//	if client.di != nil {
-//		client.di.cleanup()
-//		client.di = nil // let garbage collector handle it.
-//	}
 	if client.mailClient != nil {
 		client.mailClient.Cleanup()
 		client.mailClient = nil
@@ -214,14 +224,14 @@ func (client *MailClientContext) start() {
 	}()
 
 	client.status = MailClientStatusDeferred
-	deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
+	deferTime := time.Duration(client.WaitBeforeUse) * time.Millisecond
 	client.Debug("Starting deferTimer for %s", deferTime)
 	deferTimer := time.NewTimer(deferTime)
 	defer deferTimer.Stop()
 	if client.stats != nil {
 		go client.stats.TallyResponseTimes()
 	}
-	maxPollTime := time.Duration(client.pi.MaxPollTimeout) * time.Millisecond
+	maxPollTime := time.Duration(client.MaxPollTimeout) * time.Millisecond
 	client.Debug("Setting maxPollTimer for %s", maxPollTime)
 	maxPollTimer := time.NewTimer(maxPollTime)
 	var longPollStopCh chan int
@@ -267,7 +277,7 @@ func (client *MailClientContext) start() {
 					longPollStopCh <- 1
 					longPollStopCh = nil
 				}
-				deferTime := time.Duration(client.pi.WaitBeforeUse) * time.Millisecond
+				deferTime := time.Duration(client.WaitBeforeUse) * time.Millisecond
 				client.Debug("reStarting deferTimer for %s", deferTime)
 				deferTimer.Stop()
 				deferTimer.Reset(deferTime)
@@ -283,10 +293,10 @@ func (client *MailClientContext) start() {
 	}
 }
 
-func (client *MailClientContext) sendError(err error) {
+func sendError(errCh chan error, err error, logger *Logging.Logger) {
 	_, fn, line, _ := runtime.Caller(1)
-	client.Error("%s/%s:%d %s", path.Base(path.Dir(fn)), path.Base(fn), line, err)
-	client.errCh <- err
+	logger.Error("%s/%s:%d %s", path.Base(path.Dir(fn)), path.Base(fn), line, err)
+	errCh <- err
 }
 
 func (client *MailClientContext) Action(action PingerCommand) error {
@@ -306,7 +316,7 @@ func (client *MailClientContext) deferPoll(timeout int64) error {
 	if client.mailClient != nil {
 		client.Debug("Deferring polls")
 		if timeout > 0 {
-			client.pi.WaitBeforeUse = timeout
+			client.WaitBeforeUse = timeout
 		}
 		return client.Action(PingerDefer)
 	}
@@ -326,18 +336,16 @@ type ClientSessionInfo struct {
 	ClientContext string
 	DeviceId      string
 	Status        MailClientStatus
-	Url           string
 	Error         string
 }
 
 func (client *MailClientContext) sessionInfo() *ClientSessionInfo {
 	status, err := client.Status()
 	info := ClientSessionInfo{
-		ClientId:      client.pi.ClientId,
-		ClientContext: client.pi.ClientContext,
-		DeviceId:      client.pi.DeviceId,
+		ClientId:      client.ClientId,
+		ClientContext: client.ClientContext,
+		DeviceId:      client.DeviceId,
 		Status:        status,
-		Url:           client.pi.MailServerUrl,
 	}
 	if err != nil {
 		info.Error = err.Error()
@@ -347,13 +355,10 @@ func (client *MailClientContext) sessionInfo() *ClientSessionInfo {
 
 func (client *MailClientContext) getSessionInfo() (*ClientSessionInfo, error) {
 	switch {
-	case client.pi == nil:
-		return nil, fmt.Errorf("entry has no pi")
-
 	case client.mailClient == nil:
 		return nil, fmt.Errorf("Entry has no active client")
 
-	case client.pi.ClientId == "" || client.pi.ClientContext == "" || client.pi.DeviceId == "":
+	case client.ClientId == "" || client.ClientContext == "" || client.DeviceId == "":
 		return nil, fmt.Errorf("entry has been cleaned up.")
 	}
 	return client.sessionInfo(), nil

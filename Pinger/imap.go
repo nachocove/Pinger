@@ -9,13 +9,18 @@ import (
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"net/url"
+	"sync"
 	"time"
 )
 
 type IMAPClient struct {
 	debug     bool
 	logger    *Logging.Logger
-	parent    *MailClientContext
+	pi        *MailPingInformation
+	di        *DeviceInfo
+	wg        *sync.WaitGroup
+	errCh     chan error
+	exitCh    chan int
 	url       *url.URL
 	tlsConfig *tls.Config
 	conn      *tls.Conn
@@ -23,46 +28,52 @@ type IMAPClient struct {
 }
 
 func (imap *IMAPClient) getLogPrefix() (prefix string) {
-	if imap.parent != nil && imap.parent.di != nil {
-		prefix = imap.parent.di.getLogPrefix() + "/IMAP"
-	}
+	prefix = imap.di.getLogPrefix() + "/IMAP"
 	return
 }
 
-func NewIMAPClient(parent *MailClientContext, debug bool, logger *Logging.Logger) (*IMAPClient, error) {
+func NewIMAPClient(di *DeviceInfo, pi *MailPingInformation, wg *sync.WaitGroup, errCh chan error, exitCh chan int, debug bool, logger *Logging.Logger) (*IMAPClient, error) {
 	imap := IMAPClient{
 		debug:  debug,
-		logger: logger,
-		parent: parent,
+		logger: logger.Copy(),
+		pi:     pi,
+		di:     di,
+		wg:     wg,
+		errCh:  errCh,
+		exitCh: exitCh,
 	}
 	return &imap, nil
+}
+
+func (imap *IMAPClient) sendError(err error) {
+	sendError(imap.errCh, err, imap.logger)
 }
 
 func (imap *IMAPClient) ScanIMAPTerminator(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
-	lines := bytes.Split(data, imap.parent.pi.CommandAcknowledgement)
+	lines := bytes.Split(data, imap.pi.CommandAcknowledgement)
 	if len(lines) > 0 {
-		return len(lines[0]) + len(imap.parent.pi.CommandAcknowledgement), lines[0], nil
+		return len(lines[0]) + len(imap.pi.CommandAcknowledgement), lines[0], nil
 	}
 	// Request more data.
 	return 0, nil, nil
 }
 
 func (imap *IMAPClient) setupScanner() {
-	if len(imap.parent.pi.CommandTerminator) <= 0 {
-		imap.parent.pi.CommandTerminator = []byte("\n")
+	if len(imap.pi.CommandTerminator) <= 0 {
+		imap.pi.CommandTerminator = []byte("\n")
 	}
-	if len(imap.parent.pi.CommandAcknowledgement) <= 0 {
-		imap.parent.pi.CommandAcknowledgement = []byte("\n")
+	if len(imap.pi.CommandAcknowledgement) <= 0 {
+		imap.pi.CommandAcknowledgement = []byte("\n")
 	}
 	imap.scanner = bufio.NewScanner(imap.conn)
 	imap.scanner.Split(imap.ScanIMAPTerminator)
 }
 
 func (imap *IMAPClient) doImapAuth() error {
-	response, err := imap.doIMAPCommand([]byte(fmt.Sprintf("%s AUTHENTICATE PLAIN", imap.parent.pi.ClientContext)), 0)
+	response, err := imap.doIMAPCommand([]byte(fmt.Sprintf("%s AUTHENTICATE PLAIN", imap.pi.ClientContext)), 0)
 	if err != nil {
 		return err
 	}
@@ -72,8 +83,8 @@ func (imap *IMAPClient) doImapAuth() error {
 	}
 
 	userPassBytes := []byte(fmt.Sprintf("\000%s\000%s",
-		imap.parent.pi.MailServerCredentials.Username,
-		imap.parent.pi.MailServerCredentials.Password))
+		imap.pi.MailServerCredentials.Username,
+		imap.pi.MailServerCredentials.Password))
 	buf := make([]byte, base64.StdEncoding.EncodedLen(len(userPassBytes)))
 	base64.StdEncoding.Encode(buf, userPassBytes)
 
@@ -81,7 +92,7 @@ func (imap *IMAPClient) doImapAuth() error {
 	if err != nil {
 		return err
 	}
-	if bytes.HasPrefix(response, []byte(fmt.Sprintf("%s OK AUTHENTICATE", imap.parent.pi.ClientContext))) == false {
+	if bytes.HasPrefix(response, []byte(fmt.Sprintf("%s OK AUTHENTICATE", imap.pi.ClientContext))) == false {
 		return fmt.Errorf("Auth failed: %s", response)
 	}
 	return nil
@@ -92,7 +103,7 @@ func (imap *IMAPClient) doIMAPCommand(command []byte, waitTime int64) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	_, err = imap.conn.Write(imap.parent.pi.CommandTerminator)
+	_, err = imap.conn.Write(imap.pi.CommandTerminator)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +142,7 @@ func (imap *IMAPClient) setupConn() error {
 		imap.conn.Close()
 	}
 	if imap.url == nil {
-		imapUrl, err := url.Parse(imap.parent.pi.MailServerUrl)
+		imapUrl, err := url.Parse(imap.pi.MailServerUrl)
 		if err != nil {
 			return err
 		}
@@ -177,17 +188,17 @@ func (imap *IMAPClient) LongPoll(stopCh, exitCh chan int) {
 		if imap.conn == nil {
 			err := imap.setupConn()
 			if err != nil {
-				imap.parent.sendError(err)
+				imap.sendError(err)
 				return
 			}
 		}
 
-		reqTimeout := imap.parent.pi.ResponseTimeout
+		reqTimeout := imap.pi.ResponseTimeout
 		reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 		requestTimer := time.NewTimer(time.Duration(reqTimeout) * time.Millisecond)
 		errCh := make(chan error)
 		responseCh := make(chan []byte)
-		go imap.doRequestResponse(imap.parent.pi.RequestData, responseCh, errCh)
+		go imap.doRequestResponse(imap.pi.RequestData, responseCh, errCh)
 		select {
 		case <-requestTimer.C:
 			// request timed out. Start over.
@@ -195,25 +206,25 @@ func (imap *IMAPClient) LongPoll(stopCh, exitCh chan int) {
 			imap.conn.Close()
 			err := imap.setupConn()
 			if err != nil {
-				imap.parent.sendError(err)
+				imap.sendError(err)
 				return
 			}
 
 		case err := <-errCh:
-			imap.parent.sendError(err)
+			imap.sendError(err)
 			return
 
 		case response := <-responseCh:
 			requestTimer.Stop()
 			switch {
-			case imap.parent.pi.NoChangeReply != nil && bytes.Compare(response, imap.parent.pi.NoChangeReply) == 0:
+			case imap.pi.NoChangeReply != nil && bytes.Compare(response, imap.pi.NoChangeReply) == 0:
 				// go back to polling
 
-			case imap.parent.pi.ExpectedReply == nil || bytes.Compare(response, imap.parent.pi.ExpectedReply) == 0:
+			case imap.pi.ExpectedReply == nil || bytes.Compare(response, imap.pi.ExpectedReply) == 0:
 				// got mail! Send push.
 			}
 
-		case <-imap.parent.stopAllCh: // parent will close this, at which point this will trigger.
+		case <-imap.exitCh: // parent will close this, at which point this will trigger.
 			return
 
 		case <-stopCh:
@@ -224,5 +235,6 @@ func (imap *IMAPClient) LongPoll(stopCh, exitCh chan int) {
 }
 
 func (imap *IMAPClient) Cleanup() {
-	imap.parent = nil
+	imap.pi.cleanup()
+	imap.pi = nil
 }

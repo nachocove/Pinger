@@ -4,6 +4,7 @@ import (
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/suite"
+	"sync"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func (s *exchangeTester) SetupSuite() {
 	var err error
 	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
-	s.dbmap, err = initDB(&dbconfig, true, true, s.logger)
+	s.dbmap, err = initDB(&dbconfig, true, s.logger)
 	if err != nil {
 		panic("Could not create DB")
 	}
@@ -35,15 +36,21 @@ func TestExchange(t *testing.T) {
 }
 
 func (s *exchangeTester) TestNewExchangeClient() {
-	parent := &MailClientContext{}
+	di := &DeviceInfo{}
+	pi := &MailPingInformation{}
+	wg := &sync.WaitGroup{}
+	errCh := make(chan error)
+	exitCh := make(chan int)
 	debug := true
 
-	ex, err := NewExchangeClient(parent, debug, s.logger)
+	ex, err := NewExchangeClient(di, pi, wg, errCh, exitCh, debug, s.logger)
 	s.NoError(err)
 	s.NotNil(ex)
 
-	s.NotNil(ex.parent)
-	s.Equal(parent, ex.parent)
+	s.NotNil(ex.di)
+	s.Equal(di, ex.di)
+	s.NotNil(ex.pi)
+	s.Equal(pi, ex.pi)
 	s.Equal(debug, ex.debug)
-	s.NotEqual(s.logger, ex.logger)
+	s.NotEqual(s.logger, ex.logger) // NewExchangeClient makes a copy
 }
