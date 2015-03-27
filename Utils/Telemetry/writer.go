@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"regexp"
 )
 
 // TelemetryWriter The telemetry writer functionality. Comprises a few goroutines for writing to the DB, extracting
@@ -74,14 +75,14 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 	return &writer, nil
 }
 
+var deviceClientContextRegexp *regexp.Regexp
+func init () {
+	deviceClientContextRegexp = regexp.MustCompile("^(?P<device>Ncho[A-Z0-9a-z]+):(?P<client>us-[a-z\\-:0-9]+):(?P<context>[a-z0-9A-Z]+): .*")
+}
 func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record) telemetryLogMsg {
-	return telemetryLogMsg{
-		Id:        newId(),
-		EventType: eventType,
-		Timestamp: rec.Time.Round(time.Millisecond).UTC(),
-		Module:    rec.Module,
-		Message:   rec.Message(),
-	}
+	message := rec.Message()
+	client := deviceClientContextRegexp.ReplaceAllString(message, "${client}")
+	return NewTelemetryMsg(eventType, rec.Module, client, message, rec.Time.Round(time.Millisecond).UTC())
 }
 
 // Log Implements the logging Interface so this can be used as a logger backend.

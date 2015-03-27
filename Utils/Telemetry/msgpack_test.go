@@ -3,6 +3,7 @@ package Telemetry
 import (
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 func TestMsgSerialize(t *testing.T) {
@@ -10,7 +11,7 @@ func TestMsgSerialize(t *testing.T) {
 
 	assert := assert.New(t)
 
-	msg := NewTelemetryMsg(telemetryLogEventInfo, "foo", "bar")
+	msg := NewTelemetryMsg(telemetryLogEventInfo, "foo", "us-est-1:foo", "bar", time.Now().Round(time.Millisecond).UTC())
 	err = msg.prepareForUpload()
 	assert.NoError(err)
 	enc, err := msg.encodeMsgPack()

@@ -27,6 +27,7 @@ type telemetryLogMsg struct {
 	EventType  telemetryLogEventType `db:"event_type"`
 	Timestamp  time.Time             `db:"timestamp"`
 	UploadedAt time.Time             `db:"-"`
+	Client     string                `db:"client"`
 	Module     string                `db:"module"`
 	Message    string                `db:"message"`
 }
@@ -49,18 +50,20 @@ func (msg *telemetryLogMsg) toMap() telemetryLogMsgMap {
 	msgMap["event_type"] = string(msg.EventType)
 	msgMap["timestamp"] = telemetryTimefromTime(msg.Timestamp)
 	msgMap["uploaded_at"] = telemetryTimefromTime(msg.UploadedAt)
+	msgMap["client"] = msg.Client
 	msgMap["module"] = msg.Module
 	msgMap["message"] = msg.Message
 	return msgMap
 }
 
 // NewTelemetryMsg Create a new telemetry message instance
-func NewTelemetryMsg(eventType telemetryLogEventType, module, message string) telemetryLogMsg {
+func NewTelemetryMsg(eventType telemetryLogEventType, module, client, message string, timestamp time.Time) telemetryLogMsg {
 	return telemetryLogMsg{
 		Id:        newId(),
 		EventType: eventType,
-		Timestamp: time.Now().Round(time.Millisecond).UTC(),
+		Timestamp: timestamp,
 		Module:    module,
+		Client:    client,
 		Message:   message,
 	}
 }
