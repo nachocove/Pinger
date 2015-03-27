@@ -2,8 +2,8 @@ package Pinger
 
 import (
 	"fmt"
-	"strings"
 	"net"
+	"strings"
 )
 
 const (
@@ -35,14 +35,14 @@ type ServerConfiguration struct {
 
 func NewServerConfiguration() *ServerConfiguration {
 	return &ServerConfiguration{
-			Port:           DefaultPort,
-			BindAddress:    DefaultBindAddress,
-			TemplateDir:    DefaultTemplateDir,
-			ServerCertFile: DefaultServerCertFile,
-			ServerKeyFile:  DefaultServerKeyFile,
-			NonTlsPort:     DefaultNonTLSPort,
-			SessionSecret:  "",
-		}
+		Port:           DefaultPort,
+		BindAddress:    DefaultBindAddress,
+		TemplateDir:    DefaultTemplateDir,
+		ServerCertFile: DefaultServerCertFile,
+		ServerKeyFile:  DefaultServerKeyFile,
+		NonTlsPort:     DefaultNonTLSPort,
+		SessionSecret:  "",
+	}
 }
 func (cfg *ServerConfiguration) validate() error {
 	badIP := make([]string, 0, 5)
@@ -89,4 +89,3 @@ func (cfg *ServerConfiguration) CheckToken(token string) bool {
 	}
 	return foundMatch
 }
-
