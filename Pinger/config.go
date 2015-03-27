@@ -70,7 +70,7 @@ func NewConfiguration() *Configuration {
 		Aws:       AWS.AWSConfiguration{},
 		Db:        DBConfiguration{},
 		Rpc:       NewRPCServerConfiguration(),
-		Telemetry: Telemetry.TelemetryConfiguration{},
+		Telemetry: *Telemetry.NewTelemetryConfiguration(),
 		Server:    *NewServerConfiguration(),
 	}
 	return config
@@ -143,5 +143,9 @@ func ReadConfig(filename string) (*Configuration, error) {
 		fmt.Fprintf(os.Stderr, "Error validate server config:\n%v\n", err)
 		os.Exit(1)
 	}
+	err = config.Telemetry.Validate()
+	if err != nil {
+		return nil, err
+	}	
 	return config, nil
 }

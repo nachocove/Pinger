@@ -25,6 +25,7 @@ import (
 type TelemetryWriter struct {
 	fileLocationPrefix      string
 	uploadLocationPrefixUrl *url.URL
+	uploadInterval          int64
 	dbmap                   *gorp.DbMap
 	lastRead                time.Time
 	telemetryCh             chan telemetryLogMsg
@@ -53,6 +54,7 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 		includeDebug:       config.IncludeDebug,
 		debug:              debug,
 		mutex:              sync.Mutex{},
+		uploadInterval:     config.UploadInterval,
 	}
 	err := writer.makeFileLocationPrefix()
 	if err != nil {
@@ -151,7 +153,7 @@ func (writer *TelemetryWriter) dbWriter() {
 // uploader the goroutine responsible for pulling data out
 // of the DB and into file and from files into S3/telemetry/
 // It uses:
-//  - a timer (10 minutes) to push up files every 10 minutes (reset on 'do it now')
+//  - a timer to push up files every 10 minutes (reset on 'do it now')
 //  - a 'do it now' channel, which external entities can trigger to 'do it now'
 func (writer *TelemetryWriter) uploader() {
 	// dump any DB entries and upload any files left on the file system
@@ -160,7 +162,7 @@ func (writer *TelemetryWriter) uploader() {
 		writer.logger.Printf("Could not upload files: %v\n", err)
 	}
 
-	writeTimeout := time.Duration(10) * time.Minute
+	writeTimeout := time.Duration(writer.uploadInterval) * time.Minute
 	writeTimer := time.NewTimer(writeTimeout)
 	for {
 		select {
