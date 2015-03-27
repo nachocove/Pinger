@@ -92,11 +92,11 @@ func main() {
 		}
 		for _, info := range reply.SessionInfos {
 			if singleLine {
-				fmt.Fprintf(os.Stdout, "%s;%s;%s;%s;%s;%s\n",
-					info.ClientId, info.ClientContext, info.DeviceId, info.Url, info.Status, info.Error)
+				fmt.Fprintf(os.Stdout, "%s;%s;%s;%s;%s\n",
+					info.ClientId, info.ClientContext, info.DeviceId, info.Status, info.Error)
 			} else {
-				fmt.Fprintf(os.Stdout, "ClientID:%s\nClientContext:%s\nDeviceId:%s\nUrl:%s\nStatus:%s\n",
-					info.ClientId, info.ClientContext, info.DeviceId, info.Url, info.Status)
+				fmt.Fprintf(os.Stdout, "ClientID:%s\nClientContext:%s\nDeviceId:%s\nStatus:%s\n",
+					info.ClientId, info.ClientContext, info.DeviceId, info.Status)
 				if info.Status == Pinger.MailClientStatusError {
 					fmt.Fprintf(os.Stdout, "Error:%s\n", info.Error)
 				}
