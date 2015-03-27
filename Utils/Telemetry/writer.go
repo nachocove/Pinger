@@ -243,7 +243,7 @@ func (writer *TelemetryWriter) createFiles() error {
 		if err != nil {
 			return err
 		}
-		teleFile := fmt.Sprintf("log--%s/%s--%s.json.gz",
+		teleFile := fmt.Sprintf("%s/log--%s--%s.json.gz",
 			writer.fileLocationPrefix,
 			startTime.Format(telemetryTimeZFormat),
 			endTime.Format(telemetryTimeZFormat))
