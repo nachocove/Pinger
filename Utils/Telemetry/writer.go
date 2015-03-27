@@ -75,14 +75,30 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 }
 
 var deviceClientContextRegexp *regexp.Regexp
+var deviceClientContextProtocolRegexp *regexp.Regexp
+var clientIdRegex *regexp.Regexp
 func init () {
-	deviceClientContextRegexp = regexp.MustCompile("^(?P<device>Ncho[A-Z0-9a-z]+):(?P<client>us-[a-z\\-:0-9]+):(?P<context>[a-z0-9A-Z]+): .*")
+	commonRegex := "^(?P<device>Ncho[A-Z0-9a-z]+):(?P<client>us-[a-z\\-:0-9]+):(?P<context>[a-z0-9A-Z]+)"
+	deviceClientContextRegexp = regexp.MustCompile(fmt.Sprintf("%s: (?P<message>.*)$", commonRegex))
+	deviceClientContextProtocolRegexp = regexp.MustCompile(fmt.Sprintf("%s/(?P<protocol>[a-zA-z0-9]+): (?P<message>.*)$", commonRegex))
+	
+	clientIdRegex = regexp.MustCompile("^.*(?P<client>us-[a-z]+-[0-9]+:[a-zA-Z0-9\\-]+).*$")
 }
 func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record, hostId string) telemetryLogMsg {
 	message := rec.Message()
 	var client string
-	if deviceClientContextRegexp.MatchString(message) {
+	
+	switch {
+	case deviceClientContextRegexp.MatchString(message):
 		client = deviceClientContextRegexp.ReplaceAllString(message, "${client}")
+		message = deviceClientContextRegexp.ReplaceAllString(message, "${message} (context ${context}, device ${device})")
+		
+	case deviceClientContextProtocolRegexp.MatchString(message):
+		client = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${client}")
+		message = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${message} (protocol ${protocol}, context ${context}, device ${device})")
+
+	case clientIdRegex.MatchString(message):
+		client = clientIdRegex.ReplaceAllString(message, "${client}")
 	}
 	return NewTelemetryMsg(eventType, rec.Module, client, message, hostId, rec.Time.Round(time.Millisecond).UTC())
 }
