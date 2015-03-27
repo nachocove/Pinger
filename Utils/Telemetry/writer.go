@@ -63,7 +63,6 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 		if err != nil {
 			return nil, err
 		}
-		u.Path = path.Join(u.Path, writer.hostId)
 		writer.uploadLocationPrefixUrl = u
 	}
 	err = writer.initDb()
@@ -79,10 +78,10 @@ var deviceClientContextRegexp *regexp.Regexp
 func init () {
 	deviceClientContextRegexp = regexp.MustCompile("^(?P<device>Ncho[A-Z0-9a-z]+):(?P<client>us-[a-z\\-:0-9]+):(?P<context>[a-z0-9A-Z]+): .*")
 }
-func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record) telemetryLogMsg {
+func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record, hostId string) telemetryLogMsg {
 	message := rec.Message()
 	client := deviceClientContextRegexp.ReplaceAllString(message, "${client}")
-	return NewTelemetryMsg(eventType, rec.Module, client, message, rec.Time.Round(time.Millisecond).UTC())
+	return NewTelemetryMsg(eventType, rec.Module, client, message, hostId, rec.Time.Round(time.Millisecond).UTC())
 }
 
 // Log Implements the logging Interface so this can be used as a logger backend.
@@ -105,7 +104,7 @@ func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logg
 		eventType = telemetryLogEventWarning
 	}
 	if writer.includeDebug || eventType == telemetryLogEventWarning || eventType == telemetryLogEventError || eventType == telemetryLogEventInfo {
-		msg := newTelemetryMsgFromRecord(eventType, rec)
+		msg := newTelemetryMsgFromRecord(eventType, rec, writer.hostId)
 		writer.telemetryCh <- msg
 	}
 	return nil

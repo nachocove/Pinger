@@ -30,6 +30,7 @@ type telemetryLogMsg struct {
 	Client     string                `db:"client"`
 	Module     string                `db:"module"`
 	Message    string                `db:"message"`
+	Pinger     string                `db:"pinger"`
 }
 
 func (msg *telemetryLogMsg) prepareForUpload() error {
@@ -53,11 +54,12 @@ func (msg *telemetryLogMsg) toMap() telemetryLogMsgMap {
 	msgMap["client"] = msg.Client
 	msgMap["module"] = msg.Module
 	msgMap["message"] = msg.Message
+	msgMap["pinger"] = msg.Pinger
 	return msgMap
 }
 
 // NewTelemetryMsg Create a new telemetry message instance
-func NewTelemetryMsg(eventType telemetryLogEventType, module, client, message string, timestamp time.Time) telemetryLogMsg {
+func NewTelemetryMsg(eventType telemetryLogEventType, module, client, message, hostId string, timestamp time.Time) telemetryLogMsg {
 	return telemetryLogMsg{
 		Id:        newId(),
 		EventType: eventType,
@@ -65,5 +67,6 @@ func NewTelemetryMsg(eventType telemetryLogEventType, module, client, message st
 		Module:    module,
 		Client:    client,
 		Message:   message,
+		Pinger:    hostId,
 	}
 }
