@@ -10,14 +10,14 @@ func TestMsgSerialize(t *testing.T) {
 
 	assert := assert.New(t)
 
-	msg := NewTelemetryMsg(telemetryEventInfo, "foo", "bar")
+	msg := NewTelemetryMsg(telemetryLogEventInfo, "foo", "bar")
 	err = msg.prepareForUpload()
 	assert.NoError(err)
 	enc, err := msg.encodeMsgPack()
 	assert.NoError(err)
 	assert.NotNil(enc)
 
-	msg1 := &telemetryMsg{}
+	msg1 := &telemetryLogMsg{}
 	err = msg1.decodeMsgPack(enc)
 	assert.NoError(err)
 	if err != nil {

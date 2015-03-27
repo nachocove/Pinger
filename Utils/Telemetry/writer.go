@@ -26,7 +26,7 @@ type TelemetryWriter struct {
 	uploadLocationPrefixUrl *url.URL
 	dbmap                   *gorp.DbMap
 	lastRead                time.Time
-	telemetryCh             chan telemetryMsg
+	telemetryCh             chan telemetryLogMsg
 	doUploadNow             chan int
 	aws                     AWS.AWSHandler
 	logger                  *log.Logger
@@ -44,7 +44,7 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 	}
 	writer := TelemetryWriter{
 		fileLocationPrefix: config.FileLocationPrefix,
-		telemetryCh:        make(chan telemetryMsg, 1024),
+		telemetryCh:        make(chan telemetryLogMsg, 1024),
 		doUploadNow:        make(chan int, 5),
 		aws:                awsConfig.NewHandle(),
 		logger:             log.New(os.Stderr, "telemetryWriter", log.LstdFlags|log.Lshortfile),
@@ -74,8 +74,8 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 	return &writer, nil
 }
 
-func newTelemetryMsgFromRecord(eventType telemetryEventType, rec *logging.Record) telemetryMsg {
-	return telemetryMsg{
+func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record) telemetryLogMsg {
+	return telemetryLogMsg{
 		Id:        newId(),
 		EventType: eventType,
 		Timestamp: rec.Time.Round(time.Millisecond).UTC(),
@@ -86,24 +86,24 @@ func newTelemetryMsgFromRecord(eventType telemetryEventType, rec *logging.Record
 
 // Log Implements the logging Interface so this can be used as a logger backend.
 func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logging.Record) error {
-	var eventType telemetryEventType
+	var eventType telemetryLogEventType
 	switch {
 	case level == logging.DEBUG:
-		eventType = telemetryEventDebug
+		eventType = telemetryLogEventDebug
 
 	case level == logging.INFO:
-		eventType = telemetryEventInfo
+		eventType = telemetryLogEventInfo
 
 	case level == logging.ERROR:
-		eventType = telemetryEventError
+		eventType = telemetryLogEventError
 
 	case level == logging.WARNING:
-		eventType = telemetryEventWarning
+		eventType = telemetryLogEventWarning
 
 	default:
-		eventType = telemetryEventWarning
+		eventType = telemetryLogEventWarning
 	}
-	if writer.includeDebug || eventType == telemetryEventWarning || eventType == telemetryEventError || eventType == telemetryEventInfo {
+	if writer.includeDebug || eventType == telemetryLogEventWarning || eventType == telemetryLogEventError || eventType == telemetryLogEventInfo {
 		msg := newTelemetryMsgFromRecord(eventType, rec)
 		writer.telemetryCh <- msg
 	}
@@ -221,12 +221,12 @@ func (writer *TelemetryWriter) createFiles() error {
 		}
 	}()
 
-	var messages []telemetryMsg
-	messages, err = writer.getAllMessagesSince(writer.lastRead, telemetryEventAll)
+	var messages []telemetryLogMsg
+	messages, err = writer.getAllMessagesSince(writer.lastRead, telemetryLogEventAll)
 	if err != nil {
 		return err
 	}
-	var msgArray []telemetryMsgMap
+	var msgArray []telemetryLogMsgMap
 	if len(messages) > 0 {
 		var startTime, endTime time.Time
 		for _, msg := range messages {
@@ -243,7 +243,7 @@ func (writer *TelemetryWriter) createFiles() error {
 		if err != nil {
 			return err
 		}
-		teleFile := fmt.Sprintf("%s/%s--%s.json.gz",
+		teleFile := fmt.Sprintf("log--%s/%s--%s.json.gz",
 			writer.fileLocationPrefix,
 			startTime.Format(telemetryTimeZFormat),
 			endTime.Format(telemetryTimeZFormat))

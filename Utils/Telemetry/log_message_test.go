@@ -11,7 +11,7 @@ func TestMsgCreate(t *testing.T) {
 
 	assert := assert.New(t)
 
-	msg := NewTelemetryMsg(telemetryEventInfo, "foo", "bar")
+	msg := NewTelemetryMsg(telemetryLogEventInfo, "foo", "bar")
 	assert.NotEmpty(msg)
 	assert.NotEmpty(msg.Id)
 	assert.Equal(time.Time{}, msg.UploadedAt)
