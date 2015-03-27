@@ -174,10 +174,10 @@ func (client *MailClientContext) cleanup() {
 		client.pi.cleanup()
 		client.pi = nil
 	}
-	if client.di != nil {
-		client.di.cleanup()
-		client.di = nil // let garbage collector handle it.
-	}
+//	if client.di != nil {
+//		client.di.cleanup()
+//		client.di = nil // let garbage collector handle it.
+//	}
 	if client.mailClient != nil {
 		client.mailClient.Cleanup()
 		client.mailClient = nil
