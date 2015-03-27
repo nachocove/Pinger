@@ -80,7 +80,11 @@ func init () {
 }
 func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record, hostId string) telemetryLogMsg {
 	message := rec.Message()
-	client := deviceClientContextRegexp.ReplaceAllString(message, "${client}")
+	var client string
+	if deviceClientContextRegexp.MatchString(message) {
+		client = deviceClientContextRegexp.ReplaceAllString(message, "${client}")
+	}
+	fmt.Printf("Client is '%s'\n", client)
 	return NewTelemetryMsg(eventType, rec.Module, client, message, hostId, rec.Time.Round(time.Millisecond).UTC())
 }
 
