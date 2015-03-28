@@ -159,6 +159,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	ex.mutex.Unlock()
 	unlockMutex = false
 
+	ex.Info("Making Connection to server")
 	// Make the request and wait for response; this could take a while
 	response, err := ex.httpClient.Do(ex.request)
 	ex.request = nil // unsave it. We're done with it.
@@ -321,7 +322,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 
 		case response := <-responseCh:
 			if response == retryResponse {
-				ex.Debug("Retry-response from response reader.")
+				ex.Info("Retry-response from response reader.")
 				sleepTime = ex.exponentialBackoff(sleepTime)
 				continue
 			}
@@ -357,7 +358,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				}
 			case ex.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.pi.NoChangeReply) == 0:
 				// go back to polling
-				ex.Debug("Reply matched NoChangeReply. Back to polling")
+				ex.Info("Reply matched NoChangeReply. Back to polling")
 				if time.Since(timeSent) <= tooFastResponse {
 					ex.Warning("Response was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
 					sleepTime = ex.exponentialBackoff(sleepTime)
@@ -368,7 +369,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 			case ex.pi.ExpectedReply == nil || bytes.Compare(responseBody, ex.pi.ExpectedReply) == 0:
 				// there's new mail!
 				if ex.pi.ExpectedReply != nil {
-					ex.Debug("Reply matched ExpectedReply")
+					ex.Info("Reply matched ExpectedReply")
 				}
 				ex.Info("Sending push message for new mail")
 				err = ex.di.push(PingerNotificationNewMail) // You've got mail!
