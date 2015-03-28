@@ -14,7 +14,7 @@ type TelemetryConfiguration struct {
 
 func NewTelemetryConfiguration() *TelemetryConfiguration {
 	return &TelemetryConfiguration{
-		IncludeDebug: false,
+		IncludeDebug:   false,
 		UploadInterval: 10,
 	}
 }

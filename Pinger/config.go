@@ -146,6 +146,6 @@ func ReadConfig(filename string) (*Configuration, error) {
 	err = config.Telemetry.Validate()
 	if err != nil {
 		return nil, err
-	}	
+	}
 	return config, nil
 }
