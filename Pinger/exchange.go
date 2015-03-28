@@ -245,7 +245,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 		ex.mutex.Lock()
 		ex.cancelled = true
 		if ex.request != nil {
-			ex.Debug("Cancelling outstanding request")
+			ex.Info("Cancelling outstanding request")
 			ex.transport.CancelRequest(ex.request)
 		}
 		ex.mutex.Unlock()
@@ -359,7 +359,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				// go back to polling
 				ex.Debug("Reply matched NoChangeReply. Back to polling")
 				if time.Since(timeSent) <= tooFastResponse {
-					ex.Error("Response was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
+					ex.Warning("Response was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
 					sleepTime = ex.exponentialBackoff(sleepTime)
 				} else {
 					sleepTime = 0 // good reply. Reset any exponential backoff stuff.
@@ -370,7 +370,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				if ex.pi.ExpectedReply != nil {
 					ex.Debug("Reply matched ExpectedReply")
 				}
-				ex.Debug("Sending push message for new mail")
+				ex.Info("Sending push message for new mail")
 				err = ex.di.push(PingerNotificationNewMail) // You've got mail!
 				if err != nil {
 					if globals.config.IgnorePushFailure == false {
