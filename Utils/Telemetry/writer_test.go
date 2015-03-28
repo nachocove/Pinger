@@ -48,7 +48,12 @@ func (s *writerTester) TestFileCreation() {
 	s.NoError(err)
 	s.NotNil(writer)
 
-	messages := make([]telemetryLogMsg, 1)
+	messages := make([]telemetryLogMsg, 0)
+	fileName, err := writer.createFilesFromMessages(&messages)
+	s.NoError(err)
+	s.Empty(fileName)
+	
+	messages = make([]telemetryLogMsg, 1)
 	msg := NewTelemetryMsg(
 		telemetryLogEventInfo,
 		"foo",
@@ -58,7 +63,7 @@ func (s *writerTester) TestFileCreation() {
 		time.Now().Round(time.Millisecond).UTC(),
 	)
 	messages[0] = msg
-	fileName, err := writer.createFilesFromMessages(&messages)
+	fileName, err = writer.createFilesFromMessages(&messages)
 	s.NoError(err)
 	s.NotEmpty(fileName)
 	shouldFileName := fmt.Sprintf("%s/log--%s--%s.json.gz",
