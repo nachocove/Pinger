@@ -13,11 +13,11 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
-	"regexp"
 )
 
 // TelemetryWriter The telemetry writer functionality. Comprises a few goroutines for writing to the DB, extracting
@@ -40,7 +40,7 @@ type TelemetryWriter struct {
 }
 
 // NewTelemetryWriter create a new TelemetryWriter instance
-func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfiguration, debug bool) (*TelemetryWriter, error) {
+func NewTelemetryWriter(config *TelemetryConfiguration, aws AWS.AWSHandler, debug bool) (*TelemetryWriter, error) {
 	if config.FileLocationPrefix == "" {
 		return nil, nil // not an error. Just not configured for telemetry
 	}
@@ -48,7 +48,7 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 		fileLocationPrefix: config.FileLocationPrefix,
 		telemetryCh:        make(chan telemetryLogMsg, 1024),
 		doUploadNow:        make(chan int, 5),
-		aws:                awsConfig.NewHandle(),
+		aws:                aws,
 		logger:             log.New(os.Stderr, "telemetryWriter", log.LstdFlags|log.Lshortfile),
 		hostId:             HostId.HostId(),
 		includeDebug:       config.IncludeDebug,
@@ -60,7 +60,7 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 	if err != nil {
 		return nil, err
 	}
-	if config.UploadLocationPrefix != "" && awsConfig != nil {
+	if config.UploadLocationPrefix != "" && aws != nil {
 		u, err := url.Parse(config.UploadLocationPrefix)
 		if err != nil {
 			return nil, err
@@ -79,22 +79,23 @@ func NewTelemetryWriter(config *TelemetryConfiguration, awsConfig *AWS.AWSConfig
 var deviceClientContextRegexp *regexp.Regexp
 var deviceClientContextProtocolRegexp *regexp.Regexp
 var clientIdRegex *regexp.Regexp
-func init () {
+
+func init() {
 	commonRegex := "^(?P<device>Ncho[A-Z0-9a-z]+):(?P<client>us-[a-z\\-:0-9]+):(?P<context>[a-z0-9A-Z]+)"
 	deviceClientContextRegexp = regexp.MustCompile(fmt.Sprintf("%s: (?P<message>.*)$", commonRegex))
 	deviceClientContextProtocolRegexp = regexp.MustCompile(fmt.Sprintf("%s/(?P<protocol>[a-zA-z0-9]+): (?P<message>.*)$", commonRegex))
-	
+
 	clientIdRegex = regexp.MustCompile("^.*(?P<client>us-[a-z]+-[0-9]+:[a-zA-Z0-9\\-]+).*$")
 }
 func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record, hostId string) telemetryLogMsg {
 	message := rec.Message()
 	var client string
-	
+
 	switch {
 	case deviceClientContextRegexp.MatchString(message):
 		client = deviceClientContextRegexp.ReplaceAllString(message, "${client}")
 		message = deviceClientContextRegexp.ReplaceAllString(message, "${message} (context ${context}, device ${device})")
-		
+
 	case deviceClientContextProtocolRegexp.MatchString(message):
 		client = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${client}")
 		message = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${message} (protocol ${protocol}, context ${context}, device ${device})")
@@ -224,6 +225,50 @@ func (writer *TelemetryWriter) createFilesAndUpload() error {
 	return nil
 }
 
+func (writer *TelemetryWriter) createFilesFromMessages(messages *[]telemetryLogMsg) (string, error) {
+	var teleFile string
+	if len(*messages) > 0 {
+		var startTime, endTime time.Time
+		var msgArray []telemetryLogMsgMap
+		for _, msg := range *messages {
+			switch {
+			case startTime.IsZero() || msg.Timestamp.Before(startTime):
+				startTime = msg.Timestamp
+
+			case endTime.IsZero() || msg.Timestamp.After(endTime):
+				endTime = msg.Timestamp
+			}
+			msgArray = append(msgArray, msg.toMap())
+		}
+		if endTime.IsZero() {
+			endTime = startTime
+		}
+		jsonString, err := json.Marshal(msgArray)
+		if err != nil {
+			return "", err
+		}
+		teleFile = fmt.Sprintf("%s/log--%s--%s.json.gz",
+			writer.fileLocationPrefix,
+			startTime.Format(telemetryTimeZFormat),
+			endTime.Format(telemetryTimeZFormat))
+		if writer.debug {
+			writer.logger.Printf("Creating file: %s", teleFile)
+		}
+		fp, err := os.OpenFile(teleFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
+		if err != nil {
+			return "", err
+		}
+		w := gzip.NewWriter(fp)
+		_, err = w.Write(jsonString)
+		w.Close()
+		fp.Close()
+		if err != nil {
+			return "", err
+		}
+	}
+	return teleFile, nil
+}
+
 // createFiles responsible for pulling data out of the DB and writing it to files.
 // It does not write to the DB and does not talk to s3
 func (writer *TelemetryWriter) createFiles() error {
@@ -247,42 +292,11 @@ func (writer *TelemetryWriter) createFiles() error {
 	if err != nil {
 		return err
 	}
-	var msgArray []telemetryLogMsgMap
-	if len(messages) > 0 {
-		var startTime, endTime time.Time
-		for _, msg := range messages {
-			switch {
-			case startTime.IsZero() || msg.Timestamp.Before(startTime):
-				startTime = msg.Timestamp
-
-			case endTime.IsZero() || msg.Timestamp.After(endTime):
-				endTime = msg.Timestamp
-			}
-			msgArray = append(msgArray, msg.toMap())
-		}
-		jsonString, err := json.Marshal(msgArray)
-		if err != nil {
-			return err
-		}
-		teleFile := fmt.Sprintf("%s/log--%s--%s.json.gz",
-			writer.fileLocationPrefix,
-			startTime.Format(telemetryTimeZFormat),
-			endTime.Format(telemetryTimeZFormat))
-		if writer.debug {
-			writer.logger.Printf("Creating file: %s", teleFile)
-		}
-		fp, err := os.OpenFile(teleFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
-		if err != nil {
-			return err
-		}
-		w := gzip.NewWriter(fp)
-		_, err = w.Write(jsonString)
-		w.Close()
-		fp.Close()
-		if err != nil {
-			return err
-		}
-
+	fileName, err := writer.createFilesFromMessages(&messages)
+	if err != nil {
+		return err
+	}
+	if fileName != "" {
 		for _, msg := range messages {
 			_, err = writer.dbmap.Delete(&msg)
 			if err != nil {

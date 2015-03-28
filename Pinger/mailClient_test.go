@@ -3,6 +3,7 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
+	"github.com/nachocove/Pinger/Utils/AWS/testHandler"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -37,7 +38,7 @@ func (s *mailClientTester) SetupSuite() {
 	s.testPushService = "APNS"
 	s.testProtocol = "ActiveSync"
 
-	setGlobal(&BackendConfiguration{}, &testAwsHandler{})
+	setGlobal(&BackendConfiguration{}, &testHandler.TestAwsHandler{})
 }
 
 func (s *mailClientTester) SetupTest() {
@@ -86,35 +87,6 @@ func (client *testingMailClientContext) getStopToken() string {
 func (client *testingMailClientContext) getSessionInfo() (*ClientSessionInfo, error) {
 	client.logger.Debug("getSessionInfo")
 	return nil, nil
-}
-
-type testAwsHandler struct{}
-
-func (ah *testAwsHandler) RegisterEndpointArn(service, token, customerData string) (string, error) {
-	return "someRegisteredEndpoint", nil
-}
-func (ah *testAwsHandler) GetEndpointAttributes(endpointArn string) (map[string]string, error) {
-	return make(map[string]string), nil
-}
-func (ah *testAwsHandler) SetEndpointAttributes(endpointArn string, attributes map[string]string) error {
-	return nil
-}
-func (ah *testAwsHandler) DeleteEndpointArn(endpointArn string) error {
-	return nil
-}
-func (ah *testAwsHandler) ValidateEndpointArn(endpointArn string) (map[string]string, error) {
-	attr := make(map[string]string)
-	attr["Enabled"] = "true"
-	return attr, nil
-}
-func (ah *testAwsHandler) SendPushNotification(endpointArn, message string) error {
-	return nil
-}
-func (ah *testAwsHandler) ValidateCognitoID(clientId string) error {
-	return nil
-}
-func (ah *testAwsHandler) PutFile(bucket, srcFilePath, destFilePath string) error {
-	return nil
 }
 
 func (s *mailClientTester) TestMailClient() {
