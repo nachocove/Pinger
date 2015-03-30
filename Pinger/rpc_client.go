@@ -4,12 +4,18 @@ import (
 	"net/rpc"
 )
 
-func getRpcClient(rpcserver string) (*rpc.Client, error) {
-	return rpc.DialHTTP("tcp", rpcserver)
+func getRpcClient(rpcConfig *RPCServerConfiguration) (*rpc.Client, error) {
+	switch {
+	case rpcConfig.Protocol == RPCProtocolHTTP:
+		return rpc.DialHTTP("tcp", rpcConfig.ConnectString())
+	case rpcConfig.Protocol == RPCProtocolUnix:
+		return rpc.Dial("unix", rpcConfig.ConnectString())
+	}
+	panic("Unknown RPC protocol")
 }
 
-func StartPoll(rpcserver string, pi *MailPingInformation) (*StartPollingResponse, error) {
-	rpcClient, err := getRpcClient(rpcserver)
+func StartPoll(rpcConfig *RPCServerConfiguration, pi *MailPingInformation) (*StartPollingResponse, error) {
+	rpcClient, err := getRpcClient(rpcConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -21,8 +27,8 @@ func StartPoll(rpcserver string, pi *MailPingInformation) (*StartPollingResponse
 	return &reply, nil
 }
 
-func StopPoll(rpcserver, clientId, clientContext, deviceId, token string) (*PollingResponse, error) {
-	rpcClient, err := getRpcClient(rpcserver)
+func StopPoll(rpcConfig *RPCServerConfiguration, clientId, clientContext, deviceId, token string) (*PollingResponse, error) {
+	rpcClient, err := getRpcClient(rpcConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -40,8 +46,8 @@ func StopPoll(rpcserver, clientId, clientContext, deviceId, token string) (*Poll
 	return &reply, nil
 }
 
-func DeferPoll(rpcserver, clientId, clientContext, deviceId string, timeout int64, token string) (*PollingResponse, error) {
-	rpcClient, err := getRpcClient(rpcserver)
+func DeferPoll(rpcConfig *RPCServerConfiguration, clientId, clientContext, deviceId string, timeout int64, token string) (*PollingResponse, error) {
+	rpcClient, err := getRpcClient(rpcConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +66,8 @@ func DeferPoll(rpcserver, clientId, clientContext, deviceId string, timeout int6
 	return &reply, nil
 }
 
-func FindActiveSessions(rpcserver, clientId, clientContext, deviceId string, maxSessions int) (*FindSessionsResponse, error) {
-	rpcClient, err := getRpcClient(rpcserver)
+func FindActiveSessions(rpcConfig *RPCServerConfiguration, clientId, clientContext, deviceId string, maxSessions int) (*FindSessionsResponse, error) {
+	rpcClient, err := getRpcClient(rpcConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -82,8 +88,8 @@ func FindActiveSessions(rpcserver, clientId, clientContext, deviceId string, max
 	return &reply, nil
 }
 
-func AliveCheck(rpcserver string) (*AliveCheckResponse, error) {
-	client, err := getRpcClient(rpcserver)
+func AliveCheck(rpcConfig *RPCServerConfiguration) (*AliveCheckResponse, error) {
+	client, err := getRpcClient(rpcConfig)
 	if err != nil {
 		return nil, err
 	}
