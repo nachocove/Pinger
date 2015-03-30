@@ -358,7 +358,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				}
 			case ex.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.pi.NoChangeReply) == 0:
 				// go back to polling
-				ex.Info("Reply matched NoChangeReply. Back to polling")
+				ex.Info("Reply matched NoChangeReply after %s. Back to polling", time.Since(timeSent))
 				if time.Since(timeSent) <= tooFastResponse {
 					ex.Warning("Response was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
 					sleepTime = ex.exponentialBackoff(sleepTime)
