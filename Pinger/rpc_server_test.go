@@ -3,6 +3,8 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
+	"github.com/nachocove/Pinger/Utils/AWS"
+	"github.com/nachocove/Pinger/Utils/AWS/testHandler"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -18,6 +20,7 @@ type RPCServerTester struct {
 	testDeviceId      string
 	testPlatform      string
 	testMailServerUrl string
+	aws               AWS.AWSHandler
 }
 
 func (s *RPCServerTester) SetupSuite() {
@@ -46,6 +49,7 @@ func (s *RPCServerTester) SetupSuite() {
 	s.testDeviceId = "NCHOXfherekgrgr"
 	s.testPlatform = "ios"
 	s.testMailServerUrl = "http://foo"
+	s.aws = &testHandler.TestAwsHandler{}
 }
 
 func (s *RPCServerTester) SetupTest() {
@@ -106,7 +110,7 @@ func (s *RPCServerTester) TestRPCStartPoll() {
 	}
 	reply := StartPollingResponse{}
 
-	diInDb, err := getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	diInDb, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
 	s.NoError(err)
 	s.Nil(diInDb)
 

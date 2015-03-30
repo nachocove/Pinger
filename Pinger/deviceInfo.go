@@ -34,6 +34,7 @@ type DeviceInfo struct {
 	dbm       *gorp.DbMap     `db:"-"`
 	logger    *Logging.Logger `db:"-"`
 	logPrefix string          `db:"-"`
+	aws       AWS.AWSHandler  `db:"-"`
 }
 
 type deviceContact struct {
@@ -162,6 +163,7 @@ func newDeviceInfo(
 	pushToken, pushService,
 	platform, osVersion,
 	appBuildVersion, appBuildNumber string,
+	aws AWS.AWSHandler,
 	logger *Logging.Logger) (*DeviceInfo, error) {
 	di := &DeviceInfo{
 		ClientId:        clientID,
@@ -174,6 +176,7 @@ func newDeviceInfo(
 		AppBuildVersion: appBuildVersion,
 		AppBuildNumber:  appBuildNumber,
 		Enabled:         false,
+		aws:             aws,
 	}
 	di.SetLogger(logger)
 	err := di.validate()
@@ -248,7 +251,7 @@ func init() {
 		pingerField.Tag.Get("db"))
 }
 
-func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, logger *Logging.Logger) (*DeviceInfo, error) {
+func getDeviceInfo(dbm *gorp.DbMap, aws AWS.AWSHandler, clientId, clientContext, deviceId string, logger *Logging.Logger) (*DeviceInfo, error) {
 	var device *DeviceInfo
 	obj, err := dbm.Get(&DeviceInfo{}, clientId, clientContext, deviceId)
 	if err != nil {
@@ -257,6 +260,7 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, lo
 	if obj != nil {
 		device = obj.(*DeviceInfo)
 		device.dbm = dbm
+		device.aws = aws
 		device.SetLogger(logger)
 		if device.Pinger != pingerHostId {
 			device.Warning("device belongs to a different pinger (%s). Stealing it", device.Pinger)
@@ -267,7 +271,7 @@ func getDeviceInfo(dbm *gorp.DbMap, clientId, clientContext, deviceId string, lo
 	return device, nil
 }
 
-func getAllMyDeviceInfo(dbm *gorp.DbMap, logger *Logging.Logger) ([]DeviceInfo, error) {
+func getAllMyDeviceInfo(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger) ([]DeviceInfo, error) {
 	var devices []DeviceInfo
 	var err error
 	_, err = dbm.Select(&devices, getAllMyDeviceInfoSql, pingerHostId)
@@ -276,6 +280,7 @@ func getAllMyDeviceInfo(dbm *gorp.DbMap, logger *Logging.Logger) ([]DeviceInfo, 
 	}
 	for k := range devices {
 		devices[k].dbm = dbm
+		devices[k].aws = aws
 		devices[k].SetLogger(logger)
 	}
 	return devices, nil
@@ -371,9 +376,9 @@ func (di *DeviceInfo) getContactInfo(insert bool) (int64, int64, error) {
 	return dc.LastContact, dc.LastContactRequest, nil
 }
 
-func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *Logging.Logger) (*DeviceInfo, error) {
+func newDeviceInfoPI(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInformation, logger *Logging.Logger) (*DeviceInfo, error) {
 	var err error
-	di, err := getDeviceInfo(dbm, pi.ClientId, pi.ClientContext, pi.DeviceId, logger)
+	di, err := getDeviceInfo(dbm, aws, pi.ClientId, pi.ClientContext, pi.DeviceId, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -388,6 +393,7 @@ func newDeviceInfoPI(dbm *gorp.DbMap, pi *MailPingInformation, logger *Logging.L
 			pi.OSVersion,
 			pi.AppBuildVersion,
 			pi.AppBuildNumber,
+			aws,
 			logger)
 		if err != nil {
 			return nil, err
@@ -577,7 +583,7 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 		return err
 	}
 	di.Debug("Sending push message to AWS: %s", pushMessage)
-	err = globals.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
+	err = di.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
 	if err == nil {
 		err = di.updateLastContactRequest()
 	}
@@ -593,6 +599,12 @@ func (di *DeviceInfo) customerData() string {
 		return ""
 	}
 	return string(customJson)
+}
+
+var alreadyRegisted *regexp.Regexp
+
+func init() {
+	alreadyRegisted = regexp.MustCompile("^.*Endpoint (?P<arn>arn:aws:sns:[^ ]+) already exists.*$")
 }
 
 func (di *DeviceInfo) registerAws() error {
@@ -615,21 +627,18 @@ func (di *DeviceInfo) registerAws() error {
 		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
 	}
 
-	arn, registerErr := globals.aws.RegisterEndpointArn(di.PushService, pushToken, di.customerData())
+	arn, registerErr := di.aws.RegisterEndpointArn(di.PushService, pushToken, di.customerData())
 	if registerErr != nil {
-		re, err := regexp.Compile("^.*Endpoint (?P<arn>arn:aws:sns:[^ ]+) already exists.*$")
-		if err != nil {
-			return err
-		}
-		if re.MatchString(registerErr.Error()) == true {
-			arn := re.ReplaceAllString(registerErr.Error(), fmt.Sprintf("${%s}", re.SubexpNames()[1]))
+		if alreadyRegisted.MatchString(registerErr.Error()) == true {
+			replaceString := fmt.Sprintf("${%s}", alreadyRegisted.SubexpNames()[1])
+			arn = alreadyRegisted.ReplaceAllString(registerErr.Error(), replaceString)
 			di.Warning("Previously registered as %s. Updating.", arn)
-			attributes, err := globals.aws.GetEndpointAttributes(arn)
+			attributes, err := di.aws.GetEndpointAttributes(arn)
 			if err != nil {
 				return err
 			}
 			attributes["CustomUserData"] = di.customerData()
-			err = globals.aws.SetEndpointAttributes(arn, attributes)
+			err = di.aws.SetEndpointAttributes(arn, attributes)
 			if err != nil {
 				return err
 			}
@@ -650,7 +659,7 @@ func (di *DeviceInfo) validateAws() error {
 	if di.AWSEndpointArn == "" {
 		panic("Can't call validate before register")
 	}
-	attributes, err := globals.aws.ValidateEndpointArn(di.AWSEndpointArn)
+	attributes, err := di.aws.ValidateEndpointArn(di.AWSEndpointArn)
 	if err != nil {
 		return err
 	}
@@ -688,7 +697,7 @@ func (di *DeviceInfo) validateAws() error {
 	if pushToken != attributes["Token"] {
 		// need to update the token with aws
 		attributes["Token"] = pushToken
-		err := globals.aws.SetEndpointAttributes(di.AWSEndpointArn, attributes)
+		err := di.aws.SetEndpointAttributes(di.AWSEndpointArn, attributes)
 		if err != nil {
 			return err
 		}
@@ -705,7 +714,7 @@ func (di *DeviceInfo) validateClient() error {
 		di.Debug("Registering %s:%s with AWS.", di.PushService, di.PushToken)
 		err := di.registerAws()
 		if err != nil {
-			if globals.config.IgnorePushFailure == false {
+			if di.aws.IgnorePushFailures() == false {
 				return err
 			} else {
 				di.Warning("Registering %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
@@ -723,7 +732,7 @@ func (di *DeviceInfo) validateClient() error {
 		// mark it as enabled again. Possibly...
 		err := di.validateAws()
 		if err != nil {
-			if globals.config.IgnorePushFailure == false {
+			if di.aws.IgnorePushFailures() == false {
 				return err
 			} else {
 				di.Warning("Validating %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
@@ -735,8 +744,8 @@ func (di *DeviceInfo) validateClient() error {
 	return nil
 }
 
-func alertAllDevices(dbm *gorp.DbMap, logger *Logging.Logger) error {
-	devices, err := getAllMyDeviceInfo(dbm, logger)
+func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger) error {
+	devices, err := getAllMyDeviceInfo(dbm, aws, logger)
 	if err != nil {
 		return err
 	}

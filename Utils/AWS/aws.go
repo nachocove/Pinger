@@ -17,10 +17,15 @@ type AWSHandler interface {
 	SendPushNotification(endpointArn, message string) error
 	ValidateCognitoID(clientId string) error
 	PutFile(bucket, srcFilePath, destFilePath string) error
+	IgnorePushFailures() bool
 }
 
 // AWSHandle is the collection of AWS related information
 type AWSHandle struct {
 	AWSConfiguration
 	awsCreds aws.CredentialsProvider
+}
+
+func (aws *AWSHandle) IgnorePushFailures() bool {
+	return aws.IgnorePushFailure
 }

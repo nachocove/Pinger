@@ -1,8 +1,10 @@
 package Pinger
 
 import (
+	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
+	"github.com/nachocove/Pinger/Utils/AWS/testHandler"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -22,7 +24,8 @@ type deviceInfoTester struct {
 	testPlatform      string
 	testOSVersion     string
 	testAppVersion    string
-	testAppnumber     string
+	testAppNumber     string
+	aws               *testHandler.TestAwsHandler
 }
 
 func (s *deviceInfoTester) SetupSuite() {
@@ -41,7 +44,9 @@ func (s *deviceInfoTester) SetupSuite() {
 	s.testPlatform = "ios"
 	s.testOSVersion = "8.1"
 	s.testAppVersion = "0.9"
-	s.testAppnumber = "(dev) Foo"
+	s.testAppNumber = "(dev) Foo"
+	s.aws = &testHandler.TestAwsHandler{}
+
 }
 
 func (s *deviceInfoTester) SetupTest() {
@@ -68,7 +73,8 @@ func (s *deviceInfoTester) TestDeviceInfoValidate() {
 		s.testPlatform,
 		s.testOSVersion,
 		s.testAppVersion,
-		s.testAppnumber,
+		s.testAppNumber,
+		s.aws,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
@@ -121,7 +127,8 @@ func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 		s.testPlatform,
 		s.testOSVersion,
 		s.testAppVersion,
-		s.testAppnumber,
+		s.testAppNumber,
+		s.aws,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
@@ -143,7 +150,7 @@ func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 
 func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	var err error
-	deviceList, err := getAllMyDeviceInfo(s.dbmap, s.logger)
+	deviceList, err := getAllMyDeviceInfo(s.dbmap, s.aws, s.logger)
 	s.Equal(len(deviceList), 0)
 
 	di, err := newDeviceInfo(
@@ -155,7 +162,8 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 		s.testPlatform,
 		s.testOSVersion,
 		s.testAppVersion,
-		s.testAppnumber,
+		s.testAppNumber,
+		s.aws,
 		s.logger)
 	s.Error(err, "ClientContext can not be empty")
 	s.Nil(di)
@@ -169,7 +177,8 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 		s.testPlatform,
 		s.testOSVersion,
 		s.testAppVersion,
-		s.testAppnumber,
+		s.testAppNumber,
+		s.aws,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
@@ -182,7 +191,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.Equal(s.testPlatform, di.Platform)
 	s.Equal(s.testOSVersion, di.OSVersion)
 	s.Equal(s.testAppVersion, di.AppBuildVersion)
-	s.Equal(s.testAppnumber, di.AppBuildNumber)
+	s.Equal(s.testAppNumber, di.AppBuildNumber)
 
 	s.Equal(0, di.Id)
 	s.Empty(di.Pinger)
@@ -196,10 +205,10 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.Equal(0, lastContact)
 	s.Equal(0, lastContactRequest)
 
-	deviceList, err = getAllMyDeviceInfo(s.dbmap, s.logger)
+	deviceList, err = getAllMyDeviceInfo(s.dbmap, s.aws, s.logger)
 	s.Equal(0, len(deviceList))
 
-	diInDb, err := getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	diInDb, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
 	s.NoError(err)
 	s.Nil(diInDb)
 
@@ -216,12 +225,12 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 
 	s.Equal(pingerHostId, di.Pinger)
 
-	diInDb, err = getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	diInDb, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
 	s.NoError(err)
 	s.NotNil(diInDb)
 	s.Equal(di.Id, diInDb.Id)
 
-	deviceList, err = getAllMyDeviceInfo(s.dbmap, s.logger)
+	deviceList, err = getAllMyDeviceInfo(s.dbmap, s.aws, s.logger)
 	s.NoError(err)
 	s.Equal(1, len(deviceList))
 	s.NotNil(di.dbm)
@@ -238,7 +247,8 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 		s.testPlatform,
 		s.testOSVersion,
 		s.testAppVersion,
-		s.testAppnumber,
+		s.testAppNumber,
+		s.aws,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
@@ -246,11 +256,11 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 	err = di.insert(s.dbmap)
 	s.NoError(err)
 
-	di, err = getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
 	s.NoError(err)
 	s.NotNil(di)
 
-	di2, err := getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	di2, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
 	s.NoError(err)
 	s.NotNil(di2)
 	s.Equal(di.Id, di2.Id)
@@ -306,14 +316,15 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 		s.testPlatform,
 		s.testOSVersion,
 		s.testAppVersion,
-		s.testAppnumber,
+		s.testAppNumber,
+		s.aws,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
 
 	err = di.insert(s.dbmap)
 	s.NoError(err)
-	di, err = getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
 	s.NoError(err)
 	s.NotNil(di)
 
@@ -321,7 +332,7 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 
 	di = nil
 
-	di, err = getDeviceInfo(s.dbmap, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
 	s.NoError(err)
 	s.Nil(di)
 }
@@ -336,4 +347,36 @@ func (s *deviceInfoTester) TestDevicePushMessageCreate() {
 	s.Equal(
 		"{\"APNS\":\"{\\\"aps\\\":{\\\"content-available\\\":1,\\\"sound\\\":\\\"silent.wav\\\"},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"APNS_SANDBOX\":\"{\\\"aps\\\":{\\\"content-available\\\":1,\\\"sound\\\":\\\"silent.wav\\\"},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"collapse_key\\\":\\\"10e23d6b0b515fbff01dff49948afebea929a763\\\",\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}},\\\"delay_while_idle\\\":false,\\\"time_to_live\\\":2419200}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
 		message)
+}
+
+func (s *deviceInfoTester) TestRegisterAWS() {
+	di, err := newDeviceInfo(
+		s.testClientId,
+		s.testClientContext,
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppNumber,
+		s.aws,
+		s.logger)
+	s.NoError(err)
+	require.NotNil(s.T(), di)
+
+	err = di.insert(s.dbmap)
+	s.NoError(err)
+
+	fmt.Println(di.AWSEndpointArn)
+	s.Equal("", di.AWSEndpointArn)
+
+	//s.aws.SetRegisteredEndpoint("foo12345")
+	testArn := "arn:aws:sns:foo12345"
+	s.aws.SetReturnRegisteredEndpoint("", fmt.Errorf("Endpoint %s already exists.", testArn))
+	s.aws.SetReturnGetAttributes(make(map[string]string), nil)
+	s.aws.SetReturnSetAttributes(nil)
+	err = di.registerAws()
+	s.NoError(err)
+	s.Equal(testArn, di.AWSEndpointArn)
 }

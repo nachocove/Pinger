@@ -21,18 +21,16 @@ type Configuration struct {
 }
 
 type BackendConfiguration struct {
-	Debug             bool
-	DumpRequests      bool
-	IgnorePushFailure bool
-	PingerUpdater     int `gcfg:"pinger-updater"`
+	Debug         bool
+	DumpRequests  bool
+	PingerUpdater int `gcfg:"pinger-updater"`
 }
 
 func NewBackendConfiguration() *BackendConfiguration {
 	return &BackendConfiguration{
-		Debug:             defaultDebug,
-		DumpRequests:      defaultDumpRequests,
-		IgnorePushFailure: defaultIgnorePushFailure,
-		PingerUpdater:     defaultPingerUpdater,
+		Debug:         defaultDebug,
+		DumpRequests:  defaultDumpRequests,
+		PingerUpdater: defaultPingerUpdater,
 	}
 }
 
@@ -46,14 +44,13 @@ type LoggingConfiguration struct {
 }
 
 const (
-	defaultDumpRequests      = false
-	defaultIgnorePushFailure = false
-	defaultDebug             = false
-	defaultDebugSql          = false
-	defaultLogDir            = "./log"
-	defaultLogFileName       = ""
-	defaultLogFileLevel      = "INFO"
-	defaultPingerUpdater     = 0
+	defaultDumpRequests  = false
+	defaultDebug         = false
+	defaultDebugSql      = false
+	defaultLogDir        = "./log"
+	defaultLogFileName   = ""
+	defaultLogFileLevel  = "INFO"
+	defaultPingerUpdater = 0
 )
 
 func NewLoggingConfiguration() *LoggingConfiguration {

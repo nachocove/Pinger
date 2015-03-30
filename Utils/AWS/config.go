@@ -15,6 +15,7 @@ type AWSConfiguration struct {
 	CognitoIdentityRegionName string
 	CognitoIdentityPoolID     string
 	S3RegionName              string
+	IgnorePushFailure         bool
 }
 
 // NewHandle creates a new AWSHandle from the information from the config file.

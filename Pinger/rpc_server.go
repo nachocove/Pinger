@@ -33,7 +33,7 @@ func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger
 }
 
 func (t *BackendPolling) newMailClientContext(pi *MailPingInformation, doStats bool) (MailClientContextType, error) {
-	return NewMailClientContext(t.dbm, pi, t.debug, false, t.logger)
+	return NewMailClientContext(t.dbm, t.aws, pi, t.debug, false, t.logger)
 }
 
 func (t *BackendPolling) validateClientID(clientID string) error {

@@ -2,31 +2,84 @@ package testHandler
 
 import ()
 
-type TestAwsHandler struct{}
+type TestAwsHandler struct {
+	registeredEndpoint    string
+	registeredEndpointErr error
+
+	returnValidateAttributes    map[string]string
+	returnValidateAttributesErr error
+
+	returnGetAttributes    map[string]string
+	returnGetAttributesErr error
+
+	returnSetAttributesErr error
+
+	returnDeleteAttributesErr error
+
+	returnPushNotificationError error
+
+	returnValidateCognitoIdError error
+
+	returnPutFileError error
+
+	ignorePushFailure bool
+}
+
+func (ah *TestAwsHandler) SetReturnRegisteredEndpoint(endpoint string, err error) {
+	ah.registeredEndpoint = endpoint
+	ah.registeredEndpointErr = err
+}
+func (ah *TestAwsHandler) SetReturnGetAttributes(attrs map[string]string, err error) {
+	ah.returnGetAttributes = attrs
+	ah.returnGetAttributesErr = err
+}
+func (ah *TestAwsHandler) SetReturnSetAttributes(err error) {
+	ah.returnSetAttributesErr = err
+}
+func (ah *TestAwsHandler) SetReturnDeleteAttributes(err error) {
+	ah.returnDeleteAttributesErr = err
+}
+func (ah *TestAwsHandler) SetReturnValidateAttributes(attrs map[string]string, err error) {
+	ah.returnValidateAttributes = attrs
+	ah.returnValidateAttributesErr = err
+}
+func (ah *TestAwsHandler) SetIgnorePushFailure(ignore bool) {
+	ah.ignorePushFailure = ignore
+}
+func (ah *TestAwsHandler) SetPushNotificationError(err error) {
+	ah.returnPushNotificationError = err
+}
+func (ah *TestAwsHandler) SetValidateCognitoIdError(err error) {
+	ah.returnValidateCognitoIdError = err
+}
+func (ah *TestAwsHandler) SetPutFileError(err error) {
+	ah.returnPutFileError = err
+}
 
 func (ah *TestAwsHandler) RegisterEndpointArn(service, token, customerData string) (string, error) {
-	return "someRegisteredEndpoint", nil
+	return ah.registeredEndpoint, ah.registeredEndpointErr
 }
 func (ah *TestAwsHandler) GetEndpointAttributes(endpointArn string) (map[string]string, error) {
-	return make(map[string]string), nil
+	return ah.returnGetAttributes, ah.returnGetAttributesErr
 }
 func (ah *TestAwsHandler) SetEndpointAttributes(endpointArn string, attributes map[string]string) error {
-	return nil
+	return ah.returnSetAttributesErr
 }
 func (ah *TestAwsHandler) DeleteEndpointArn(endpointArn string) error {
-	return nil
+	return ah.returnDeleteAttributesErr
 }
 func (ah *TestAwsHandler) ValidateEndpointArn(endpointArn string) (map[string]string, error) {
-	attr := make(map[string]string)
-	attr["Enabled"] = "true"
-	return attr, nil
+	return ah.returnValidateAttributes, ah.returnValidateAttributesErr
 }
 func (ah *TestAwsHandler) SendPushNotification(endpointArn, message string) error {
-	return nil
+	return ah.returnPushNotificationError
 }
 func (ah *TestAwsHandler) ValidateCognitoID(clientId string) error {
-	return nil
+	return ah.returnValidateCognitoIdError
 }
 func (ah *TestAwsHandler) PutFile(bucket, srcFilePath, destFilePath string) error {
-	return nil
+	return ah.returnPutFileError
+}
+func (ah *TestAwsHandler) IgnorePushFailures() bool {
+	return ah.ignorePushFailure
 }

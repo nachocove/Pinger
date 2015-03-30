@@ -3,6 +3,7 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
+	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/AWS/testHandler"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/suite"
@@ -20,6 +21,7 @@ type mailClientTester struct {
 	testPushToken     string
 	testPushService   string
 	testProtocol      string
+	aws               AWS.AWSHandler
 }
 
 func (s *mailClientTester) SetupSuite() {
@@ -37,8 +39,8 @@ func (s *mailClientTester) SetupSuite() {
 	s.testPushToken = "AEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEF"
 	s.testPushService = "APNS"
 	s.testProtocol = "ActiveSync"
-
-	setGlobal(&BackendConfiguration{}, &testHandler.TestAwsHandler{})
+	s.aws = &testHandler.TestAwsHandler{}
+	setGlobal(&BackendConfiguration{})
 }
 
 func (s *mailClientTester) SetupTest() {
@@ -93,7 +95,7 @@ func (s *mailClientTester) TestMailClient() {
 	pi := &MailPingInformation{}
 	debug := true
 	doStats := false
-	client, err := NewMailClientContext(s.dbmap, pi, debug, doStats, s.logger)
+	client, err := NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
 	s.Equal("ClientID can not be empty", err.Error())
@@ -108,7 +110,7 @@ func (s *mailClientTester) TestMailClient() {
 		PushService:   s.testPushService,
 		PushToken:     s.testPushToken,
 	}
-	client, err = NewMailClientContext(s.dbmap, pi, debug, doStats, s.logger)
+	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
 	s.Equal(fmt.Sprintf("%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testClientId, s.testClientContext, ""), err.Error())
@@ -122,7 +124,7 @@ func (s *mailClientTester) TestMailClient() {
 		PushToken:     s.testPushToken,
 		Protocol:      "Foo",
 	}
-	client, err = NewMailClientContext(s.dbmap, pi, debug, doStats, s.logger)
+	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
 
@@ -136,7 +138,7 @@ func (s *mailClientTester) TestMailClient() {
 		PushToken:     s.testPushToken,
 		Protocol:      s.testProtocol,
 	}
-	client, err = NewMailClientContext(s.dbmap, pi, debug, doStats, s.logger)
+	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.NotNil(client)
 	s.NoError(err)
 	s.NotEmpty(client.stopToken)

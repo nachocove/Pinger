@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils"
+	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/twinj/uuid"
 	"path"
@@ -100,7 +101,7 @@ const (
 	DefaultMaxPollTimeout int64 = 2 * 24 * 60 * 60 * 1000 // 2 days in milliseconds
 )
 
-func NewMailClientContext(dbm *gorp.DbMap, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
+func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
 		logger:         logger.Copy(),
 		errCh:          make(chan error),
@@ -118,7 +119,7 @@ func NewMailClientContext(dbm *gorp.DbMap, pi *MailPingInformation, debug, doSta
 	}
 	client.logger.SetCallDepth(1)
 
-	di, err := newDeviceInfoPI(dbm, pi, logger)
+	di, err := newDeviceInfoPI(dbm, aws, pi, logger)
 	if err != nil {
 		return nil, err
 	}

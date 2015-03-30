@@ -374,7 +374,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				ex.Info("Sending push message for new mail")
 				err = ex.di.push(PingerNotificationNewMail) // You've got mail!
 				if err != nil {
-					if globals.config.IgnorePushFailure == false {
+					if ex.di.aws.IgnorePushFailures() == false {
 						ex.sendError(err)
 						return
 					} else {
