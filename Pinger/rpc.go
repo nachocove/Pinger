@@ -189,11 +189,11 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 		logger.Warning(message)
 		reply.Message = message
 		reply.Code = PollingReplyError
-		return
+		return nil
 	}
 	(*pollMap)[pollMapKey] = client
 	reply.Token = client.getStopToken()
-	return
+	return nil
 }
 
 type StopPollArgs struct {
@@ -240,8 +240,7 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 		logger.Warning("%s: No active sessions found for key %s", args.getLogPrefix(), pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "Not Polling"
-		err = nil
-		return
+		return nil
 	} else {
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
@@ -251,24 +250,21 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 			logger.Warning("%s: invalid token", args.getLogPrefix())
 			reply.Message = "Token does not match"
 			reply.Code = PollingReplyError
-			err = nil
-			return
+			return nil
 		} else {
 			err = client.updateLastContact()
 			if err != nil {
 				logger.Error("%s: Could not update last contact %s", args.getLogPrefix(), err.Error())
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
-				err = nil
-				return
+				return nil
 			}
 			err = client.stop()
 			if err != nil {
 				logger.Error("%s:: Error stopping poll: %s", args.getLogPrefix(), err.Error())
 				reply.Message = err.Error()
 				reply.Code = PollingReplyError
-				err = nil
-				return
+				return nil
 			} else {
 				delete((*pollMap), args.ClientId)
 				reply.Message = "Stopped"
