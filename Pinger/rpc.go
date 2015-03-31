@@ -7,8 +7,7 @@ import (
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"io/ioutil"
 	"log"
-	"os"
-	"net"
+	"net/http"
 	"net/rpc"
 )
 
@@ -75,8 +74,7 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 
 	log.SetOutput(ioutil.Discard) // rpc.Register logs a warning for ToggleDebug, which we don't want.
 
-	rpcServer := rpc.NewServer()
-	rpcServer.Register(pollingAPI)
+	rpc.Register(pollingAPI)
 
 	go alertAllDevices(pollingAPI.dbm, pollingAPI.aws, pollingAPI.logger)
 
@@ -89,28 +87,16 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 	}
 
 	logger.Debug("Starting RPC server on %s (pinger id %s)", config.Rpc.String(), pingerHostId)
-	var listener net.Listener
 	switch {
 	case config.Rpc.Protocol == RPCProtocolHTTP:
-		rpcServer.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
-		listener, err = net.Listen("tcp", config.Rpc.ConnectString())
+		rpc.HandleHTTP()
+		err = http.ListenAndServe(config.Rpc.ConnectString(), nil)
 		if err != nil {
-			panic(err)
+			return err
 		}
-		
 	case config.Rpc.Protocol == RPCProtocolUnix:
-		if exists(config.Rpc.Path) {
-			err = os.Remove(config.Rpc.Path)
-			if err != nil {
-				panic(err)
-			}
-		}
-		listener, err = net.Listen("unix", config.Rpc.Path)
-		if err != nil {
-			panic(err)
-		}
+		panic("UNIX server is not yet implemented")
 	}
-	rpcServer.Accept(listener)
 	return nil
 }
 

@@ -41,25 +41,32 @@ func main() {
 		usage()
 		os.Exit(0)
 	}
-	
-	if configFile == "" {
-		configFile = os.Getenv("PINGER_CONFIG")
+
+	rpcConnectString := os.Getenv("PINGER_RPC")
+
+	if rpcConnectString == "" {
+		if configFile == "" {
+			configFile = os.Getenv("PINGER_CONFIG")
+		}
+		if configFile != "" {
+			config, err := Pinger.ReadConfig(configFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Reading config: %s\n", err)
+				os.Exit(1)
+			}
+			rpcConnectString = config.Rpc.ConnectString()
+		}
 	}
-	if configFile == "" {
-		fmt.Fprintf(os.Stderr, "Need configuration file. Use --config or set env variable PINGER_CONFIG\n")
-		os.Exit(1)
-	}
-	config, err := Pinger.ReadConfig(configFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Reading config: %s\n", err)
+	if rpcConnectString == "" {
+		fmt.Fprintf(os.Stderr, "No Rpc Connect string found. Set environment PINGER_RPC or use -c\n")
 		os.Exit(1)
 	}
 
 	if debug {
-		fmt.Fprintf(os.Stdout, "Contacting RPC server at %s\n", config.Rpc.String())
+		fmt.Fprintf(os.Stdout, "Contacting RPC server at %s\n", rpcConnectString)
 		fmt.Fprintf(os.Stdout, "Arguments: ClientId:%s, ClientContext:%s, DeviceId:%s, maxSessions:%d\n", clientId, clientContext, deviceId, maxSessions)
 	}
-	reply, err := Pinger.FindActiveSessions(&config.Rpc, clientId, clientContext, deviceId, maxSessions)
+	reply, err := Pinger.FindActiveSessions(rpcConnectString, clientId, clientContext, deviceId, maxSessions)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not call FindActiveSessions: %s\n", err)
 		os.Exit(1)
