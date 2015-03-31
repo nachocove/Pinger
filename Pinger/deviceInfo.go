@@ -9,6 +9,7 @@ import (
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
+	"github.com/nachocove/Pinger/Utils/Telemetry"
 	"reflect"
 	"regexp"
 	"time"
@@ -518,6 +519,7 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 	}
 	pingerMap := map[string]interface{}{}
 	pingerMap["pinger"] = map[string]string{di.ClientContext: string(message)}
+	pingerMap["timestamp"] = time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat)
 	pingerJson, err := json.Marshal(pingerMap)
 	if err != nil {
 		return "", err
