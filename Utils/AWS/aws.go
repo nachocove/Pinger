@@ -13,7 +13,6 @@ type AWSHandler interface {
 	GetEndpointAttributes(endpointArn string) (map[string]string, error)
 	SetEndpointAttributes(endpointArn string, attributes map[string]string) error
 	DeleteEndpointArn(endpointArn string) error
-	ValidateEndpointArn(endpointArn string) (map[string]string, error)
 	SendPushNotification(endpointArn, message string) error
 	ValidateCognitoID(clientId string) error
 	PutFile(bucket, srcFilePath, destFilePath string) error

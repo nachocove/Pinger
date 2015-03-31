@@ -2,7 +2,6 @@ package Telemetry
 
 import (
 	"fmt"
-	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/AWS/testHandler"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -12,11 +11,11 @@ import (
 type writerTester struct {
 	suite.Suite
 	config *TelemetryConfiguration
-	aws    AWS.AWSHandler
+	aws    *testHandler.TestAwsHandler
 }
 
 func (s *writerTester) SetupSuite() {
-	s.aws = &testHandler.TestAwsHandler{}
+	s.aws = testHandler.NewTestAwsHandler()
 }
 
 func (s *writerTester) SetupTest() {

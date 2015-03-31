@@ -86,19 +86,6 @@ func (ah *AWSHandle) DeleteEndpointArn(endpointArn string) error {
 	return nil
 }
 
-func (ah *AWSHandle) ValidateEndpointArn(endpointArn string) (map[string]string, error) {
-	snsSession, err := ah.getSNSSession()
-	if err != nil {
-		return nil, err
-	}
-	input := sns.GetEndpointAttributesInput{EndpointARN: aws.StringValue(&endpointArn)}
-	response, err := snsSession.GetEndpointAttributes(&input)
-	if err != nil {
-		return nil, err
-	}
-	return response.Attributes, nil
-}
-
 func (ah *AWSHandle) SendPushNotification(endpointArn, message string) error {
 	snsSession, err := ah.getSNSSession()
 	if err != nil {

@@ -3,7 +3,6 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
-	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/AWS/testHandler"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/suite"
@@ -21,7 +20,7 @@ type mailClientTester struct {
 	testPushToken     string
 	testPushService   string
 	testProtocol      string
-	aws               AWS.AWSHandler
+	aws               *testHandler.TestAwsHandler
 }
 
 func (s *mailClientTester) SetupSuite() {
@@ -39,7 +38,7 @@ func (s *mailClientTester) SetupSuite() {
 	s.testPushToken = "AEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEF"
 	s.testPushService = "APNS"
 	s.testProtocol = "ActiveSync"
-	s.aws = &testHandler.TestAwsHandler{}
+	s.aws = testHandler.NewTestAwsHandler()
 	setGlobal(&BackendConfiguration{})
 }
 

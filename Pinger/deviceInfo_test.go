@@ -45,7 +45,7 @@ func (s *deviceInfoTester) SetupSuite() {
 	s.testOSVersion = "8.1"
 	s.testAppVersion = "0.9"
 	s.testAppNumber = "(dev) Foo"
-	s.aws = &testHandler.TestAwsHandler{}
+	s.aws = testHandler.NewTestAwsHandler()
 
 }
 

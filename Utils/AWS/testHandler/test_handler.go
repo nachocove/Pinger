@@ -6,9 +6,6 @@ type TestAwsHandler struct {
 	registeredEndpoint    string
 	registeredEndpointErr error
 
-	returnValidateAttributes    map[string]string
-	returnValidateAttributesErr error
-
 	returnGetAttributes    map[string]string
 	returnGetAttributesErr error
 
@@ -25,6 +22,24 @@ type TestAwsHandler struct {
 	ignorePushFailure bool
 }
 
+func NewTestAwsHandler() *TestAwsHandler {
+	return &TestAwsHandler{
+		registeredEndpoint: "arn:aws:sns:us-west-2:263277746520:endpoint/APNS/com.nachocove.nachomail.alpha/1bd0418c-48da-36f4-8653-8d54c36d54bd",
+		registeredEndpointErr: nil,
+		returnGetAttributes: map[string]string{
+			"Enabled": "true",
+			"Token": "12345",
+			"CustomUserData": "",
+		},
+		returnGetAttributesErr: nil,
+		returnSetAttributesErr: nil,
+		returnDeleteAttributesErr: nil,
+		returnPushNotificationError: nil,
+		returnValidateCognitoIdError: nil,
+		returnPutFileError: nil,
+		ignorePushFailure: false,
+	}
+}
 func (ah *TestAwsHandler) SetReturnRegisteredEndpoint(endpoint string, err error) {
 	ah.registeredEndpoint = endpoint
 	ah.registeredEndpointErr = err
@@ -38,10 +53,6 @@ func (ah *TestAwsHandler) SetReturnSetAttributes(err error) {
 }
 func (ah *TestAwsHandler) SetReturnDeleteAttributes(err error) {
 	ah.returnDeleteAttributesErr = err
-}
-func (ah *TestAwsHandler) SetReturnValidateAttributes(attrs map[string]string, err error) {
-	ah.returnValidateAttributes = attrs
-	ah.returnValidateAttributesErr = err
 }
 func (ah *TestAwsHandler) SetIgnorePushFailure(ignore bool) {
 	ah.ignorePushFailure = ignore
@@ -67,9 +78,6 @@ func (ah *TestAwsHandler) SetEndpointAttributes(endpointArn string, attributes m
 }
 func (ah *TestAwsHandler) DeleteEndpointArn(endpointArn string) error {
 	return ah.returnDeleteAttributesErr
-}
-func (ah *TestAwsHandler) ValidateEndpointArn(endpointArn string) (map[string]string, error) {
-	return ah.returnValidateAttributes, ah.returnValidateAttributesErr
 }
 func (ah *TestAwsHandler) SendPushNotification(endpointArn, message string) error {
 	return ah.returnPushNotificationError

@@ -612,101 +612,84 @@ func init() {
 }
 
 func (di *DeviceInfo) registerAws() error {
-	if di.AWSEndpointArn != "" {
-		panic("No need to call register again. Call validate")
-	}
 	var pushToken string
 	var err error
-	switch {
-	case di.PushService == AWS.PushServiceAPNS:
-		pushToken, err = AWS.DecodeAPNSPushToken(di.PushToken)
-		if err != nil {
-			return err
-		}
-		if len(pushToken) != 64 {
-			return fmt.Errorf("APNS token length wrong. %d ('%s')", len(pushToken), string(pushToken))
-		}
-
-	default:
-		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
-	}
-
-	arn, registerErr := di.aws.RegisterEndpointArn(di.PushService, pushToken, di.customerData())
-	if registerErr != nil {
-		if alreadyRegisted.MatchString(registerErr.Error()) == true {
-			replaceString := fmt.Sprintf("${%s}", alreadyRegisted.SubexpNames()[1])
-			arn = alreadyRegisted.ReplaceAllString(registerErr.Error(), replaceString)
-			di.Warning("Previously registered as %s. Updating.", arn)
-			attributes, err := di.aws.GetEndpointAttributes(arn)
+	var attributes map[string]string
+	need_di_update := false
+	need_attr_update := false
+	
+	if di.AWSEndpointArn == "" {
+		// Need to register first
+		switch {
+		case di.PushService == AWS.PushServiceAPNS:
+			pushToken, err = AWS.DecodeAPNSPushToken(di.PushToken)
 			if err != nil {
 				return err
 			}
-			attributes["CustomUserData"] = di.customerData()
-			err = di.aws.SetEndpointAttributes(arn, attributes)
-			if err != nil {
-				return err
+			if len(pushToken) != 64 {
+				return fmt.Errorf("APNS token length wrong. %d ('%s')", len(pushToken), string(pushToken))
+			}
+	
+		default:
+			return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
+		}
+	
+		di.Debug("Registering %s:%s with AWS.", di.PushService, di.PushToken)
+		arn, registerErr := di.aws.RegisterEndpointArn(di.PushService, pushToken, di.customerData())
+		if registerErr != nil {
+			if alreadyRegisted.MatchString(registerErr.Error()) == true {
+				replaceString := fmt.Sprintf("${%s}", alreadyRegisted.SubexpNames()[1])
+				arn = alreadyRegisted.ReplaceAllString(registerErr.Error(), replaceString)
+				di.Warning("Previously registered as %s. Updating.", arn)
+			} else {
+				return registerErr
 			}
 		} else {
-			return registerErr
+			di.Debug("endpoint created %s", arn)
 		}
+		di.AWSEndpointArn = arn
+		need_di_update = true
 	}
-	di.AWSEndpointArn = arn
-	di.Enabled = true
-	_, err = di.update()
+	
+	// fetch the attributes
+	di.Debug("fetching attributes for %s.", di.AWSEndpointArn)
+	attributes, err = di.aws.GetEndpointAttributes(di.AWSEndpointArn)
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (di *DeviceInfo) validateAws() error {
-	if di.AWSEndpointArn == "" {
-		panic("Can't call validate before register")
+	if attributes == nil {
+		panic("attributes should not be nil")
 	}
-	attributes, err := di.aws.ValidateEndpointArn(di.AWSEndpointArn)
-	if err != nil {
-		return err
-	}
-	need_update := false
 	enabled, ok := attributes["Enabled"]
 	if !ok || enabled != "true" {
 		if enabled != "true" {
-			// Only disable this if we get an actual indication thereof
-			di.Enabled = false
-			need_update = true
+			di.Warning("AWS has endpoint disabled. Reenabling it")
+			attributes["Enabled"] = "true"
+			need_attr_update = true
 		}
-		return errors.New("Endpoint is not enabled")
-	}
-	if di.Enabled == false {
-		// re-enable the endpoint
-		di.Enabled = true
-		need_update = true
 	}
 
-	var pushToken string
-	switch {
-	case di.PushService == AWS.PushServiceAPNS:
-		pushToken, err = AWS.DecodeAPNSPushToken(di.PushToken)
-		if err != nil {
-			return err
-		}
-		if len(pushToken) != 64 {
-			return fmt.Errorf("APNS token length wrong. %d ('%s')", len(pushToken), string(pushToken))
-		}
-
-	default:
-		return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
-	}
-
-	if pushToken != attributes["Token"] {
+	if attributes["Token"] == "" || (pushToken != "" && pushToken != attributes["Token"]) {
 		// need to update the token with aws
 		attributes["Token"] = pushToken
+		need_attr_update = true
+	}
+	
+	cd := di.customerData()
+	if cd != attributes["CustomUserData"] {
+		attributes["CustomUserData"] = cd
+		need_attr_update = true
+	}
+	
+	if need_attr_update {
+		di.Debug("Setting new attributes for %s: %+v", di.AWSEndpointArn, attributes)
 		err := di.aws.SetEndpointAttributes(di.AWSEndpointArn, attributes)
 		if err != nil {
+			di.Debug("Could not set attributes")
 			return err
 		}
 	}
-	if need_update {
+	if need_di_update {
 		di.update()
 	}
 	return nil
@@ -714,35 +697,12 @@ func (di *DeviceInfo) validateAws() error {
 
 func (di *DeviceInfo) validateClient() error {
 	// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
-	if di.AWSEndpointArn == "" {
-		di.Debug("Registering %s:%s with AWS.", di.PushService, di.PushToken)
-		err := di.registerAws()
-		if err != nil {
-			if di.aws.IgnorePushFailures() == false {
-				return err
-			} else {
-				di.Warning("Registering %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
-			}
+	err := di.registerAws()
+	if err != nil {
+		if di.aws.IgnorePushFailures() == false {
+			return err
 		} else {
-			di.Debug("endpoint created %s", di.AWSEndpointArn)
-		}
-		if di.AWSEndpointArn == "" {
-			di.Error("AWSEndpointArn empty after register!")
-		}
-		// TODO We should send a test-ping here, so we don't find out the endpoint is unreachable later.
-		// It's optional (we'll find out eventually), but this would speed it up.
-	} else {
-		// Validate this even if the device is marked as deviceInfo.Enabled=false, because this might
-		// mark it as enabled again. Possibly...
-		err := di.validateAws()
-		if err != nil {
-			if di.aws.IgnorePushFailures() == false {
-				return err
-			} else {
-				di.Warning("Validating %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
-			}
-		} else {
-			di.Debug("endpoint validated %s", di.AWSEndpointArn)
+			di.Warning("Registering %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
 		}
 	}
 	return nil
