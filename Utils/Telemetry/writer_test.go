@@ -68,8 +68,8 @@ func (s *writerTester) TestFileCreation() {
 	s.NotEmpty(fileName)
 	shouldFileName := fmt.Sprintf("%s/log--%s--%s.json.gz",
 		writer.fileLocationPrefix,
-		messages[0].Timestamp.Format(telemetryTimeZFormat),
-		messages[0].Timestamp.Format(telemetryTimeZFormat))
+		messages[0].Timestamp.Format(TelemetryTimeZFormat),
+		messages[0].Timestamp.Format(TelemetryTimeZFormat))
 
 	s.Equal(shouldFileName, fileName)
 
@@ -97,8 +97,8 @@ func (s *writerTester) TestFileCreation() {
 	s.NotEmpty(fileName)
 	shouldFileName = fmt.Sprintf("%s/log--%s--%s.json.gz",
 		writer.fileLocationPrefix,
-		messages[0].Timestamp.Format(telemetryTimeZFormat),
-		messages[1].Timestamp.Format(telemetryTimeZFormat))
+		messages[0].Timestamp.Format(TelemetryTimeZFormat),
+		messages[1].Timestamp.Format(TelemetryTimeZFormat))
 
 	s.Equal(shouldFileName, fileName)
 
@@ -135,8 +135,8 @@ func (s *writerTester) TestFileCreation() {
 	s.NotEmpty(fileName)
 	shouldFileName = fmt.Sprintf("%s/log--%s--%s.json.gz",
 		writer.fileLocationPrefix,
-		messages[0].Timestamp.Format(telemetryTimeZFormat),
-		messages[2].Timestamp.Format(telemetryTimeZFormat))
+		messages[0].Timestamp.Format(TelemetryTimeZFormat),
+		messages[2].Timestamp.Format(TelemetryTimeZFormat))
 
 	s.Equal(shouldFileName, fileName)
 

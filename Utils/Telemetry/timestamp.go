@@ -7,7 +7,7 @@ import (
 type telemetryTime uint64
 
 const (
-	telemetryTimeZFormat string = "2006-01-02T15:04:05.999Z"
+	TelemetryTimeZFormat string = "2006-01-02T15:04:05.999Z"
 
 	// TelemetryTimeUnixZeroTicks equivalent to ticks since start
 	// of the gregorian calendar up to 1970-01-01 UTC Midnight
@@ -19,7 +19,7 @@ const (
 )
 
 func timeFromZTime(s string) (time.Time, error) {
-	return time.Parse(telemetryTimeZFormat, s)
+	return time.Parse(TelemetryTimeZFormat, s)
 }
 
 func telemetryTimefromTime(t time.Time) telemetryTime {

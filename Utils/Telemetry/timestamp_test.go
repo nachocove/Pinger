@@ -16,12 +16,12 @@ func TestTimestamp(t *testing.T) {
 	tm, err = timeFromZTime(zTime)
 	assert.NoError(err)
 	assert.True(tm.Unix() > 0)
-	assert.Equal(zTime, tm.Format(telemetryTimeZFormat))
+	assert.Equal(zTime, tm.Format(TelemetryTimeZFormat))
 
 	tele := telemetryTimefromTime(tm)
 	assert.Equal(teleTime, tele)
 
 	tm = teleTime.time()
 	assert.True(tm.Unix() > 0)
-	assert.Equal(zTime, tm.Format(telemetryTimeZFormat))
+	assert.Equal(zTime, tm.Format(TelemetryTimeZFormat))
 }

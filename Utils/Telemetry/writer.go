@@ -249,8 +249,8 @@ func (writer *TelemetryWriter) createFilesFromMessages(messages *[]telemetryLogM
 		}
 		teleFile = fmt.Sprintf("%s/log--%s--%s.json.gz",
 			writer.fileLocationPrefix,
-			startTime.Format(telemetryTimeZFormat),
-			endTime.Format(telemetryTimeZFormat))
+			startTime.Format(TelemetryTimeZFormat),
+			endTime.Format(TelemetryTimeZFormat))
 		if writer.debug {
 			writer.logger.Printf("Creating file: %s", teleFile)
 		}
