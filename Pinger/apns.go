@@ -5,6 +5,7 @@ import (
 	"github.com/anachronistic/apns"
 	"github.com/nachocove/Pinger/Utils/Telemetry"
 	"time"
+	"github.com/nachocove/Pinger/Utils/AWS"
 )
 
 const (
@@ -23,7 +24,11 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification) error {
 		panic("No apns key set. Can not push to APNS")
 	}
 	pn := apns.NewPushNotification()
-	pn.DeviceToken = di.PushToken
+	token, err := AWS.DecodeAPNSPushToken(di.PushToken)
+	if err != nil {
+		return err
+	}
+	pn.DeviceToken = token
 	pn.Priority = 10
 
 	payload := make(map[string]interface{})
@@ -44,7 +49,7 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification) error {
 	pn.Set("pinger", pingerMap)
 
 	msg, _ := pn.PayloadString()
-	di.Debug("Push Message: %s", msg)
+	di.Debug("Push Message to APNS/%s: %s", token, msg)
 
 	var apnsHost string
 	if globals.config.APNSSandbox {
