@@ -309,7 +309,7 @@ func RPCFindActiveSessions(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMa
 			err = e
 		}
 	}()
-	logger.Info("Received findActiveSessions request with options %s", args.getLogPrefix())
+	logger.Debug("Received findActiveSessions request with options %s", args.getLogPrefix())
 	for key, poll := range *pollMap {
 		if args.MaxSessions > 0 && len(reply.SessionInfos) >= args.MaxSessions {
 			logger.Debug("Max sessions read (%d). Stopping search.", len(reply.SessionInfos))
