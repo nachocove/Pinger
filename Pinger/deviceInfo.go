@@ -559,6 +559,11 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 		if err != nil {
 			return "", err
 		}
+		if len(b) > 256 {
+			di.Warning("Length of push message is %d > 256", len(b))
+		} else {
+			di.Debug("Length of push message %d", len(b))
+		}
 		notificationMap["APNS"] = string(b)
 		notificationMap["APNS_SANDBOX"] = string(b)
 	
