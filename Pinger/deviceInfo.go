@@ -532,11 +532,6 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 	if err != nil {
 		return "", err
 	}
-	hash := sha1.New()
-	hash.Write(pingerJson)
-	md := hash.Sum(nil)
-	pingerMapSha := hex.EncodeToString(md)
-
 	notificationMap := map[string]string{}
 	notificationMap["default"] = string(pingerJson)
 
@@ -568,6 +563,11 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 		notificationMap["APNS_SANDBOX"] = string(b)
 	
 	case di.Platform == "android":
+		hash := sha1.New()
+		hash.Write(pingerJson)
+		md := hash.Sum(nil)
+		pingerMapSha := hex.EncodeToString(md)
+	
 		GCMMap := map[string]interface{}{}
 		GCMMap["data"] = pingerMap
 		GCMMap["collapse_key"] = string(pingerMapSha)
@@ -603,15 +603,19 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 	if di.AWSEndpointArn == "" {
 		return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", di.PushService, di.PushToken)
 	}
-	var days_28 int64 = 2419200
-	pushMessage, err := di.pushMessage(message, days_28)
-	if err != nil {
-		return err
-	}
-	di.Debug("Sending push message to AWS: pushToken: %s/%s AWSEndpointArn:%s %s", di.PushService, di.PushToken, di.AWSEndpointArn, pushMessage)
-	err = di.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
-	if err == nil {
-		err = di.updateLastContactRequest()
+	if globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
+		var days_28 int64 = 2419200
+		pushMessage, err := di.pushMessage(message, days_28)
+		if err != nil {
+			return err
+		}
+		di.Debug("Sending push message to AWS: pushToken: %s/%s AWSEndpointArn:%s %s", di.PushService, di.PushToken, di.AWSEndpointArn, pushMessage)
+		err = di.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
+		if err == nil {
+			err = di.updateLastContactRequest()
+		}
+	} else {
+		err = di.APNSpushMessage(message)
 	}
 	return err
 }

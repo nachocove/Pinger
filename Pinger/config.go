@@ -24,6 +24,9 @@ type BackendConfiguration struct {
 	Debug         bool
 	DumpRequests  bool
 	PingerUpdater int `gcfg:"pinger-updater"`
+	APNSSandbox   bool
+	APNSKeyFile   string
+	APNSCertFile  string
 }
 
 func NewBackendConfiguration() *BackendConfiguration {
@@ -34,6 +37,15 @@ func NewBackendConfiguration() *BackendConfiguration {
 	}
 }
 
+func (cfg *BackendConfiguration) validate() error {
+	if cfg.APNSKeyFile != "" && !exists(cfg.APNSKeyFile) {
+		return fmt.Errorf("Key file %s does not exist", cfg.APNSKeyFile)
+	}
+	if cfg.APNSCertFile != "" && !exists(cfg.APNSCertFile) {
+		return fmt.Errorf("Cert file %s does not exist", cfg.APNSCertFile)
+	}
+	return nil
+}
 type LoggingConfiguration struct {
 	LogDir       string
 	LogFileName  string
