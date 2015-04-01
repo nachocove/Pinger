@@ -29,7 +29,6 @@ type DeviceInfo struct {
 	AppBuildVersion string `db:"build_version"`
 	AppBuildNumber  string `db:"build_number"`
 	AWSEndpointArn  string `db:"aws_endpoint_arn"`
-	Enabled         bool   `db:"enabled"`
 	Pinger          string `db:"pinger"`
 
 	dbm       *gorp.DbMap     `db:"-"`
@@ -176,7 +175,6 @@ func newDeviceInfo(
 		OSVersion:       osVersion,
 		AppBuildVersion: appBuildVersion,
 		AppBuildNumber:  appBuildNumber,
-		Enabled:         false,
 		aws:             aws,
 	}
 	di.SetLogger(logger)
@@ -575,9 +573,6 @@ type APNSPushNotification struct {
 
 func (di *DeviceInfo) push(message PingerNotification) error {
 	var err error
-	if di.Enabled == false {
-		return errors.New("Endpoint is disabled. Can not push.")
-	}
 	if di.AWSEndpointArn == "" {
 		return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", di.PushService, di.PushToken)
 	}
@@ -679,10 +674,6 @@ func (di *DeviceInfo) registerAws() error {
 	if cd != attributes["CustomUserData"] {
 		attributes["CustomUserData"] = cd
 		need_attr_update = true
-	}
-	if di.Enabled == false {
-		di.Enabled = true
-		need_di_update = true
 	}
 	if need_attr_update {
 		di.Debug("Setting new attributes for %s: %+v", di.AWSEndpointArn, attributes)
