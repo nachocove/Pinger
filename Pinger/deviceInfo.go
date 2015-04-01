@@ -523,14 +523,11 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 	if message == "" {
 		return "", fmt.Errorf("Message can not be empty")
 	}
-	metadataMap := make(map[string]string)
-	metadataMap["timestamp"] = time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat)
-	metadataMap["session"] = di.sessionId
 	pingerMap := make(map[string]interface{})
-	pingerMap["pinger"] = map[string]interface{}{
-		di.ClientContext: string(message),
-		"metadata": metadataMap,
-	}
+	pingerMap[di.ClientContext] = string(message)
+	pingerMap["timestamp"] = time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat)
+	pingerMap["session"] = di.sessionId
+
 	pingerJson, err := json.Marshal(pingerMap)
 	if err != nil {
 		return "", err
@@ -543,32 +540,36 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 	notificationMap := map[string]string{}
 	notificationMap["default"] = string(pingerJson)
 
-	APNSMap := map[string]interface{}{}
-	APNSMap["pinger"] = pingerMap["pinger"]
-	APNSMap["aps"] = map[string]interface{}{"content-available": 1, "sound": "silent.wav"}
-	if message == "new" {
-		APNSMap["alert"] = "Yo! You got mail!"
-	} else {
-		APNSMap["alert"] = "Yo! You need to re-register!"		
+	switch {
+	case di.Platform == "ios":
+		APNSMap := map[string]interface{}{}
+		APNSMap["pinger"] = pingerMap
+		APNSMap["aps"] = map[string]interface{}{"content-available": 1, "sound": "silent.wav"}
+		if message == "new" {
+			APNSMap["alert"] = "Yo! You got mail!"
+		} else {
+			APNSMap["alert"] = "Yo! You need to re-register!"		
+		}
+		b, err := json.Marshal(APNSMap)
+		if err != nil {
+			return "", err
+		}
+		notificationMap["APNS"] = string(b)
+		notificationMap["APNS_SANDBOX"] = string(b)
+	
+	case di.Platform == "android":
+		GCMMap := map[string]interface{}{}
+		GCMMap["data"] = pingerMap
+		GCMMap["collapse_key"] = string(pingerMapSha)
+		GCMMap["time_to_live"] = ttl
+		GCMMap["delay_while_idle"] = false
+	
+		b, err := json.Marshal(GCMMap)
+		if err != nil {
+			return "", err
+		}
+		notificationMap["GCM"] = string(b)
 	}
-	b, err := json.Marshal(APNSMap)
-	if err != nil {
-		return "", err
-	}
-	notificationMap["APNS"] = string(b)
-	notificationMap["APNS_SANDBOX"] = string(b)
-
-	GCMMap := map[string]interface{}{}
-	GCMMap["data"] = pingerMap
-	GCMMap["collapse_key"] = string(pingerMapSha)
-	GCMMap["time_to_live"] = ttl
-	GCMMap["delay_while_idle"] = false
-
-	b, err = json.Marshal(GCMMap)
-	if err != nil {
-		return "", err
-	}
-	notificationMap["GCM"] = string(b)
 
 	var notificationBytes []byte
 	notificationBytes, err = json.Marshal(notificationMap)
