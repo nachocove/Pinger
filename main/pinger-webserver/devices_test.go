@@ -113,6 +113,7 @@ func TestRegisterJsonFail(t *testing.T) {
 func TestRegisterRPCFail(t *testing.T) {
 	assert := assert.New(t)
 	config.Rpc.Port = 10
+	config.Server.TokenAuthKey = "01234567890123456789012345678901"
 	req, err := http.NewRequest("POST", fakeRegisterUrl, strings.NewReader(registerJson))
 	assert.NoError(err)
 	assert.NotNil(req)
