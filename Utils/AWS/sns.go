@@ -92,10 +92,24 @@ func (ah *AWSHandle) SendPushNotification(endpointArn, message string) error {
 		return err
 	}
 	messageType := "json"
+	attributes := make(sns.MessageAttributeMap)
+	//	ttl := "12345"
+	//	strString := "String"
+	//	attrTTL := sns.MessageAttributeValue{DataType: aws.StringValue(&strString), StringValue: aws.StringValue(&ttl)}
+	//	attributes["AWS.SNS.MOBILE.APNS.TTL"] = attrTTL
+	//	attributes["AWS.SNS.MOBILE.GCM.TTL"] = attrTTL
+	//	attributes["AWS.SNS.MOBILE.APNS_SANDBOX.TTL"] = attrTTL
+
+	// sadly, PRIORITY does not exist (yet?)
+	//	priority := "10"
+	//	attrPriority := sns.MessageAttributeValue{DataType: aws.StringValue(&strString), StringValue: aws.StringValue(&priority)}
+	//	attributes["AWS.SNS.MOBILE.APNS.PRIORITY"] = attrPriority
+
 	input := sns.PublishInput{
-		Message:          aws.StringValue(&message),
-		MessageStructure: aws.StringValue(&messageType),
-		TargetARN:        aws.StringValue(&endpointArn),
+		Message:           aws.StringValue(&message),
+		MessageAttributes: attributes,
+		MessageStructure:  aws.StringValue(&messageType),
+		TargetARN:         aws.StringValue(&endpointArn),
 	}
 	response, err := snsSession.Publish(&input)
 	if err != nil {
