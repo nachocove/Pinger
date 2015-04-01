@@ -586,7 +586,7 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 	if err != nil {
 		return err
 	}
-	di.Debug("Sending push message to AWS: %s", pushMessage)
+	di.Debug("Sending push message to AWS: pushToken: %s/%s AWSEndpointArn:%s %s", di.PushService, di.PushToken, di.AWSEndpointArn, pushMessage)
 	err = di.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
 	if err == nil {
 		err = di.updateLastContactRequest()
