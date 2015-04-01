@@ -523,11 +523,13 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 	if message == "" {
 		return "", fmt.Errorf("Message can not be empty")
 	}
-	pingerMap := map[string]interface{}{}
-	pingerMap["pinger"] = map[string]string{
+	metadataMap := make(map[string]string)
+	metadataMap["timestamp"] = time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat)
+	metadataMap["session"] = di.sessionId
+	pingerMap := make(map[string]interface{})
+	pingerMap["pinger"] = map[string]interface{}{
 		di.ClientContext: string(message),
-		"timestamp":      time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat),
-		"session":        di.sessionId,
+		"metadata": metadataMap,
 	}
 	pingerJson, err := json.Marshal(pingerMap)
 	if err != nil {
