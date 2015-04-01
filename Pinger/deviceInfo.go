@@ -680,7 +680,10 @@ func (di *DeviceInfo) registerAws() error {
 		attributes["CustomUserData"] = cd
 		need_attr_update = true
 	}
-	
+	if di.Enabled == false {
+		di.Enabled = true
+		need_di_update = true
+	}
 	if need_attr_update {
 		di.Debug("Setting new attributes for %s: %+v", di.AWSEndpointArn, attributes)
 		err := di.aws.SetEndpointAttributes(di.AWSEndpointArn, attributes)
