@@ -403,6 +403,8 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 
 // SelfDelete Used to zero out the structure and let garbage collection reap the empty stuff.
 func (ex *ExchangeClient) Cleanup() {
+	ex.di.cleanup()
+	ex.di = nil
 	ex.pi.cleanup()
 	ex.pi = nil
 	if ex.transport != nil {

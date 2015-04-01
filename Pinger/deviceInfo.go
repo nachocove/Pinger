@@ -219,10 +219,10 @@ func (di *DeviceInfo) cleanup() {
 	di.Debug("Cleaning up DeviceInfo")
 	n, err := di.dbm.Delete(di)
 	if n == 0 {
-		panic("Not deleted!")
+		di.Error("Not deleted from DB!")
 	}
 	if err != nil {
-		panic(err)
+		di.Error("Not deleted from DB: %s", err)
 	}
 	di.ClientId = ""
 	di.ClientContext = ""
