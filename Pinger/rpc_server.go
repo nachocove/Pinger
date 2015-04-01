@@ -1,7 +1,6 @@
 package Pinger
 
 import (
-	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
@@ -34,13 +33,6 @@ func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger
 
 func (t *BackendPolling) newMailClientContext(pi *MailPingInformation, doStats bool) (MailClientContextType, error) {
 	return NewMailClientContext(t.dbm, t.aws, pi, t.debug, false, t.logger)
-}
-
-func (t *BackendPolling) validateClientID(clientID string) error {
-	if clientID == "" {
-		return fmt.Errorf("Empty client ID is not valid")
-	}
-	return t.aws.ValidateCognitoID(clientID)
 }
 
 func (t *BackendPolling) ToggleDebug() {

@@ -72,16 +72,6 @@ func (t *TestingBackend) newMailClientContext(pi *MailPingInformation, doStats b
 	}, nil
 }
 
-var testingValidateError error = fmt.Errorf("validateError")
-var testingValidateEmptyClientIdError error = fmt.Errorf("EmptyClientIDTestingValidateError")
-
-func (t *TestingBackend) validateClientID(clientID string) error {
-	if clientID == "" {
-		return testingValidateEmptyClientIdError
-	}
-	return testingValidateError
-}
-
 func (t *TestingBackend) Start(args *StartPollArgs, reply *StartPollingResponse) (err error) {
 	return RPCStartPoll(t, &t.pollMap, t.dbm, args, reply, t.logger)
 }
@@ -99,10 +89,6 @@ func (t *TestingBackend) FindActiveSessions(args *FindSessionsArgs, reply *FindS
 }
 
 func (s *RPCServerTester) TestRPCStartPoll() {
-	err := s.backend.validateClientID("12345")
-	s.Error(err)
-	s.Equal(testingValidateError, err)
-
 	mailInfo := &MailPingInformation{}
 	args := StartPollArgs{
 		MailInfo: mailInfo,
@@ -117,7 +103,6 @@ func (s *RPCServerTester) TestRPCStartPoll() {
 	fmt.Println(reply)
 	s.NoError(err)
 	s.Equal(PollingReplyError, reply.Code)
-	s.Empty(reply.Token)
 	s.NotEmpty(reply.Message)
 
 	args.MailInfo = &MailPingInformation{
@@ -131,6 +116,5 @@ func (s *RPCServerTester) TestRPCStartPoll() {
 	fmt.Println(reply)
 	s.NoError(err)
 	s.Equal(PollingReplyError, reply.Code)
-	s.Empty(reply.Token)
 	s.NotEmpty(reply.Message)
 }

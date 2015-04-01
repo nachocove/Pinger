@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"testing"
+	"encoding/json"
 )
 
 type deviceInfoTester struct {
@@ -344,9 +345,21 @@ func (s *deviceInfoTester) TestDevicePushMessageCreate() {
 	message, err := di.pushMessage(PingerNotificationRegister, days_28)
 	s.NoError(err)
 	s.NotEmpty(message)
-	s.Equal(
-		"{\"APNS\":\"{\\\"aps\\\":{\\\"content-available\\\":1,\\\"sound\\\":\\\"silent.wav\\\"},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"APNS_SANDBOX\":\"{\\\"aps\\\":{\\\"content-available\\\":1,\\\"sound\\\":\\\"silent.wav\\\"},\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\",\"GCM\":\"{\\\"collapse_key\\\":\\\"10e23d6b0b515fbff01dff49948afebea929a763\\\",\\\"data\\\":{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}},\\\"delay_while_idle\\\":false,\\\"time_to_live\\\":2419200}\",\"default\":\"{\\\"pinger\\\":{\\\"FOO\\\":\\\"register\\\"}}\"}",
-		message)
+	
+	pushMessage := make(map[string]string)
+	err = json.Unmarshal([]byte(message), &pushMessage)
+	s.NoError(err)
+	
+	sections := []string{"APNS", "APNS_SANDBOX", "GCM", "default"}
+	for _, sec := range sections {
+		secStr, ok := pushMessage[sec]
+		s.True(ok)
+		s.NotEqual("", secStr)
+		secMap := make(map[string]interface{})
+		err := json.Unmarshal([]byte(secStr), &secMap)
+		s.NoError(err)
+		s.NotEmpty(secMap)
+	}
 }
 
 func (s *deviceInfoTester) TestRegisterAWS() {

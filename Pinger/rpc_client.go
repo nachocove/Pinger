@@ -21,7 +21,7 @@ func StartPoll(rpcserver string, pi *MailPingInformation) (*StartPollingResponse
 	return &reply, nil
 }
 
-func StopPoll(rpcserver, clientId, clientContext, deviceId, token string) (*PollingResponse, error) {
+func StopPoll(rpcserver, clientId, clientContext, deviceId string) (*PollingResponse, error) {
 	rpcClient, err := getRpcClient(rpcserver)
 	if err != nil {
 		return nil, err
@@ -31,7 +31,6 @@ func StopPoll(rpcserver, clientId, clientContext, deviceId, token string) (*Poll
 		ClientId:      clientId,
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
-		StopToken:     token,
 	}
 	err = rpcClient.Call("BackendPolling.Stop", &args, &reply)
 	if err != nil {
@@ -40,7 +39,7 @@ func StopPoll(rpcserver, clientId, clientContext, deviceId, token string) (*Poll
 	return &reply, nil
 }
 
-func DeferPoll(rpcserver, clientId, clientContext, deviceId string, timeout int64, token string) (*PollingResponse, error) {
+func DeferPoll(rpcserver, clientId, clientContext, deviceId string, timeout int64) (*PollingResponse, error) {
 	rpcClient, err := getRpcClient(rpcserver)
 	if err != nil {
 		return nil, err
@@ -51,7 +50,6 @@ func DeferPoll(rpcserver, clientId, clientContext, deviceId string, timeout int6
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
 		Timeout:       timeout,
-		StopToken:     token,
 	}
 	err = rpcClient.Call("BackendPolling.Defer", &args, &reply)
 	if err != nil {

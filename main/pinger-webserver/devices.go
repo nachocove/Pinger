@@ -180,9 +180,18 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	//	}
 	responseData := make(map[string]string)
 
+	var token string
+	if reply.Code != Pinger.PollingReplyError {
+		token, err = context.Config.Server.CreateAuthToken(postInfo.ClientId, postInfo.ClientContext, postInfo.DeviceId)
+		if err != nil {
+			context.Logger.Error("%s: error creating token %s", postInfo.getLogPrefix(), err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}		
+	}
 	switch {
 	case reply.Code == Pinger.PollingReplyOK:
-		responseData["Token"] = reply.Token
+		responseData["Token"] = token
 		responseData["Status"] = "OK"
 		responseData["Message"] = ""
 
@@ -191,7 +200,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		responseData["Message"] = reply.Message
 
 	case reply.Code == Pinger.PollingReplyWarn:
-		responseData["Token"] = reply.Token
+		responseData["Token"] = token
 		responseData["Status"] = "WARN"
 		responseData["Message"] = reply.Message
 
@@ -255,16 +264,27 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not parse json", http.StatusBadRequest)
 		return
 	}
-	//	if session.Values[SessionVarClientId] != deferData.ClientId {
-	//		context.Logger.Error("Client ID %s does not match session", deferData.ClientId)
-	//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
-	//		return
-	//	}
-	reply, err := Pinger.DeferPoll(context.Config.Rpc.ConnectString(), deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout, deferData.Token)
+	
+	var reply *Pinger.PollingResponse
+	
+	_, err = context.Config.Server.ValidateAuthToken(deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Token)
 	if err != nil {
-		context.Logger.Error("%s: Error deferring poll %s", deferData.getLogPrefix(), err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		reply = &Pinger.PollingResponse{
+			Code: Pinger.PollingReplyError,
+			Message: "Token is not valid",
+		}
+	} else {		
+		//	if session.Values[SessionVarClientId] != deferData.ClientId {
+		//		context.Logger.Error("Client ID %s does not match session", deferData.ClientId)
+		//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
+		//		return
+		//	}
+		reply, err = Pinger.DeferPoll(context.Config.Rpc.ConnectString(), deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout)
+		if err != nil {
+			context.Logger.Error("%s: Error deferring poll %s", deferData.getLogPrefix(), err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	responseData := make(map[string]string)
 	switch {
@@ -339,16 +359,27 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not parse json", http.StatusBadRequest)
 		return
 	}
-	//	if session.Values[SessionVarClientId] != stopData.ClientId {
-	//		context.Logger.Error("Client ID %s does not match session", stopData.ClientId)
-	//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
-	//		return
-	//	}
-	reply, err := Pinger.StopPoll(context.Config.Rpc.ConnectString(), stopData.ClientId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
+
+	var reply *Pinger.PollingResponse
+	
+	_, err = context.Config.Server.ValidateAuthToken(stopData.ClientId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
 	if err != nil {
-		context.Logger.Error("%s: Error stopping poll %s", stopData.getLogPrefix(), err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		reply = &Pinger.PollingResponse{
+			Code: Pinger.PollingReplyError,
+			Message: "Token is not valid",
+		}
+	} else {
+		//	if session.Values[SessionVarClientId] != stopData.ClientId {
+		//		context.Logger.Error("Client ID %s does not match session", stopData.ClientId)
+		//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
+		//		return
+		//	}
+		reply, err = Pinger.StopPoll(context.Config.Rpc.ConnectString(), stopData.ClientId, stopData.ClientContext, stopData.DeviceId)
+		if err != nil {
+			context.Logger.Error("%s: Error stopping poll %s", stopData.getLogPrefix(), err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	responseData := make(map[string]string)
 	switch {

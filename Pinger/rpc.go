@@ -57,7 +57,6 @@ const (
 
 type BackendPoller interface {
 	newMailClientContext(pi *MailPingInformation, doStats bool) (MailClientContextType, error)
-	validateClientID(clientID string) error
 	Start(args *StartPollArgs, reply *StartPollingResponse) (err error)
 	Stop(args *StopPollArgs, reply *PollingResponse) (err error)
 	Defer(args *DeferPollArgs, reply *PollingResponse) (err error)
@@ -103,7 +102,6 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 // StartPollingResponse is used by the start polling rpc
 type StartPollingResponse struct {
 	Code    int
-	Token   string
 	Message string
 }
 
@@ -138,12 +136,6 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			err = fmt.Errorf("%s: Could not find poll session in map", args.getLogPrefix())
 			return err
 		}
-		err = client.updateLastContact()
-		if err != nil {
-			reply.Message = err.Error()
-			reply.Code = PollingReplyError
-			return nil
-		}
 		logger.Debug("%s: Found Existing polling session", args.getLogPrefix())
 		status, err := client.Status()
 		switch {
@@ -175,32 +167,23 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			panic("Got a client but ok is false?")
 		}
 	}
-	err = t.validateClientID(args.MailInfo.ClientId)
-	if err != nil {
-		reply.Message = err.Error()
-		reply.Code = PollingReplyError
-		return nil
-	}
-
-	// nothing started. So start it.
-	client, err = t.newMailClientContext(args.MailInfo, false)
-	if err != nil {
-		message := fmt.Sprintf("%s: Could not create new client: %s", args.getLogPrefix(), err)
-		logger.Warning(message)
-		reply.Message = message
-		reply.Code = PollingReplyError
-		return nil
-	}
-	(*pollMap)[pollMapKey] = client
-	reply.Token = client.getStopToken()
+	go createNewPingerSession(t, pollMap, pollMapKey, args.MailInfo, logger)
 	return nil
 }
 
+func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey string, mi *MailPingInformation, logger *Logging.Logger) {
+	// nothing started. So start it.
+	client, err := t.newMailClientContext(mi, false)
+	if err != nil {
+		logger.Error("%s: Could not create new client: %s", pollMapKey, err)
+		return
+	}
+	(*pollMap)[pollMapKey] = client
+}
 type StopPollArgs struct {
 	ClientId      string
 	ClientContext string
 	DeviceId      string
-	StopToken     string
 
 	logPrefix string
 }
@@ -245,31 +228,9 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
 		}
-		validToken := client.validateStopToken(args.StopToken)
-		if validToken == false {
-			logger.Warning("%s: invalid token", args.getLogPrefix())
-			reply.Message = "Token does not match"
-			reply.Code = PollingReplyError
-			return nil
-		} else {
-			err = client.updateLastContact()
-			if err != nil {
-				logger.Error("%s: Could not update last contact %s", args.getLogPrefix(), err.Error())
-				reply.Message = err.Error()
-				reply.Code = PollingReplyError
-				return nil
-			}
-			err = client.stop()
-			if err != nil {
-				logger.Error("%s:: Error stopping poll: %s", args.getLogPrefix(), err.Error())
-				reply.Message = err.Error()
-				reply.Code = PollingReplyError
-				return nil
-			} else {
-				delete((*pollMap), args.ClientId)
-				reply.Message = "Stopped"
-			}
-		}
+		go client.stop()
+		delete((*pollMap), args.ClientId)
+		reply.Message = "Stopped"
 	}
 	reply.Code = PollingReplyOK
 	err = nil
@@ -281,7 +242,6 @@ type DeferPollArgs struct {
 	ClientContext string
 	DeviceId      string
 	Timeout       int64
-	StopToken     string
 
 	logPrefix string
 }
@@ -320,32 +280,10 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
 		}
-		validToken := client.validateStopToken(args.StopToken)
-		if validToken == false {
-			logger.Warning("%s: invalid token", args.getLogPrefix())
-			reply.Message = "Token does not match"
-			reply.Code = PollingReplyError
-			return nil
-		} else {
-			err = client.updateLastContact()
-			if err != nil {
-				logger.Error("%s: Could not update last contact %s", args.getLogPrefix(), err.Error())
-				reply.Code = PollingReplyError
-				reply.Message = err.Error()
-				return nil
-			}
-			err = client.deferPoll(args.Timeout)
-			if err != nil {
-				logger.Error("%s: Error deferring poll: %s", args.getLogPrefix(), err.Error())
-				reply.Message = err.Error()
-				reply.Code = PollingReplyError
-				return nil
-			}
-		}
+		go client.deferPoll(args.Timeout)
 	}
 	reply.Code = PollingReplyOK
 	return nil
-
 }
 
 type FindSessionsArgs struct {

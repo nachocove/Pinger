@@ -57,17 +57,17 @@ type testingMailClientContext struct {
 	logger *Logging.Logger
 }
 
-func (client *testingMailClientContext) stop() error {
+func (client *testingMailClientContext) stop() {
 	client.logger.Debug("stop")
-	return nil
+	return
 }
 func (client *testingMailClientContext) validateStopToken(token string) bool {
 	client.logger.Debug("validateStopToken")
 	return true
 }
-func (client *testingMailClientContext) deferPoll(timeout int64) error {
+func (client *testingMailClientContext) deferPoll(timeout int64) {
 	client.logger.Debug("deferPoll")
-	return nil
+	return
 }
 func (client *testingMailClientContext) updateLastContact() error {
 	client.logger.Debug("updateLastContact")

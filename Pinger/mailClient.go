@@ -17,8 +17,8 @@ import (
 )
 
 type MailClientContextType interface {
-	deferPoll(timeout int64) error
-	stop() error
+	deferPoll(timeout int64)
+	stop()
 	validateStopToken(token string) bool
 	updateLastContact() error
 	Status() (MailClientStatus, error)
@@ -117,6 +117,12 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 		WaitBeforeUse:  pi.WaitBeforeUse,
 		MaxPollTimeout: pi.MaxPollTimeout,
 	}
+	err := aws.ValidateCognitoID(pi.ClientId)
+	if err != nil {
+		client.Error("Could not validate client ID: %s", err.Error())
+		return nil, err
+	}
+	
 	client.logger.SetCallDepth(1)
 
 	di, err := newDeviceInfoPI(dbm, aws, pi, logger)
@@ -156,6 +162,7 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 	if mailclient == nil {
 		return nil, fmt.Errorf("%s: Could not create new Mail Client Pinger", pi.getLogPrefix())
 	}
+	client.updateLastContact()
 	client.Debug("Starting polls for %s", pi.String())
 	uuid.SwitchFormat(uuid.Clean)
 	client.stopToken = uuid.NewV4().String()
@@ -305,23 +312,41 @@ func (client *MailClientContext) Action(action PingerCommand) error {
 	return nil
 }
 
-func (client *MailClientContext) stop() error {
-	if client.mailClient != nil {
-		client.Debug("Stopping polls")
-		return client.Action(PingerStop)
+func (client *MailClientContext) stop() {
+	if client.mailClient == nil {
+		client.Warning("Client is stopped. Can not defer")
+		return
 	}
-	return nil
+	client.Debug("Stopping polls")
+	err := client.updateLastContact()
+	if err != nil {
+		client.Error("Could not update last contact: %s", err.Error())
+	}
+	err = client.Action(PingerStop)
+	if err != nil {
+		client.Error("Could not send stop action: %s", err.Error())
+	}
+	return
 }
 
-func (client *MailClientContext) deferPoll(timeout int64) error {
-	if client.mailClient != nil {
-		client.Debug("Deferring polls")
-		if timeout > 0 {
-			client.WaitBeforeUse = timeout
-		}
-		return client.Action(PingerDefer)
+func (client *MailClientContext) deferPoll(timeout int64) {
+	if client.mailClient == nil {
+		client.Warning("Client is stopped. Can not defer")
+		return
 	}
-	return fmt.Errorf("Client has stopped. Can not defer")
+	client.Debug("Deferring polls")
+	err := client.updateLastContact()
+	if err != nil {
+		client.Error("Could not update last contact: %s", err.Error())
+	}
+	if timeout > 0 {
+		client.WaitBeforeUse = timeout
+	}
+	err = client.Action(PingerDefer)
+	if err != nil {
+		client.Error("Could not send defer action: %s", err.Error())
+		
+	}
 }
 
 func (client *MailClientContext) updateLastContact() error {
