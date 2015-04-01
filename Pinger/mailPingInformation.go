@@ -33,6 +33,7 @@ type MailPingInformation struct {
 	OSVersion              string
 	AppBuildVersion        string
 	AppBuildNumber         string
+	SessionId              string
 
 	logPrefix string
 }
@@ -92,7 +93,7 @@ func (pi *MailPingInformation) Validate() bool {
 
 func (pi *MailPingInformation) getLogPrefix() string {
 	if pi.logPrefix == "" {
-		pi.logPrefix = fmt.Sprintf("%s:%s:%s", pi.DeviceId, pi.ClientId, pi.ClientContext)
+		pi.logPrefix = fmt.Sprintf("%s:%s:%s:%s", pi.DeviceId, pi.ClientId, pi.ClientContext, pi.SessionId)
 	}
 	return pi.logPrefix
 }

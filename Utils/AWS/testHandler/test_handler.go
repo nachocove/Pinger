@@ -24,20 +24,20 @@ type TestAwsHandler struct {
 
 func NewTestAwsHandler() *TestAwsHandler {
 	return &TestAwsHandler{
-		registeredEndpoint: "arn:aws:sns:us-west-2:263277746520:endpoint/APNS/com.nachocove.nachomail.alpha/1bd0418c-48da-36f4-8653-8d54c36d54bd",
+		registeredEndpoint:    "arn:aws:sns:us-west-2:263277746520:endpoint/APNS/com.nachocove.nachomail.alpha/1bd0418c-48da-36f4-8653-8d54c36d54bd",
 		registeredEndpointErr: nil,
 		returnGetAttributes: map[string]string{
-			"Enabled": "true",
-			"Token": "12345",
+			"Enabled":        "true",
+			"Token":          "12345",
 			"CustomUserData": "",
 		},
-		returnGetAttributesErr: nil,
-		returnSetAttributesErr: nil,
-		returnDeleteAttributesErr: nil,
-		returnPushNotificationError: nil,
+		returnGetAttributesErr:       nil,
+		returnSetAttributesErr:       nil,
+		returnDeleteAttributesErr:    nil,
+		returnPushNotificationError:  nil,
 		returnValidateCognitoIdError: nil,
-		returnPutFileError: nil,
-		ignorePushFailure: false,
+		returnPutFileError:           nil,
+		ignorePushFailure:            false,
 	}
 }
 func (ah *TestAwsHandler) SetReturnRegisteredEndpoint(endpoint string, err error) {

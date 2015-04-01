@@ -1,12 +1,14 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/nachocove/Pinger/Pinger"
 	"net/http"
 	"strings"
-
-	"github.com/nachocove/Pinger/Pinger"
 )
 
 func init() {
@@ -93,7 +95,7 @@ func (pd *registerPostData) Validate() (bool, []string) {
 	return ok, MissingFields
 }
 
-func (pd *registerPostData) AsMailInfo() *Pinger.MailPingInformation {
+func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInformation {
 	// there's got to be a better way to do this...
 	pi := Pinger.MailPingInformation{}
 	pi.ClientId = pd.ClientId
@@ -122,7 +124,22 @@ func (pd *registerPostData) AsMailInfo() *Pinger.MailPingInformation {
 	pi.OSVersion = pd.OSVersion
 	pi.AppBuildNumber = pd.AppBuildNumber
 	pi.AppBuildVersion = pd.AppBuildVersion
+	pi.SessionId = sessionId
 	return &pi
+}
+
+func makeSessionId(token string) (string, error) {
+	data, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		return "", err
+	}
+	hash := sha256.Sum256(data)
+	myId := make([]byte, 8)
+	n := hex.Encode(myId, hash[0:4])
+	if n <= 0 {
+		return "", fmt.Errorf("Could not encode to hex string")
+	}
+	return string(myId), nil
 }
 
 func registerDevice(w http.ResponseWriter, r *http.Request) {
@@ -161,10 +178,16 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		responseError(w, MissingRequiredData, strings.Join(missingFields, ","))
 		return
 	}
+	token, err := context.Config.Server.CreateAuthToken(postInfo.ClientId, postInfo.ClientContext, postInfo.DeviceId)
+	if err != nil {
+		context.Logger.Error("%s: error creating token %s", postInfo.getLogPrefix(), err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	//	session.Values[SessionVarClientId] = postInfo.ClientId
-
-	reply, err := Pinger.StartPoll(context.Config.Rpc.ConnectString(), postInfo.AsMailInfo())
+	sessionId, err := makeSessionId(token)
+	reply, err := Pinger.StartPoll(context.Config.Rpc.ConnectString(), postInfo.AsMailInfo(sessionId))
 	if err != nil {
 		context.Logger.Warning("%s: Could not re/start polling for device: %s", postInfo.getLogPrefix(), err)
 		responseError(w, RPCServerError, "")
@@ -180,15 +203,6 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	//	}
 	responseData := make(map[string]string)
 
-	var token string
-	if reply.Code != Pinger.PollingReplyError {
-		token, err = context.Config.Server.CreateAuthToken(postInfo.ClientId, postInfo.ClientContext, postInfo.DeviceId)
-		if err != nil {
-			context.Logger.Error("%s: error creating token %s", postInfo.getLogPrefix(), err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}		
-	}
 	switch {
 	case reply.Code == Pinger.PollingReplyOK:
 		responseData["Token"] = token
@@ -264,16 +278,16 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not parse json", http.StatusBadRequest)
 		return
 	}
-	
+
 	var reply *Pinger.PollingResponse
-	
+
 	_, err = context.Config.Server.ValidateAuthToken(deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Token)
 	if err != nil {
 		reply = &Pinger.PollingResponse{
-			Code: Pinger.PollingReplyError,
+			Code:    Pinger.PollingReplyError,
 			Message: "Token is not valid",
 		}
-	} else {		
+	} else {
 		//	if session.Values[SessionVarClientId] != deferData.ClientId {
 		//		context.Logger.Error("Client ID %s does not match session", deferData.ClientId)
 		//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
@@ -361,11 +375,11 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var reply *Pinger.PollingResponse
-	
+
 	_, err = context.Config.Server.ValidateAuthToken(stopData.ClientId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
 	if err != nil {
 		reply = &Pinger.PollingResponse{
-			Code: Pinger.PollingReplyError,
+			Code:    Pinger.PollingReplyError,
 			Message: "Token is not valid",
 		}
 	} else {

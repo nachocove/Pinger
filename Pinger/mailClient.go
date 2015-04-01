@@ -46,12 +46,13 @@ type MailClientContext struct {
 	MaxPollTimeout int64 // max polling lifetime in milliseconds. Default 2 days.
 	wg             sync.WaitGroup
 	status         MailClientStatus
+	sessionId      string
 	logPrefix      string
 }
 
 func (client *MailClientContext) getLogPrefix() string {
 	if client.logPrefix == "" {
-		client.logPrefix = fmt.Sprintf("%s:%s:%s", client.DeviceId, client.ClientId, client.ClientContext)
+		client.logPrefix = fmt.Sprintf("%s:%s:%s:%s", client.DeviceId, client.ClientId, client.ClientContext, client.sessionId)
 	}
 	return client.logPrefix
 }
@@ -116,13 +117,14 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 		Protocol:       pi.Protocol,
 		WaitBeforeUse:  pi.WaitBeforeUse,
 		MaxPollTimeout: pi.MaxPollTimeout,
+		sessionId:      pi.SessionId,
 	}
 	err := aws.ValidateCognitoID(pi.ClientId)
 	if err != nil {
 		client.Error("Could not validate client ID: %s", err.Error())
 		return nil, err
 	}
-	
+
 	client.logger.SetCallDepth(1)
 
 	di, err := newDeviceInfoPI(dbm, aws, pi, logger)
@@ -345,7 +347,7 @@ func (client *MailClientContext) deferPoll(timeout int64) {
 	err = client.Action(PingerDefer)
 	if err != nil {
 		client.Error("Could not send defer action: %s", err.Error())
-		
+
 	}
 }
 

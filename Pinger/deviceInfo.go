@@ -35,6 +35,7 @@ type DeviceInfo struct {
 	logger    *Logging.Logger `db:"-"`
 	logPrefix string          `db:"-"`
 	aws       AWS.AWSHandler  `db:"-"`
+	sessionId string          `db:"-"`
 }
 
 type deviceContact struct {
@@ -163,8 +164,12 @@ func newDeviceInfo(
 	pushToken, pushService,
 	platform, osVersion,
 	appBuildVersion, appBuildNumber string,
+	sessionId string,
 	aws AWS.AWSHandler,
 	logger *Logging.Logger) (*DeviceInfo, error) {
+	if sessionId == "" {
+		panic("session ID needs to be set")
+	}
 	di := &DeviceInfo{
 		ClientId:        clientID,
 		ClientContext:   clientContext,
@@ -176,6 +181,7 @@ func newDeviceInfo(
 		AppBuildVersion: appBuildVersion,
 		AppBuildNumber:  appBuildNumber,
 		aws:             aws,
+		sessionId:       sessionId,
 	}
 	di.SetLogger(logger)
 	err := di.validate()
@@ -192,7 +198,7 @@ func (di *DeviceInfo) SetLogger(logger *Logging.Logger) {
 
 func (di *DeviceInfo) getLogPrefix() string {
 	if di.logPrefix == "" {
-		di.logPrefix = fmt.Sprintf("%s:%s:%s", di.DeviceId, di.ClientId, di.ClientContext)
+		di.logPrefix = fmt.Sprintf("%s:%s:%s:%s", di.DeviceId, di.ClientId, di.ClientContext, di.sessionId)
 	}
 	return di.logPrefix
 }
@@ -250,7 +256,7 @@ func init() {
 		pingerField.Tag.Get("db"))
 }
 
-func getDeviceInfo(dbm *gorp.DbMap, aws AWS.AWSHandler, clientId, clientContext, deviceId string, logger *Logging.Logger) (*DeviceInfo, error) {
+func getDeviceInfo(dbm *gorp.DbMap, aws AWS.AWSHandler, clientId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
 	var device *DeviceInfo
 	obj, err := dbm.Get(&DeviceInfo{}, clientId, clientContext, deviceId)
 	if err != nil {
@@ -260,6 +266,7 @@ func getDeviceInfo(dbm *gorp.DbMap, aws AWS.AWSHandler, clientId, clientContext,
 		device = obj.(*DeviceInfo)
 		device.dbm = dbm
 		device.aws = aws
+		device.sessionId = sessionId
 		device.SetLogger(logger)
 		if device.Pinger != pingerHostId {
 			device.Warning("device belongs to a different pinger (%s). Stealing it", device.Pinger)
@@ -377,7 +384,7 @@ func (di *DeviceInfo) getContactInfo(insert bool) (int64, int64, error) {
 
 func newDeviceInfoPI(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInformation, logger *Logging.Logger) (*DeviceInfo, error) {
 	var err error
-	di, err := getDeviceInfo(dbm, aws, pi.ClientId, pi.ClientContext, pi.DeviceId, logger)
+	di, err := getDeviceInfo(dbm, aws, pi.ClientId, pi.ClientContext, pi.DeviceId, pi.SessionId, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -392,6 +399,7 @@ func newDeviceInfoPI(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInformatio
 			pi.OSVersion,
 			pi.AppBuildVersion,
 			pi.AppBuildNumber,
+			pi.SessionId,
 			aws,
 			logger)
 		if err != nil {
@@ -518,7 +526,8 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 	pingerMap := map[string]interface{}{}
 	pingerMap["pinger"] = map[string]string{
 		di.ClientContext: string(message),
-		"timestamp": time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat),
+		"timestamp":      time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat),
+		"session":        di.sessionId,
 	}
 	pingerJson, err := json.Marshal(pingerMap)
 	if err != nil {
@@ -612,7 +621,7 @@ func (di *DeviceInfo) registerAws() error {
 	var attributes map[string]string
 	need_di_update := false
 	need_attr_update := false
-	
+
 	if di.AWSEndpointArn == "" {
 		// Need to register first
 		switch {
@@ -624,11 +633,11 @@ func (di *DeviceInfo) registerAws() error {
 			if len(pushToken) != 64 {
 				return fmt.Errorf("APNS token length wrong. %d ('%s')", len(pushToken), string(pushToken))
 			}
-	
+
 		default:
 			return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
 		}
-	
+
 		di.Debug("Registering %s:%s with AWS.", di.PushService, di.PushToken)
 		arn, registerErr := di.aws.RegisterEndpointArn(di.PushService, pushToken, di.customerData())
 		if registerErr != nil {
@@ -645,7 +654,7 @@ func (di *DeviceInfo) registerAws() error {
 		di.AWSEndpointArn = arn
 		need_di_update = true
 	}
-	
+
 	// fetch the attributes
 	di.Debug("fetching attributes for %s.", di.AWSEndpointArn)
 	attributes, err = di.aws.GetEndpointAttributes(di.AWSEndpointArn)
@@ -669,7 +678,7 @@ func (di *DeviceInfo) registerAws() error {
 		attributes["Token"] = pushToken
 		need_attr_update = true
 	}
-	
+
 	cd := di.customerData()
 	if cd != attributes["CustomUserData"] {
 		attributes["CustomUserData"] = cd

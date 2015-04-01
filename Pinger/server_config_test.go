@@ -1,10 +1,10 @@
 package Pinger
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
-	"fmt"
 )
 
 type ServerConfigTests struct {
@@ -30,13 +30,12 @@ func TestServerConfiguration(t *testing.T) {
 func (s *ServerConfigTests) TestServerConfigValidation() {
 	s.cfg.TokenAuthKey = "foo12345"
 	err := s.cfg.validate()
-	s.Error(err)	
+	s.Error(err)
 
 	s.cfg.TokenAuthKey = "01234567890123456789012345678901"
 	err = s.cfg.validate()
-	s.NoError(err)	
+	s.NoError(err)
 }
-
 
 func (s *ServerConfigTests) TestTokenCreationValidation() {
 	s.cfg.TokenAuthKey = "01234567890123456789012345678901"
@@ -47,7 +46,7 @@ func (s *ServerConfigTests) TestTokenCreationValidation() {
 	s.NoError(err)
 	s.NotEqual("", token)
 	fmt.Printf("%d %s\n", len(token), token)
-	
+
 	t, err := s.cfg.ValidateAuthToken(testClientId, testClientContext, testDeviceId, token)
 	s.NoError(err)
 	s.NotEmpty(t)

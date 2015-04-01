@@ -180,6 +180,7 @@ func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey st
 	}
 	(*pollMap)[pollMapKey] = client
 }
+
 type StopPollArgs struct {
 	ClientId      string
 	ClientContext string

@@ -51,7 +51,7 @@ func (s *writerTester) TestFileCreation() {
 	fileName, err := writer.createFilesFromMessages(&messages)
 	s.NoError(err)
 	s.Empty(fileName)
-	
+
 	messages = make([]telemetryLogMsg, 1)
 	msg := NewTelemetryMsg(
 		telemetryLogEventInfo,

@@ -1,6 +1,7 @@
 package Pinger
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
@@ -9,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"testing"
-	"encoding/json"
 )
 
 type deviceInfoTester struct {
@@ -27,6 +27,7 @@ type deviceInfoTester struct {
 	testAppVersion    string
 	testAppNumber     string
 	aws               *testHandler.TestAwsHandler
+	sessionId         string
 }
 
 func (s *deviceInfoTester) SetupSuite() {
@@ -46,6 +47,7 @@ func (s *deviceInfoTester) SetupSuite() {
 	s.testOSVersion = "8.1"
 	s.testAppVersion = "0.9"
 	s.testAppNumber = "(dev) Foo"
+	s.sessionId = "12345678"
 	s.aws = testHandler.NewTestAwsHandler()
 
 }
@@ -75,6 +77,7 @@ func (s *deviceInfoTester) TestDeviceInfoValidate() {
 		s.testOSVersion,
 		s.testAppVersion,
 		s.testAppNumber,
+		s.sessionId,
 		s.aws,
 		s.logger)
 	s.NoError(err)
@@ -129,6 +132,7 @@ func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 		s.testOSVersion,
 		s.testAppVersion,
 		s.testAppNumber,
+		s.sessionId,
 		s.aws,
 		s.logger)
 	s.NoError(err)
@@ -164,6 +168,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 		s.testOSVersion,
 		s.testAppVersion,
 		s.testAppNumber,
+		s.sessionId,
 		s.aws,
 		s.logger)
 	s.Error(err, "ClientContext can not be empty")
@@ -179,6 +184,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 		s.testOSVersion,
 		s.testAppVersion,
 		s.testAppNumber,
+		s.sessionId,
 		s.aws,
 		s.logger)
 	s.NoError(err)
@@ -209,7 +215,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	deviceList, err = getAllMyDeviceInfo(s.dbmap, s.aws, s.logger)
 	s.Equal(0, len(deviceList))
 
-	diInDb, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	diInDb, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.Nil(diInDb)
 
@@ -226,7 +232,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 
 	s.Equal(pingerHostId, di.Pinger)
 
-	diInDb, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	diInDb, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(diInDb)
 	s.Equal(di.Id, diInDb.Id)
@@ -249,6 +255,7 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 		s.testOSVersion,
 		s.testAppVersion,
 		s.testAppNumber,
+		s.sessionId,
 		s.aws,
 		s.logger)
 	s.NoError(err)
@@ -257,11 +264,11 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 	err = di.insert(s.dbmap)
 	s.NoError(err)
 
-	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(di)
 
-	di2, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	di2, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(di2)
 	s.Equal(di.Id, di2.Id)
@@ -318,6 +325,7 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 		s.testOSVersion,
 		s.testAppVersion,
 		s.testAppNumber,
+		s.sessionId,
 		s.aws,
 		s.logger)
 	s.NoError(err)
@@ -325,7 +333,7 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 
 	err = di.insert(s.dbmap)
 	s.NoError(err)
-	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(di)
 
@@ -333,7 +341,7 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 
 	di = nil
 
-	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.Nil(di)
 }
@@ -345,11 +353,11 @@ func (s *deviceInfoTester) TestDevicePushMessageCreate() {
 	message, err := di.pushMessage(PingerNotificationRegister, days_28)
 	s.NoError(err)
 	s.NotEmpty(message)
-	
+
 	pushMessage := make(map[string]string)
 	err = json.Unmarshal([]byte(message), &pushMessage)
 	s.NoError(err)
-	
+
 	sections := []string{"APNS", "APNS_SANDBOX", "GCM", "default"}
 	for _, sec := range sections {
 		secStr, ok := pushMessage[sec]
@@ -373,6 +381,7 @@ func (s *deviceInfoTester) TestRegisterAWS() {
 		s.testOSVersion,
 		s.testAppVersion,
 		s.testAppNumber,
+		s.sessionId,
 		s.aws,
 		s.logger)
 	s.NoError(err)

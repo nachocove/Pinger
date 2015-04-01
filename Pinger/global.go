@@ -1,7 +1,6 @@
 package Pinger
 
-import (
-)
+import ()
 
 type globalStuff struct {
 	config *BackendConfiguration

@@ -21,6 +21,7 @@ type mailClientTester struct {
 	testPushService   string
 	testProtocol      string
 	aws               *testHandler.TestAwsHandler
+	sessionId         string
 }
 
 func (s *mailClientTester) SetupSuite() {
@@ -39,6 +40,7 @@ func (s *mailClientTester) SetupSuite() {
 	s.testPushService = "APNS"
 	s.testProtocol = "ActiveSync"
 	s.aws = testHandler.NewTestAwsHandler()
+	s.sessionId = "12345678"
 	setGlobal(&BackendConfiguration{})
 }
 
@@ -92,6 +94,7 @@ func (client *testingMailClientContext) getSessionInfo() (*ClientSessionInfo, er
 
 func (s *mailClientTester) TestMailClient() {
 	pi := &MailPingInformation{}
+	pi.SessionId = s.sessionId
 	debug := true
 	doStats := false
 	client, err := NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
@@ -108,11 +111,12 @@ func (s *mailClientTester) TestMailClient() {
 		Platform:      s.testPlatform,
 		PushService:   s.testPushService,
 		PushToken:     s.testPushToken,
+		SessionId:     s.sessionId,
 	}
 	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
-	s.Equal(fmt.Sprintf("%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testClientId, s.testClientContext, ""), err.Error())
+	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testClientId, s.testClientContext, s.sessionId, ""), err.Error())
 
 	pi = &MailPingInformation{
 		ClientId:      s.testClientId,
@@ -122,12 +126,13 @@ func (s *mailClientTester) TestMailClient() {
 		PushService:   s.testPushService,
 		PushToken:     s.testPushToken,
 		Protocol:      "Foo",
+		SessionId:     s.sessionId,
 	}
 	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
 
-	s.Equal(fmt.Sprintf("%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testClientId, s.testClientContext, "Foo"), err.Error())
+	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testClientId, s.testClientContext, s.sessionId, "Foo"), err.Error())
 	pi = &MailPingInformation{
 		ClientId:      s.testClientId,
 		ClientContext: s.testClientContext,
@@ -136,6 +141,7 @@ func (s *mailClientTester) TestMailClient() {
 		PushService:   s.testPushService,
 		PushToken:     s.testPushToken,
 		Protocol:      s.testProtocol,
+		SessionId:     s.sessionId,
 	}
 	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.NotNil(client)

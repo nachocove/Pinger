@@ -20,6 +20,7 @@ type RPCServerTester struct {
 	testPlatform      string
 	testMailServerUrl string
 	aws               *testHandler.TestAwsHandler
+	sessionId         string
 }
 
 func (s *RPCServerTester) SetupSuite() {
@@ -48,6 +49,7 @@ func (s *RPCServerTester) SetupSuite() {
 	s.testDeviceId = "NCHOXfherekgrgr"
 	s.testPlatform = "ios"
 	s.testMailServerUrl = "http://foo"
+	s.sessionId = "12345678"
 	s.aws = testHandler.NewTestAwsHandler()
 }
 
@@ -95,7 +97,7 @@ func (s *RPCServerTester) TestRPCStartPoll() {
 	}
 	reply := StartPollingResponse{}
 
-	diInDb, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.logger)
+	diInDb, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.Nil(diInDb)
 
