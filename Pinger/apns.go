@@ -34,9 +34,7 @@ func FeedbackListener(logger *Logging.Logger) {
 		apnsHost = APNSFeedbackServer
 	}
 	for {
-		sleepTime := time.Duration(globals.config.APNSFeedbackPeriod) * time.Minute
-		logger.Debug("APNS FEEDBACK: sleeping %s", sleepTime)
-		time.Sleep(sleepTime)
+		time.Sleep(time.Duration(globals.config.APNSFeedbackPeriod) * time.Minute)
 		logger.Debug("APNS FEEDBACK: Checking feedback service")
 		client := apns.NewClient(apnsHost, globals.config.APNSCertFile, globals.config.APNSKeyFile)
 		go client.ListenForFeedback()
@@ -52,7 +50,7 @@ func FeedbackListener(logger *Logging.Logger) {
 	}
 }
 
-func (di *DeviceInfo) APNSpushMessage(message PingerNotification) error {
+func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert string) error {
 	if globals.config.APNSCertFile == "" {
 		panic("No apns cert set. Can not push to APNS")
 	}
@@ -68,10 +66,8 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification) error {
 	pn.Priority = 10
 
 	payload := make(map[string]interface{})
-	if message == "new" {
-		payload["alert"] = "Yo! Jan says you got mail!"
-	} else {
-		payload["alert"] = "That would be in the butt, bob!"
+	if alert != "" {
+		payload["alert"] = alert
 	}
 	payload["sound"] = "silent.wav"
 	payload["content-available"] = 1

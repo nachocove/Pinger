@@ -520,7 +520,7 @@ const (
 	PingerNotificationNewMail  PingerNotification = "new"
 )
 
-func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string, error) {
+func (di *DeviceInfo) pushMessage(message PingerNotification, alert string, ttl int64) (string, error) {
 	if message == "" {
 		return "", fmt.Errorf("Message can not be empty")
 	}
@@ -540,17 +540,13 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 	case di.Platform == "ios":
 		APNSMap := map[string]interface{}{}
 		APNSMap["pinger"] = pingerMap
-		var alert string
-		if message == "new" {
-			alert = "Yo! You got mail!"
-		} else {
-			alert = "Yo! You need to re-register!"
+		apsMap := make(map[string]interface{})
+		apsMap["content-available"] = 1
+		apsMap["sound"] = "silent.wav"
+		if alert != "" {
+			apsMap["alert"] = alert
 		}
-		APNSMap["aps"] = map[string]interface{}{
-			"content-available": 1,
-			"sound":             "silent.wav",
-			"alert":             alert,
-		}
+		APNSMap["aps"] = apsMap
 		b, err := json.Marshal(APNSMap)
 		if err != nil {
 			return "", err
@@ -601,10 +597,16 @@ type APNSPushNotification struct {
 
 func (di *DeviceInfo) push(message PingerNotification) error {
 	var err error
-	if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
-		err = di.AWSpushMessage(message)
+	var alert string
+	if message == "new" {
+		alert = "Nacho says: You got mail."
 	} else {
-		err = di.APNSpushMessage(message)
+		alert = "Nacho says: Please register."
+	}
+	if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
+		err = di.AWSpushMessage(message, alert)
+	} else {
+		err = di.APNSpushMessage(message, alert)
 	}
 	if err == nil {
 		err = di.updateLastContactRequest()
@@ -612,12 +614,12 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 	return err
 }
 
-func (di *DeviceInfo) AWSpushMessage(message PingerNotification) error {
+func (di *DeviceInfo) AWSpushMessage(message PingerNotification, alert string) error {
 	if di.AWSEndpointArn == "" {
 		return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", di.PushService, di.PushToken)
 	}
 	var days_28 int64 = 2419200
-	pushMessage, err := di.pushMessage(message, days_28)
+	pushMessage, err := di.pushMessage(message, alert, days_28)
 	if err != nil {
 		return err
 	}
