@@ -39,9 +39,11 @@ func (s *exchangeTester) TestNewExchangeClient() {
 	di := &DeviceInfo{}
 	pi := &MailPingInformation{}
 	wg := &sync.WaitGroup{}
+	errCh := make(chan error)
+	exitCh := make(chan int)
 	debug := true
 
-	ex, err := NewExchangeClient(di, pi, wg, debug, s.logger)
+	ex, err := NewExchangeClient(di, pi, wg, errCh, exitCh, debug, s.logger)
 	s.NoError(err)
 	s.NotNil(ex)
 
