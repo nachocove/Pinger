@@ -3,18 +3,48 @@ package Pinger
 import (
 	"fmt"
 	"github.com/anachronistic/apns"
+	"github.com/nachocove/Pinger/Utils/AWS"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils/Telemetry"
 	"time"
-	"github.com/nachocove/Pinger/Utils/AWS"
 )
 
 const (
-	APNSServer = "gateway.push.apple.com:2195"
-	APNSSandboxServer = "gateway.sandbox.push.apple.com:2195"
+	APNSServer                = "gateway.push.apple.com:2195"
+	APNSFeedbackServer        = "feedback.push.apple.com:2196"
+	APNSSandboxServer         = "gateway.sandbox.push.apple.com:2195"
+	APNSSandboxFeedbackServer = "feedback.sandbox.push.apple.com:2196"
 )
 
-var apnsCert string
-var apnsKey string
+func FeedbackListener(logger *Logging.Logger) {
+	if globals.config.APNSCertFile == "" {
+		return
+	}
+	if globals.config.APNSKeyFile == "" {
+		return
+	}
+	var apnsHost string
+	if globals.config.APNSSandbox {
+		apnsHost = APNSSandboxFeedbackServer
+	} else {
+		apnsHost = APNSFeedbackServer
+	}
+	for {
+		time.Sleep(time.Duration(1)*time.Minute)
+		logger.Debug("APNS FEEDBACK: Checking feedback service")
+		client := apns.NewClient(apnsHost, globals.config.APNSCertFile, globals.config.APNSKeyFile)
+		go client.ListenForFeedback()
+	
+		for {
+			select {
+			case resp := <-apns.FeedbackChannel:
+				logger.Warning("APNS FEEDBACK recv'd:", resp.DeviceToken)
+			case <-apns.ShutdownChannel:
+				logger.Info("APNS FEEDBACK nothing returned from the feedback service")
+			}
+		}
+	}
+}
 
 func (di *DeviceInfo) APNSpushMessage(message PingerNotification) error {
 	if globals.config.APNSCertFile == "" {

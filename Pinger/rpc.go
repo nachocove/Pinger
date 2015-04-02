@@ -74,7 +74,7 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 	log.SetOutput(ioutil.Discard) // rpc.Register logs a warning for ToggleDebug, which we don't want.
 
 	rpc.Register(pollingAPI)
-
+	go FeedbackListener(logger)
 	go alertAllDevices(pollingAPI.dbm, pollingAPI.aws, pollingAPI.logger)
 
 	if config.Backend.PingerUpdater > 0 {
