@@ -543,12 +543,12 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 		if message == "new" {
 			alert = "Yo! You got mail!"
 		} else {
-			alert = "Yo! You need to re-register!"		
+			alert = "Yo! You need to re-register!"
 		}
 		APNSMap["aps"] = map[string]interface{}{
 			"content-available": 1,
-			"sound": "silent.wav",
-			"alert": alert,
+			"sound":             "silent.wav",
+			"alert":             alert,
 		}
 		b, err := json.Marshal(APNSMap)
 		if err != nil {
@@ -561,19 +561,19 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, ttl int64) (string
 		}
 		notificationMap["APNS"] = string(b)
 		notificationMap["APNS_SANDBOX"] = string(b)
-	
+
 	case di.Platform == "android":
 		hash := sha1.New()
 		hash.Write(pingerJson)
 		md := hash.Sum(nil)
 		pingerMapSha := hex.EncodeToString(md)
-	
+
 		GCMMap := map[string]interface{}{}
 		GCMMap["data"] = pingerMap
 		GCMMap["collapse_key"] = string(pingerMapSha)
 		GCMMap["time_to_live"] = ttl
 		GCMMap["delay_while_idle"] = false
-	
+
 		b, err := json.Marshal(GCMMap)
 		if err != nil {
 			return "", err

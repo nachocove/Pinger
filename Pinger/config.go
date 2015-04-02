@@ -46,6 +46,7 @@ func (cfg *BackendConfiguration) validate() error {
 	}
 	return nil
 }
+
 type LoggingConfiguration struct {
 	LogDir       string
 	LogFileName  string
