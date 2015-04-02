@@ -141,10 +141,24 @@ func (s *writerTester) TestFileCreation() {
 }
 
 func (s *writerTester) TestClientRegex() {
-	message := "NchoDC28E565X072CX46B1XBF205:us-east-1:44211d8c-caf6-4b17-80cf-72febe0ebb2d:12345:vgifyyyTOxF2rvS1/ActiveSync: exiting LongPoll"
+	clientId := "us-east-1:44211d8c-caf6-4b17-80cf-72febe0ebb2d"
+	deviceId := "NchoDC28E565X072CX46B1XBF205"
+	context := "12345"
+	sessionId := "fd330a9e"
+	protocol := "ActiveSync"
+	messageStr := "Starting polls for NchoDC28E565X072CX46B1XBF205:us-east-1:44211d8c-caf6-4b17-80cf-72febe0ebb2d:12345:fd330a9e: NoChangeReply:AwFqAAANRUcDMQABAQ==, RequestData:AwFqAAANRUgDNjAwAAFJSksDNgABTANFbWFpbAABAUpLAzIAAUwDQ2FsZW5kYXIAAQEBAQ==, ExpectedReply:	"
+
+	message := fmt.Sprintf("%s:%s:%s:%s/%s: %s", deviceId, clientId, context, sessionId, protocol, messageStr)
 	s.False(deviceClientContextRegexp.MatchString(message), "should have matched deviceClientContextRegexp")
 	s.True(deviceClientContextProtocolRegexp.MatchString(message), "should have matched deviceClientContextProtocolRegexp")
 	s.True(clientIdRegex.MatchString(message), "should have matched clientIdRegex")
+	s.Equal(clientId, deviceClientContextProtocolRegexp.ReplaceAllString(message, "${client}"))
+	s.Equal(deviceId, deviceClientContextProtocolRegexp.ReplaceAllString(message, "${device}"))
+	s.Equal(context, deviceClientContextProtocolRegexp.ReplaceAllString(message, "${context}"))
+	s.Equal(sessionId, deviceClientContextProtocolRegexp.ReplaceAllString(message, "${session}"))
+	s.Equal(protocol, deviceClientContextProtocolRegexp.ReplaceAllString(message, "${protocol}"))
+	s.Equal(messageStr, deviceClientContextProtocolRegexp.ReplaceAllString(message, "${message}"))
+	fmt.Println(deviceClientContextProtocolRegexp.ReplaceAllString(message, "${message} (protocol ${protocol}, context ${context}, device ${device}, session ${session})"))
 
 	message = "NchoDC28E565X072CX46B1XBF205:us-east-1:44211d8c-caf6-4b17-80cf-72febe0ebb2d:12345:vgifyyyTOxF2rvS1: exiting LongPoll"
 	s.True(deviceClientContextRegexp.MatchString(message), "should have matched deviceClientContextRegexp")

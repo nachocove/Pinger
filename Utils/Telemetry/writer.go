@@ -93,11 +93,11 @@ func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Rec
 	switch {
 	case deviceClientContextRegexp.MatchString(message):
 		client = deviceClientContextRegexp.ReplaceAllString(message, "${client}")
-		message = deviceClientContextRegexp.ReplaceAllString(message, "${message} (context ${context}, device ${device})")
+		message = deviceClientContextRegexp.ReplaceAllString(message, "${message} (context ${context}, device ${device}, session ${session})")
 
 	case deviceClientContextProtocolRegexp.MatchString(message):
 		client = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${client}")
-		message = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${message} (protocol ${protocol}, context ${context}, device ${device})")
+		message = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${message} (protocol ${protocol}, context ${context}, device ${device}, session ${session})")
 
 	case clientIdRegex.MatchString(message):
 		client = clientIdRegex.ReplaceAllString(message, "${client}")
