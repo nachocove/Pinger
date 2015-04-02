@@ -126,7 +126,7 @@ func DecodeAPNSPushToken(token string) (string, error) {
 		// see if the string decodes, in which case it's probably already passed to us in hex
 		_, err := hex.DecodeString(token)
 		if err == nil {
-			return token, nil
+			return strings.ToUpper(token), nil
 		}
 	} else {
 		tokenBytes, err := base64.StdEncoding.DecodeString(token)
@@ -137,7 +137,7 @@ func DecodeAPNSPushToken(token string) (string, error) {
 		if len(tokenstring) != 64 {
 			return "", fmt.Errorf("Decoded token is not 64 bytes long")
 		}
-		return tokenstring, nil
+		return strings.ToUpper(tokenstring), nil
 	}
 	return "", fmt.Errorf("Could not determine push token format: %s", token)
 }
