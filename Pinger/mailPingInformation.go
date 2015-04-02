@@ -39,8 +39,7 @@ type MailPingInformation struct {
 }
 
 func (pi *MailPingInformation) String() string {
-	return fmt.Sprintf("%s: NoChangeReply:%s, RequestData:%s, ExpectedReply:%s",
-		pi.getLogPrefix(),
+	return fmt.Sprintf("NoChangeReply:%s, RequestData:%s, ExpectedReply:%s",
 		base64.StdEncoding.EncodeToString(pi.NoChangeReply),
 		base64.StdEncoding.EncodeToString(pi.RequestData),
 		base64.StdEncoding.EncodeToString(pi.ExpectedReply))
