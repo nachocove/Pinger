@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/coopernurse/gorp"
-	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/AWS/testHandler"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/require"
@@ -347,7 +346,8 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 }
 
 func (s *deviceInfoTester) TestDevicePushMessageCreate() {
-	di := DeviceInfo{Platform: "ios", PushService: AWS.PushServiceAPNS, ClientContext: "FOO"}
+	di := DeviceInfo{Platform: "ios", PushService: PushServiceAPNS, ClientContext: "FOO"}
+	di.logger = s.logger
 	var days_28 int64 = 2419200
 
 	message, err := di.pushMessage(PingerNotificationRegister, days_28)
@@ -358,10 +358,10 @@ func (s *deviceInfoTester) TestDevicePushMessageCreate() {
 	err = json.Unmarshal([]byte(message), &pushMessage)
 	s.NoError(err)
 
-	sections := []string{"APNS", "APNS_SANDBOX", "GCM", "default"}
+	sections := []string{"APNS", "APNS_SANDBOX", "default"}
 	for _, sec := range sections {
 		secStr, ok := pushMessage[sec]
-		s.True(ok)
+		s.True(ok, sec)
 		s.NotEqual("", secStr)
 		secMap := make(map[string]interface{})
 		err := json.Unmarshal([]byte(secStr), &secMap)

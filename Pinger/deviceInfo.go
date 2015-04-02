@@ -12,6 +12,7 @@ import (
 	"github.com/nachocove/Pinger/Utils/Telemetry"
 	"reflect"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -600,27 +601,28 @@ type APNSPushNotification struct {
 
 func (di *DeviceInfo) push(message PingerNotification) error {
 	var err error
-	if di.AWSEndpointArn == "" {
-		return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", di.PushService, di.PushToken)
-	}
-	if globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
-		var days_28 int64 = 2419200
-		pushMessage, err := di.pushMessage(message, days_28)
-		if err != nil {
-			return err
-		}
-		di.Debug("Sending push message to AWS: pushToken: %s/%s AWSEndpointArn:%s %s", di.PushService, di.PushToken, di.AWSEndpointArn, pushMessage)
-		err = di.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
-		if err == nil {
-			err = di.updateLastContactRequest()
-		}
+	if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
+		err = di.AWSpushMessage(message)
 	} else {
 		err = di.APNSpushMessage(message)
 	}
-	if err != nil {
-		di.Error("%s", err.Error())
+	if err == nil {
+		err = di.updateLastContactRequest()
 	}
 	return err
+}
+
+func (di *DeviceInfo) AWSpushMessage(message PingerNotification) error {
+	if di.AWSEndpointArn == "" {
+		return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", di.PushService, di.PushToken)
+	}
+	var days_28 int64 = 2419200
+	pushMessage, err := di.pushMessage(message, days_28)
+	if err != nil {
+		return err
+	}
+	di.Debug("Sending push message to AWS: pushToken: %s/%s AWSEndpointArn:%s %s", di.PushService, di.PushToken, di.AWSEndpointArn, pushMessage)
+	return di.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
 }
 
 func (di *DeviceInfo) customerData() string {
@@ -650,7 +652,7 @@ func (di *DeviceInfo) registerAws() error {
 	if di.AWSEndpointArn == "" {
 		// Need to register first
 		switch {
-		case di.PushService == AWS.PushServiceAPNS:
+		case di.PushService == PushServiceAPNS:
 			pushToken, err = AWS.DecodeAPNSPushToken(di.PushToken)
 			if err != nil {
 				return err
@@ -724,13 +726,15 @@ func (di *DeviceInfo) registerAws() error {
 }
 
 func (di *DeviceInfo) validateClient() error {
-	// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
-	err := di.registerAws()
-	if err != nil {
-		if di.aws.IgnorePushFailures() == false {
-			return err
-		} else {
-			di.Warning("Registering %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
+	if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
+		// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
+		err := di.registerAws()
+		if err != nil {
+			if di.aws.IgnorePushFailures() == false {
+				return err
+			} else {
+				di.Warning("Registering %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
+			}
 		}
 	}
 	return nil

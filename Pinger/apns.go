@@ -10,6 +10,10 @@ import (
 )
 
 const (
+	PushServiceAPNS = "APNS"
+)
+
+const (
 	APNSServer                = "gateway.push.apple.com:2195"
 	APNSFeedbackServer        = "feedback.push.apple.com:2196"
 	APNSSandboxServer         = "gateway.sandbox.push.apple.com:2195"
@@ -79,7 +83,7 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification) error {
 	pn.Set("pinger", pingerMap)
 
 	msg, _ := pn.PayloadString()
-	di.Debug("Push Message to APNS/%s: %s", token, msg)
+	di.Debug("Sending push message to APNS: pushToken: %s %s", di.PushToken, msg)
 
 	var apnsHost string
 	if globals.config.APNSSandbox {
