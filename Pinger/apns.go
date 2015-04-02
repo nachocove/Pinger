@@ -30,11 +30,11 @@ func FeedbackListener(logger *Logging.Logger) {
 		apnsHost = APNSFeedbackServer
 	}
 	for {
-		time.Sleep(time.Duration(1)*time.Minute)
+		time.Sleep(time.Duration(1) * time.Minute)
 		logger.Debug("APNS FEEDBACK: Checking feedback service")
 		client := apns.NewClient(apnsHost, globals.config.APNSCertFile, globals.config.APNSKeyFile)
 		go client.ListenForFeedback()
-	
+
 		for {
 			select {
 			case resp := <-apns.FeedbackChannel:
@@ -88,11 +88,6 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification) error {
 		apnsHost = APNSServer
 	}
 	client := apns.NewClient(apnsHost, globals.config.APNSCertFile, globals.config.APNSKeyFile)
-//	resp := apns.PushNotificationResponse{}
-//	err = client.ConnectAndWrite(&resp, []byte(msg))
-//	if err != nil && err.Error() != "NO_ERRORS" {
-//		return err
-//	}
 	resp := client.Send(pn)
 	if resp.AppleResponse != "" {
 		di.Debug("Response from apple: %s", resp.AppleResponse)
