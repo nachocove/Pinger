@@ -34,7 +34,9 @@ func FeedbackListener(logger *Logging.Logger) {
 		apnsHost = APNSFeedbackServer
 	}
 	for {
-		time.Sleep(time.Duration(1) * time.Minute)
+		sleepTime := time.Duration(globals.config.APNSFeedbackPeriod) * time.Minute
+		logger.Debug("APNS FEEDBACK: sleeping %s", sleepTime)
+		time.Sleep(sleepTime)
 		logger.Debug("APNS FEEDBACK: Checking feedback service")
 		client := apns.NewClient(apnsHost, globals.config.APNSCertFile, globals.config.APNSKeyFile)
 		go client.ListenForFeedback()

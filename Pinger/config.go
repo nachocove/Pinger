@@ -21,19 +21,21 @@ type Configuration struct {
 }
 
 type BackendConfiguration struct {
-	Debug         bool
-	DumpRequests  bool
-	PingerUpdater int `gcfg:"pinger-updater"`
-	APNSSandbox   bool
-	APNSKeyFile   string
-	APNSCertFile  string
+	Debug              bool
+	DumpRequests       bool
+	PingerUpdater      int `gcfg:"pinger-updater"`
+	APNSSandbox        bool
+	APNSKeyFile        string
+	APNSCertFile       string
+	APNSFeedbackPeriod int
 }
 
 func NewBackendConfiguration() *BackendConfiguration {
 	return &BackendConfiguration{
-		Debug:         defaultDebug,
-		DumpRequests:  defaultDumpRequests,
-		PingerUpdater: defaultPingerUpdater,
+		Debug:              defaultDebug,
+		DumpRequests:       defaultDumpRequests,
+		PingerUpdater:      defaultPingerUpdater,
+		APNSFeedbackPeriod: defaultAPNSFeedbackPeriod,
 	}
 }
 
@@ -43,6 +45,9 @@ func (cfg *BackendConfiguration) validate() error {
 	}
 	if cfg.APNSCertFile != "" && !exists(cfg.APNSCertFile) {
 		return fmt.Errorf("Cert file %s does not exist", cfg.APNSCertFile)
+	}
+	if cfg.APNSKeyFile != "" && cfg.APNSCertFile != "" && cfg.APNSFeedbackPeriod <= 0 {
+		return fmt.Errorf("APNSFeedbackPeriod can not be <= 0 if APNS cert and keys are configured")
 	}
 	return nil
 }
@@ -57,13 +62,14 @@ type LoggingConfiguration struct {
 }
 
 const (
-	defaultDumpRequests  = false
-	defaultDebug         = false
-	defaultDebugSql      = false
-	defaultLogDir        = "./log"
-	defaultLogFileName   = ""
-	defaultLogFileLevel  = "INFO"
-	defaultPingerUpdater = 0
+	defaultDumpRequests       = false
+	defaultDebug              = false
+	defaultDebugSql           = false
+	defaultLogDir             = "./log"
+	defaultLogFileName        = ""
+	defaultLogFileLevel       = "INFO"
+	defaultPingerUpdater      = 0
+	defaultAPNSFeedbackPeriod = 10
 )
 
 func NewLoggingConfiguration() *LoggingConfiguration {
@@ -82,6 +88,7 @@ func NewConfiguration() *Configuration {
 		Rpc:       NewRPCServerConfiguration(),
 		Telemetry: *Telemetry.NewTelemetryConfiguration(),
 		Server:    *NewServerConfiguration(),
+		Backend:   *NewBackendConfiguration(),
 	}
 	return config
 }
@@ -154,6 +161,10 @@ func ReadConfig(filename string) (*Configuration, error) {
 		os.Exit(1)
 	}
 	err = config.Telemetry.Validate()
+	if err != nil {
+		return nil, err
+	}
+	err = config.Backend.validate()
 	if err != nil {
 		return nil, err
 	}
