@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
@@ -126,7 +128,13 @@ func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInforma
 }
 
 func makeSessionId(token string) (string, error) {
-	return token[0:16], nil
+	ha := sha256.Sum256([]byte(token))
+	myId := make([]byte, 8)
+	n := hex.Encode(myId, ha[0:4])
+	if n <= 0 {
+		return "", fmt.Errorf("Could not encode to hex string")
+	}
+	return string(myId), nil
 }
 
 func registerDevice(w http.ResponseWriter, r *http.Request) {
