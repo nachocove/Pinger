@@ -63,9 +63,9 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification) error {
 
 	payload := make(map[string]interface{})
 	if message == "new" {
-		payload["alert"] = "Yo! You got mail via apple!"
+		payload["alert"] = "Yo! Jan says you got mail!"
 	} else {
-		payload["alert"] = "Yo! You need to re-register via apple!"
+		payload["alert"] = "That would be in the butt, bob!"
 	}
 	payload["sound"] = "silent.wav"
 	payload["content-available"] = 1
