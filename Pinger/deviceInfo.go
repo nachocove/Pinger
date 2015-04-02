@@ -614,9 +614,11 @@ func (di *DeviceInfo) push(message PingerNotification) error {
 		if err == nil {
 			err = di.updateLastContactRequest()
 		}
-	} else {
-		err = di.APNSpushMessage(message)
 	}
+	if err != nil {
+		di.Error("%s", err.Error())
+	}
+	err = di.APNSpushMessage(message)
 	return err
 }
 
