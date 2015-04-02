@@ -138,5 +138,16 @@ func (s *writerTester) TestFileCreation() {
 		messages[2].Timestamp.Format(TelemetryTimeZFormat))
 
 	s.Equal(shouldFileName, fileName)
+}
 
+func (s *writerTester) TestClientRegex() {
+	message := "NchoDC28E565X072CX46B1XBF205:us-east-1:44211d8c-caf6-4b17-80cf-72febe0ebb2d:12345:vgifyyyTOxF2rvS1/ActiveSync: exiting LongPoll"
+	s.False(deviceClientContextRegexp.MatchString(message), "should have matched deviceClientContextRegexp")
+	s.True(deviceClientContextProtocolRegexp.MatchString(message), "should have matched deviceClientContextProtocolRegexp")
+	s.True(clientIdRegex.MatchString(message), "should have matched clientIdRegex")
+
+	message = "NchoDC28E565X072CX46B1XBF205:us-east-1:44211d8c-caf6-4b17-80cf-72febe0ebb2d:12345:vgifyyyTOxF2rvS1: exiting LongPoll"
+	s.True(deviceClientContextRegexp.MatchString(message), "should have matched deviceClientContextRegexp")
+	s.False(deviceClientContextProtocolRegexp.MatchString(message), "should have matched deviceClientContextProtocolRegexp")
+	s.True(clientIdRegex.MatchString(message), "should have matched clientIdRegex")
 }

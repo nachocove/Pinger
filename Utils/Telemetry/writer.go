@@ -81,7 +81,7 @@ var deviceClientContextProtocolRegexp *regexp.Regexp
 var clientIdRegex *regexp.Regexp
 
 func init() {
-	commonRegex := "^(?P<device>Ncho[A-Z0-9a-z]+):(?P<client>us-[a-z]+-[0-9]+:[a-z\\-0-9]+):(?P<context>[a-z0-9A-Z]+)"
+	commonRegex := "^(?P<device>Ncho[A-Z0-9a-z]+):(?P<client>us-[a-z]+-[0-9]+:[a-z\\-0-9]+):(?P<context>[a-z0-9A-Z]+):(?P<session>[a-z0-9A-Z]+)"
 	deviceClientContextRegexp = regexp.MustCompile(fmt.Sprintf("%s: (?P<message>.*)$", commonRegex))
 	deviceClientContextProtocolRegexp = regexp.MustCompile(fmt.Sprintf("%s/(?P<protocol>[a-zA-z0-9]+): (?P<message>.*)$", commonRegex))
 
