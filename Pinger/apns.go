@@ -63,12 +63,12 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification) error {
 
 	payload := make(map[string]interface{})
 	if message == "new" {
-		payload["Alert"] = "Yo! You got mail via apple!"
+		payload["alert"] = "Yo! You got mail via apple!"
 	} else {
-		payload["Alert"] = "Yo! You need to re-register via apple!"
+		payload["alert"] = "Yo! You need to re-register via apple!"
 	}
-	payload["Sound"] = "silent.wav"
-	payload["ContentAvailable"] = 1
+	payload["sound"] = "silent.wav"
+	payload["content-available"] = 1
 
 	pn.Set("aps", payload)
 
@@ -88,8 +88,15 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification) error {
 		apnsHost = APNSServer
 	}
 	client := apns.NewClient(apnsHost, globals.config.APNSCertFile, globals.config.APNSKeyFile)
+//	resp := apns.PushNotificationResponse{}
+//	err = client.ConnectAndWrite(&resp, []byte(msg))
+//	if err != nil && err.Error() != "NO_ERRORS" {
+//		return err
+//	}
 	resp := client.Send(pn)
-	di.Debug("Response from apple: %s", resp.AppleResponse)
+	if resp.AppleResponse != "" {
+		di.Debug("Response from apple: %s", resp.AppleResponse)
+	}
 	if resp.Error != nil {
 		return fmt.Errorf("APNS Push error: %s", resp.Error)
 	}
