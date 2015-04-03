@@ -64,7 +64,6 @@ type LoggingConfiguration struct {
 const (
 	defaultDumpRequests       = false
 	defaultDebug              = false
-	defaultDebugSql           = false
 	defaultLogDir             = "./log"
 	defaultLogFileName        = ""
 	defaultLogFileLevel       = "INFO"

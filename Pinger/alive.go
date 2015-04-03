@@ -56,9 +56,6 @@ func addPingerInfoTable(dbmap *gorp.DbMap) {
 	cMap.SetUnique(true)
 }
 
-func getPingerInfo() *PingerInfo {
-	return nil
-}
 func (pinger *PingerInfo) Updater(minutes int) {
 	d := time.Duration(minutes) * time.Minute
 	ticker := time.NewTicker(d)

@@ -16,7 +16,6 @@ import (
 type PingerCommand int
 
 const (
-	noCommand PingerCommand = 0
 	// Stop stop the client
 	PingerStop PingerCommand = 1
 	// Defer the client, i.e. stop all activity and sleep for a time
