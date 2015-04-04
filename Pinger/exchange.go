@@ -378,8 +378,13 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 				if ex.pi.ExpectedReply != nil {
 					ex.Info("Reply matched ExpectedReply")
 				}
-				ex.Debug("Got mail. Setting LongPollNewMail")
-				errCh <- LongPollNewMail
+				if time.Since(timeSent) <= tooFastResponse {
+					ex.Warning("new-mail reply was too fast. This can happen on rearming, if the client hasn't picked up the new mail from last time.")
+					errCh <- LongPollNoNewMail
+				} else {
+					ex.Debug("Got mail. Setting LongPollNewMail")
+					errCh <- LongPollNewMail
+				}
 				return
 
 			default:

@@ -58,10 +58,12 @@ func (client *MailClientContext) getLogPrefix() string {
 
 var LongPollReRegister error
 var LongPollNewMail error
+var LongPollNoNewMail error
 
 func init() {
 	LongPollReRegister = fmt.Errorf("Need Registger")
 	LongPollNewMail = fmt.Errorf("New Mail")
+	LongPollNoNewMail = fmt.Errorf("No New Mail")
 }
 
 type MailClient interface {
@@ -335,21 +337,22 @@ func (client *MailClientContext) start() {
 
 		case err := <-errCh:
 			switch {
-			case err == LongPollNewMail:
-				// TODO Should we send a push notification each time we've rearmed? Or just
-				// on the first go-around (rearmingCount == 0)?
-				client.Info("Sending push message for new mail")
-				err = client.di.PushNewMail()
-				if err != nil {
-					if client.di.aws.IgnorePushFailures() == false {
-						logError(err, client.logger)
-						return
-					} else {
-						client.Warning("Push failed but ignored: %s", err.Error())
+			case err == LongPollNewMail || err == LongPollNoNewMail:
+				if err == LongPollNewMail {
+					client.Info("Sending push message for new mail")
+					err = client.di.PushNewMail()
+					if err != nil {
+						if client.di.aws.IgnorePushFailures() == false {
+							logError(err, client.logger)
+							return
+						} else {
+							client.Warning("Push failed but ignored: %s", err.Error())
+						}
 					}
+					client.Debug("New mail notification sent")
 				}
-				client.Debug("New mail notification sent")
-				err = client.fsm.Event(FSMStopped, "Stopping (new mail push sent)", MailClientStatusStopped)
+
+				err = client.fsm.Event(FSMStopped, fmt.Sprintf("Stopping (LongPoll returned %s)", err.Error()), MailClientStatusStopped)
 				if err != nil {
 					panic(err)
 				}
