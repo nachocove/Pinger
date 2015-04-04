@@ -370,7 +370,7 @@ func (client *MailClientContext) start() {
 				err1 := client.di.PushRegister()
 				if err1 != nil {
 					// don't bother with this error. The real/main error is the http status. Just log it.
-					client.Error("Push failed but ignored: %s", err.Error())
+					client.Error("Push failed but ignored: %s", err1.Error())
 				}
 				err = client.fsm.Event(FSMStopped, "Client needs reregister. Stopping.", MailClientStatusStopped)
 				if err != nil {
