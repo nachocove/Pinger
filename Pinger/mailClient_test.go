@@ -63,10 +63,6 @@ func (client *testingMailClientContext) stop() {
 	client.logger.Debug("stop")
 	return
 }
-func (client *testingMailClientContext) validateStopToken(token string) bool {
-	client.logger.Debug("validateStopToken")
-	return true
-}
 func (client *testingMailClientContext) deferPoll(timeout int64) {
 	client.logger.Debug("deferPoll")
 	return
@@ -82,10 +78,6 @@ func (client *testingMailClientContext) Status() (MailClientStatus, error) {
 func (client *testingMailClientContext) Action(action PingerCommand) error {
 	client.logger.Debug("Action")
 	return nil
-}
-func (client *testingMailClientContext) getStopToken() string {
-	client.logger.Debug("getStopToken")
-	return "1234"
 }
 func (client *testingMailClientContext) getSessionInfo() (*ClientSessionInfo, error) {
 	client.logger.Debug("getSessionInfo")
@@ -146,6 +138,5 @@ func (s *mailClientTester) TestMailClient() {
 	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.NotNil(client)
 	s.NoError(err)
-	s.NotEmpty(client.stopToken)
 	s.NotNil(client.mailClient)
 }

@@ -25,10 +25,7 @@ type ExchangeClient struct {
 	debug      bool
 	logger     *Logging.Logger
 	pi         *MailPingInformation
-	di         *DeviceInfo
 	wg         *sync.WaitGroup
-	errCh      chan error
-	exitCh     chan int
 	transport  *http.Transport
 	request    *http.Request
 	mutex      *sync.Mutex
@@ -37,15 +34,12 @@ type ExchangeClient struct {
 }
 
 // NewExchangeClient set up a new exchange client
-func NewExchangeClient(di *DeviceInfo, pi *MailPingInformation, wg *sync.WaitGroup, errCh chan error, exitCh chan int, debug bool, logger *Logging.Logger) (*ExchangeClient, error) {
+func NewExchangeClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, logger *Logging.Logger) (*ExchangeClient, error) {
 	ex := &ExchangeClient{
 		debug:     debug,
 		logger:    logger.Copy(),
 		pi:        pi,
-		di:        di,
 		wg:        wg,
-		errCh:     errCh,
-		exitCh:    exitCh,
 		mutex:     &sync.Mutex{},
 		cancelled: false,
 	}
@@ -84,15 +78,14 @@ func (ex *ExchangeClient) maxResponseSize() (size int) {
 	return
 }
 
-func (ex *ExchangeClient) sendError(err error) {
-	sendError(ex.errCh, err, ex.logger)
-}
-
+// This dummy response is used to indicate to the receiver of the http reply that we need to retry.
 var retryResponse *http.Response
 
 func init() {
 	retryResponse = &http.Response{}
 }
+
+// doRequestResponse is used as a go-routine to do the actual send/receive (blocking) of the exchange messages.
 func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errCh chan error) {
 	defer Utils.RecoverCrash(ex.logger)
 	ex.mutex.Lock() // prevents the longpoll from cancelling the request while we're still setting it up.
@@ -238,27 +231,44 @@ func (ex *ExchangeClient) exponentialBackoff(sleepTime int) int {
 	return int(n)
 }
 
-func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
-	defer Utils.RecoverCrash(ex.logger)
-	defer ex.wg.Done()
-	askedToStop := false
-	defer func(prefixStr string) {
-		ex.mutex.Lock()
-		ex.cancelled = true
-		if ex.request != nil {
-			ex.Info("Cancelling outstanding request")
-			ex.transport.CancelRequest(ex.request)
-		}
-		ex.mutex.Unlock()
-		ex.transport.CloseIdleConnections()
-		if askedToStop == false {
-			ex.logger.SetCallDepth(0)
-			ex.logger.Debug("%s: exiting LongPoll", prefixStr)
-			ex.logger.SetCallDepth(1)
-			exitCh <- 1 // tell the parent we've exited.
-		}
-	}(ex.getLogPrefix())
+func (ex *ExchangeClient) sendError(errCh chan error, err error) {
+	logError(err, ex.logger)
+	errCh <- err
+}
 
+func (ex *ExchangeClient) cancel() {
+	ex.mutex.Lock()
+	ex.cancelled = true
+	if ex.request != nil {
+		ex.Info("Cancelling outstanding request")
+		ex.transport.CancelRequest(ex.request)
+	}
+	ex.mutex.Unlock()
+	ex.transport.CloseIdleConnections()
+}
+
+// LongPoll is called by the FSM loop to do the actual work.
+//
+// stopPollCh - used by the parent loop to tell us to stop. This is used when a defer comes in, and
+//    we just need the polling itself to stop.
+//
+// stopAllCh - this is a sort of broadcast mechanism used by the parent loop to indicate to all its children
+//    that they can exit. This is simpler than keeping track of all the per-child stop channels.
+//
+// errCh - used to pass back results to the caller. The results are not just errors, but can be some
+//    dummy errors like LongPollReRegister (tell the device to register), and LongPollNewMail (tell
+//    the device there's new mail). This reduces the number of channels we'd use, i.e. instead of using
+//    the dummy errors, we'd need a resultsChannel or some kind.
+//
+func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan error) {
+	defer Utils.RecoverCrash(ex.logger) // catch all panic. RecoverCrash logs information needed for debugging.
+
+	ex.wg.Add(1)
+	defer ex.wg.Done()
+
+	defer ex.cancel()
+
+	var err error
 	reqTimeout := ex.pi.ResponseTimeout
 	reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 	ex.transport = &http.Transport{
@@ -271,7 +281,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	if proxy != "" {
 		proxyUrl, err := url.Parse(proxy)
 		if err != nil {
-			ex.sendError(err)
+			ex.sendError(errCh, err)
 			return
 		}
 		ex.transport.Proxy = http.ProxyURL(proxyUrl)
@@ -284,7 +294,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	if useCookieJar {
 		cookieJar, err := cookiejar.New(nil)
 		if err != nil {
-			ex.sendError(err)
+			ex.sendError(errCh, err)
 			return
 		}
 		ex.httpClient.Jar = cookieJar
@@ -294,17 +304,17 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 	tooFastResponse := (time.Duration(ex.pi.ResponseTimeout) * time.Millisecond) / 4
 	ex.Debug("TooFast timeout set to %s", tooFastResponse)
 	var responseCh chan *http.Response
-	var errCh chan error
+	var responseErrCh chan error
 	for {
 		if sleepTime > 0 {
 			s := time.Duration(sleepTime) * time.Second
 			ex.Debug("Sleeping %s before retry", s)
 			time.Sleep(s)
 		}
-		if errCh != nil {
-			close(errCh)
+		if responseErrCh != nil {
+			close(responseErrCh)
 		}
-		errCh = make(chan error)
+		responseErrCh = make(chan error)
 		if responseCh != nil {
 			close(responseCh)
 		}
@@ -313,29 +323,29 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 		timeSent := time.Now()
 		ex.wg.Add(1)
 		ex.cancelled = false
-		go ex.doRequestResponse(responseCh, errCh)
+		go ex.doRequestResponse(responseCh, responseErrCh)
 		ex.Debug("Waiting for response")
 		select {
-		case err := <-errCh:
-			ex.sendError(err)
+		case err = <-responseErrCh:
+			ex.sendError(errCh, err)
 			return
 
 		case response := <-responseCh:
 			if response == retryResponse {
-				ex.Info("Retry-response from response reader.")
+				ex.Debug("Retry-response from response reader.")
 				sleepTime = ex.exponentialBackoff(sleepTime)
 				continue
 			}
-			// the response body tends to be pretty short. Let's just read it all.
+			// the response body tends to be pretty short (and we've capped it anyway). Let's just read it all.
 			responseBody, err := ioutil.ReadAll(response.Body)
 			if err != nil {
-				ex.sendError(err)
 				response.Body.Close() // attempt to close. Ignore any errors.
+				ex.sendError(errCh, err)
 				return
 			}
 			err = response.Body.Close()
 			if err != nil {
-				ex.sendError(err)
+				ex.sendError(errCh, err)
 				return
 			}
 			switch {
@@ -344,11 +354,7 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				case response.StatusCode == 401:
 					// ask the client to re-register, since nothing we could do would fix this
 					ex.Warning("401 response. Telling client to re-register")
-					err = ex.di.push(PingerNotificationRegister)
-					if err != nil {
-						// don't bother with this error. The real/main error is the http status. Just log it.
-						ex.Error("Push failed but ignored: %s", err.Error())
-					}
+					errCh <- LongPollReRegister
 					return
 
 				default:
@@ -356,13 +362,14 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 					sleepTime = ex.exponentialBackoff(sleepTime)
 					ex.Warning("Response Status %s. Back to polling", response.Status)
 				}
+
 			case ex.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.pi.NoChangeReply) == 0:
 				// go back to polling
-				ex.Info("Reply matched NoChangeReply after %s. Back to polling", time.Since(timeSent))
 				if time.Since(timeSent) <= tooFastResponse {
-					ex.Warning("Response was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
+					ex.Warning("NoChangeReply was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
 					sleepTime = ex.exponentialBackoff(sleepTime)
 				} else {
+					ex.Info("NoChangeReply after %s. Back to polling", time.Since(timeSent))
 					sleepTime = 0 // good reply. Reset any exponential backoff stuff.
 				}
 
@@ -371,16 +378,8 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				if ex.pi.ExpectedReply != nil {
 					ex.Info("Reply matched ExpectedReply")
 				}
-				ex.Info("Sending push message for new mail")
-				err = ex.di.push(PingerNotificationNewMail) // You've got mail!
-				if err != nil {
-					if ex.di.aws.IgnorePushFailures() == false {
-						ex.sendError(err)
-						return
-					} else {
-						ex.Warning("Push failed but ignored: %s", err.Error())
-					}
-				}
+				ex.Debug("Got mail. Setting LongPollNewMail")
+				errCh <- LongPollNewMail
 				return
 
 			default:
@@ -388,14 +387,12 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 				sleepTime = ex.exponentialBackoff(sleepTime)
 			}
 
-		case <-ex.exitCh: // parent will close this, at which point this will trigger.
+		case <-stopPollCh: // parent will close this, at which point this will trigger.
 			ex.Debug("Was told to stop (allStop). Stopping")
-			askedToStop = true
 			return
 
-		case <-stopCh:
+		case <-stopAllCh: // parent will close this, at which point this will trigger.
 			ex.Debug("Was told to stop. Stopping")
-			askedToStop = true
 			return
 		}
 	}
@@ -403,8 +400,6 @@ func (ex *ExchangeClient) LongPoll(stopCh, exitCh chan int) {
 
 // SelfDelete Used to zero out the structure and let garbage collection reap the empty stuff.
 func (ex *ExchangeClient) Cleanup() {
-	ex.di.cleanup()
-	ex.di = nil
 	ex.pi.cleanup()
 	ex.pi = nil
 	if ex.transport != nil {

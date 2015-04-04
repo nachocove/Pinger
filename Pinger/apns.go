@@ -50,7 +50,7 @@ func FeedbackListener(logger *Logging.Logger) {
 	}
 }
 
-func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert string) error {
+func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert string, ttl int64) error {
 	if globals.config.APNSCertFile == "" {
 		panic("No apns cert set. Can not push to APNS")
 	}
@@ -64,6 +64,7 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert string) 
 	}
 	pn.DeviceToken = token
 	pn.Priority = 10
+	//pn.Expiry = ttl
 
 	payload := make(map[string]interface{})
 	if alert != "" {

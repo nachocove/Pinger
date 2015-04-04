@@ -520,6 +520,43 @@ const (
 	PingerNotificationNewMail  PingerNotification = "new"
 )
 
+func (di *DeviceInfo) Push(message PingerNotification, alert string, ttl int64) error {
+	var err error
+	if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
+		err = di.awsPushMessage(message, alert, ttl)
+	} else {
+		err = di.APNSpushMessage(message, alert, ttl)
+	}
+	if err == nil {
+		err = di.updateLastContactRequest()
+	}
+	return err
+}
+
+var days_28 int64 = 2419200
+
+func (di *DeviceInfo) PushRegister() error {
+	return di.Push(PingerNotificationRegister, "Nacho says: Reregister!", days_28)
+}
+
+func (di *DeviceInfo) PushNewMail() error {
+	return di.Push(PingerNotificationNewMail, "Nacho says: You have mail!", days_28)
+}
+
+// AWS Push message code
+
+func (di *DeviceInfo) awsPushMessage(message PingerNotification, alert string, ttl int64) error {
+	if di.AWSEndpointArn == "" {
+		return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", di.PushService, di.PushToken)
+	}
+	pushMessage, err := di.pushMessage(message, alert, ttl)
+	if err != nil {
+		return err
+	}
+	di.Debug("Sending push message to AWS: pushToken: %s/%s AWSEndpointArn:%s %s", di.PushService, di.PushToken, di.AWSEndpointArn, pushMessage)
+	return di.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
+}
+
 func (di *DeviceInfo) pushMessage(message PingerNotification, alert string, ttl int64) (string, error) {
 	if message == "" {
 		return "", fmt.Errorf("Message can not be empty")
@@ -587,44 +624,6 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, alert string, ttl 
 		return "", fmt.Errorf("No notificationBytes created")
 	}
 	return string(notificationBytes), nil
-}
-
-type StringInterfaceMap map[string]interface{}
-type APNSPushNotification struct {
-	aps    *StringInterfaceMap
-	pinger *StringInterfaceMap
-}
-
-func (di *DeviceInfo) push(message PingerNotification) error {
-	var err error
-	var alert string
-	if message == "new" {
-		alert = "Nacho says: You got mail."
-	} else {
-		alert = "Nacho says: Please register."
-	}
-	if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
-		err = di.AWSpushMessage(message, alert)
-	} else {
-		err = di.APNSpushMessage(message, alert)
-	}
-	if err == nil {
-		err = di.updateLastContactRequest()
-	}
-	return err
-}
-
-func (di *DeviceInfo) AWSpushMessage(message PingerNotification, alert string) error {
-	if di.AWSEndpointArn == "" {
-		return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", di.PushService, di.PushToken)
-	}
-	var days_28 int64 = 2419200
-	pushMessage, err := di.pushMessage(message, alert, days_28)
-	if err != nil {
-		return err
-	}
-	di.Debug("Sending push message to AWS: pushToken: %s/%s AWSEndpointArn:%s %s", di.PushService, di.PushToken, di.AWSEndpointArn, pushMessage)
-	return di.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
 }
 
 func (di *DeviceInfo) customerData() string {
@@ -750,7 +749,7 @@ func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger
 	count := 0
 	for _, di := range devices {
 		logger.Info("%s: sending PingerNotificationRegister to device", di.getLogPrefix())
-		err = di.push(PingerNotificationRegister)
+		err = di.PushRegister()
 		if err != nil {
 			logger.Warning("%s: Could not send push: %s", di.getLogPrefix(), err.Error())
 		} else {

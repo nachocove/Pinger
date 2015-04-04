@@ -5,10 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/coopernurse/gorp"
+	"github.com/looplab/fsm"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
-	"github.com/twinj/uuid"
 	"path"
 	"runtime"
 	"strings"
@@ -19,21 +19,16 @@ import (
 type MailClientContextType interface {
 	deferPoll(timeout int64)
 	stop()
-	validateStopToken(token string) bool
 	updateLastContact() error
 	Status() (MailClientStatus, error)
 	Action(action PingerCommand) error
-	getStopToken() string
 	getSessionInfo() (*ClientSessionInfo, error)
 }
 
 type MailClientContext struct {
 	mailClient     MailClient // a mail client with the MailClient interface
-	stopToken      string
 	logger         *Logging.Logger
-	errCh          chan error
-	stopAllCh      chan int // closed when client is exiting, so that any sub-routine can exit
-	exitCh         chan int // used by MailClient{} to signal it has exited
+	stopAllCh      chan int // (broadcast) closed when client is exiting, so that any sub-routine can exit
 	command        chan PingerCommand
 	lastError      error
 	stats          *Utils.StatLogger
@@ -42,12 +37,16 @@ type MailClientContext struct {
 	ClientContext  string
 	DeviceId       string
 	Protocol       string
+	sessionId      string
 	WaitBeforeUse  int64 // in milliseconds
 	MaxPollTimeout int64 // max polling lifetime in milliseconds. Default 2 days.
 	wg             sync.WaitGroup
 	status         MailClientStatus
-	sessionId      string
 	logPrefix      string
+	fsm            *fsm.FSM
+	deferTimer     *time.Timer
+	maxPollTime    time.Duration
+	maxPollTimer   *time.Timer
 }
 
 func (client *MailClientContext) getLogPrefix() string {
@@ -57,10 +56,17 @@ func (client *MailClientContext) getLogPrefix() string {
 	return client.logPrefix
 }
 
+var LongPollReRegister error
+var LongPollNewMail error
+
+func init() {
+	LongPollReRegister = fmt.Errorf("Need Registger")
+	LongPollNewMail = fmt.Errorf("New Mail")
+}
+
 type MailClient interface {
-	LongPoll(stopCh, exitCh chan int)
+	LongPoll(stopPollCh, stopAllCh chan int, errCh chan error)
 	Cleanup()
-	sendError(err error)
 }
 
 const (
@@ -71,11 +77,11 @@ const (
 type MailClientStatus int
 
 const (
-	MailClientStatusError       = iota
-	MailClientStatusInitialized = iota
-	MailClientStatusPinging     = iota
-	MailClientStatusDeferred    = iota
-	MailClientStatusStopped     = iota
+	MailClientStatusError       MailClientStatus = iota
+	MailClientStatusInitialized MailClientStatus = iota
+	MailClientStatusPinging     MailClientStatus = iota
+	MailClientStatusDeferred    MailClientStatus = iota
+	MailClientStatusStopped     MailClientStatus = iota
 )
 
 func (status MailClientStatus) String() string {
@@ -105,9 +111,7 @@ const (
 func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
 		logger:         logger.Copy(),
-		errCh:          make(chan error),
 		stopAllCh:      make(chan int),
-		exitCh:         make(chan int),
 		command:        make(chan PingerCommand, 10),
 		stats:          nil,
 		status:         MailClientStatusInitialized,
@@ -147,12 +151,12 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 
 	switch {
 	case strings.EqualFold(client.Protocol, MailClientActiveSync):
-		mailclient, err = NewExchangeClient(di, pi, &client.wg, client.errCh, client.stopAllCh, debug, logger)
+		mailclient, err = NewExchangeClient(pi, &client.wg, debug, logger)
 		if err != nil {
 			return nil, err
 		}
 		//	case strings.EqualFold(client.Protocol, MailClientIMAP):
-		//		mailclient, err = NewIMAPClient(client, debug, client.logger)
+		//		mailclient, err = NewIMAPClient(pi, &client.wg, debug, logger)
 		//		if err != nil {
 		//			return nil, err
 		//		}
@@ -166,8 +170,6 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 	}
 	client.updateLastContact()
 	client.Debug("Starting polls for %s", pi.String())
-	uuid.SwitchFormat(uuid.Clean)
-	client.stopToken = uuid.NewV4().String()
 	client.mailClient = mailclient
 	go client.start()
 	return client, nil
@@ -197,12 +199,13 @@ func (client *MailClientContext) Status() (MailClientStatus, error) {
 }
 
 func (client *MailClientContext) cleanup() {
+	client.di.cleanup()
+	client.di = nil
 	client.Debug("Cleaning up MailClientContext struct")
 	if client.mailClient != nil {
 		client.mailClient.Cleanup()
 		client.mailClient = nil
 	}
-	client.stopToken = ""
 
 	// tell Garbage collection to run. Might not free/remove all instances we free'd above,
 	// but it's worth the effort.
@@ -219,8 +222,77 @@ func UserSha256(username string) string {
 	return hex.EncodeToString(md)
 }
 
-func (client *MailClientContext) validateStopToken(token string) bool {
-	return token != "" && strings.EqualFold(client.stopToken, token)
+const (
+	FSMInit     = "init"
+	FSMDeferred = "deferred"
+	FSMPinging  = "pinging"
+	FSMStopped  = "stopped"
+)
+
+func (client *MailClientContext) initFsm() {
+	client.fsm = fsm.NewFSM(
+		FSMInit,
+		fsm.Events{
+			{Name: FSMInit,
+				Src: []string{""},
+				Dst: FSMInit},
+			{Name: FSMDeferred,
+				Src: []string{FSMStopped, FSMInit},
+				Dst: FSMDeferred},
+			{Name: FSMPinging,
+				Src: []string{FSMDeferred, FSMStopped},
+				Dst: FSMPinging},
+			{Name: FSMStopped,
+				Src: []string{FSMPinging, FSMDeferred},
+				Dst: FSMStopped},
+		},
+		fsm.Callbacks{
+			"leave_init":     client.leaveInit,
+			"enter_deferred": client.enterDeferred,
+			"leave_deferred": client.exitDeferred,
+			"enter_pinging":  client.enterPinging,
+			"enter_stopped":  client.enterStopped,
+		},
+	)
+	client.Debug("FSM initialized")
+}
+
+func (client *MailClientContext) leaveInit(e *fsm.Event) {
+	client.maxPollTime = time.Duration(client.MaxPollTimeout) * time.Millisecond
+	client.Debug("Setting maxPollTimer for %s", client.maxPollTime)
+	client.maxPollTimer = time.NewTimer(client.maxPollTime)
+	client.deferTimer = time.NewTimer(time.Duration(client.WaitBeforeUse) * time.Millisecond)
+}
+
+func (client *MailClientContext) enterDeferred(e *fsm.Event) {
+	client.deferTimer.Stop()
+	deferTime := time.Duration(client.WaitBeforeUse) * time.Millisecond
+	client.Debug("Starting deferTimer for %s", deferTime)
+	client.deferTimer.Reset(deferTime)
+	client.status = MailClientStatusDeferred
+}
+
+func (client *MailClientContext) exitDeferred(e *fsm.Event) {
+	client.deferTimer.Stop()
+}
+
+func (client *MailClientContext) enterPinging(e *fsm.Event) {
+	stopPollCh := e.Args[0].(chan int)
+	errCh := e.Args[1].(chan error)
+	client.status = MailClientStatusPinging
+	go client.mailClient.LongPoll(stopPollCh, client.stopAllCh, errCh)
+}
+
+func (client *MailClientContext) enterStopped(e *fsm.Event) {
+	msg := e.Args[0].(string)
+	status := e.Args[1].(MailClientStatus)
+	client.Info(msg)
+	client.status = status
+}
+
+func logError(err error, logger *Logging.Logger) {
+	_, fn, line, _ := runtime.Caller(1)
+	logger.Error("%s/%s:%d %s", path.Base(path.Dir(fn)), path.Base(fn), line, err)
 }
 
 func (client *MailClientContext) start() {
@@ -232,72 +304,115 @@ func (client *MailClientContext) start() {
 		client.Debug("Cleaning up")
 		client.cleanup()
 	}()
-
-	client.status = MailClientStatusDeferred
-	deferTime := time.Duration(client.WaitBeforeUse) * time.Millisecond
-	client.Debug("Starting deferTimer for %s", deferTime)
-	deferTimer := time.NewTimer(deferTime)
-	defer deferTimer.Stop()
 	if client.stats != nil {
 		go client.stats.TallyResponseTimes()
 	}
-	maxPollTime := time.Duration(client.MaxPollTimeout) * time.Millisecond
-	client.Debug("Setting maxPollTimer for %s", maxPollTime)
-	maxPollTimer := time.NewTimer(maxPollTime)
-	var longPollStopCh chan int
+
+	stopPollCh := make(chan int)
+	errCh := make(chan error)
+	rearmingCount := 0
+
+	client.initFsm()
+	err := client.fsm.Event(FSMDeferred)
+	if err != nil {
+		panic(err)
+	}
 	for {
 		select {
-		case <-maxPollTimer.C:
-			client.Debug("maxPollTimer expired. Stopping everything.")
-			client.status = MailClientStatusStopped
+		case <-client.maxPollTimer.C:
+			client.di.PushRegister()
+			err = client.fsm.Event(FSMStopped, "maxPollTimer expired. Stopping everything.", MailClientStatusStopped)
+			if err != nil {
+				panic(err)
+			}
 			return
 
-		case <-deferTimer.C:
-			// defer timer has timed out. Now it's time to do something
-			client.Info("DeferTimer expired. Starting Polling.")
-			maxPollTimer.Reset(maxPollTime)
-			// launch the longpoll and wait for it to exit
-			longPollStopCh = make(chan int)
-			client.wg.Add(1)
-			go client.mailClient.LongPoll(longPollStopCh, client.exitCh)
-			client.status = MailClientStatusPinging
+		case <-client.deferTimer.C:
+			err = client.fsm.Event(FSMPinging, stopPollCh, errCh)
+			if err != nil {
+				panic(err)
+			}
 
-		case <-client.exitCh:
-			// the mailClient.LongPoll has indicated that it has exited. Clean up.
-			client.status = MailClientStatusStopped
-			client.Info("LongPoll exited. Stopping.")
-			client.Action(PingerStop)
+		case err := <-errCh:
+			switch {
+			case err == LongPollNewMail:
+				// TODO Should we send a push notification each time we've rearmed? Or just
+				// on the first go-around (rearmingCount == 0)?
+				client.Info("Sending push message for new mail")
+				err = client.di.PushNewMail()
+				if err != nil {
+					if client.di.aws.IgnorePushFailures() == false {
+						logError(err, client.logger)
+						return
+					} else {
+						client.Warning("Push failed but ignored: %s", err.Error())
+					}
+				}
+				client.Debug("New mail notification sent")
+				err = client.fsm.Event(FSMStopped, "Stopping (new mail push sent)", MailClientStatusStopped)
+				if err != nil {
+					panic(err)
+				}
 
-		case err := <-client.errCh:
-			// the mailClient.LongPoll has thrown an error. note it.
-			client.status = MailClientStatusError
-			client.Warning("Error thrown. Stopping.")
-			client.lastError = err
+				if rearmingCount < 3 {
+					rearmingCount++
+					client.WaitBeforeUse = int64(time.Duration(10)*time.Minute) / int64(time.Millisecond)
+					client.Debug("Rearming: %d", rearmingCount)
+					err = client.fsm.Event(FSMDeferred)
+					if err != nil {
+						panic(err)
+					}
+				} else {
+					return
+				}
+
+			case err == LongPollReRegister:
+				err1 := client.di.PushRegister()
+				if err1 != nil {
+					// don't bother with this error. The real/main error is the http status. Just log it.
+					client.Error("Push failed but ignored: %s", err.Error())
+				}
+				err = client.fsm.Event(FSMStopped, "Client needs reregister. Stopping.", MailClientStatusStopped)
+				if err != nil {
+					panic(err)
+				}
+				return
+
+			default:
+				client.lastError = err
+				// the mailClient.LongPoll has thrown an error. note it.
+				err = client.fsm.Event(FSMStopped, fmt.Sprintf("Error Thrown: %s. Stopping", err.Error), MailClientStatusError)
+				if err != nil {
+					panic(err)
+				}
+				return
+			}
 
 		case cmd := <-client.command:
 			switch {
 			case cmd == PingerStop:
-				client.status = MailClientStatusStopped
 				close(client.stopAllCh) // tell all goroutines listening on this channel that they can stop now.
-				client.Debug("got 'PingerStop' command")
+				err = client.fsm.Event(FSMStopped, "got 'PingerStop' command", MailClientStatusStopped)
+				if err != nil {
+					panic(err)
+				}
 				return
 
 			case cmd == PingerDefer:
-				if longPollStopCh != nil {
-					longPollStopCh <- 1
-					longPollStopCh = nil
+				err = client.fsm.Event(FSMStopped, "Got 'PingerDefer' command", MailClientStatusStopped)
+				if err != nil {
+					panic(err)
 				}
-				deferTime := time.Duration(client.WaitBeforeUse) * time.Millisecond
-				client.Debug("reStarting deferTimer for %s", deferTime)
-				deferTimer.Stop()
-				deferTimer.Reset(deferTime)
-				maxPollTimer.Stop()
-				client.status = MailClientStatusDeferred
+				// this comes from the client, which means we need to reset the count.
+				rearmingCount = 0
+				err = client.fsm.Event(FSMDeferred)
+				if err != nil {
+					panic(err)
+				}
 
 			default:
 				client.Error("Unknown command %d", cmd)
 				continue
-
 			}
 		}
 	}
@@ -353,10 +468,6 @@ func (client *MailClientContext) deferPoll(timeout int64) {
 
 func (client *MailClientContext) updateLastContact() error {
 	return client.di.updateLastContact()
-}
-
-func (client *MailClientContext) getStopToken() string {
-	return client.stopToken
 }
 
 type ClientSessionInfo struct {

@@ -350,7 +350,7 @@ func (s *deviceInfoTester) TestDevicePushMessageCreate() {
 	di.logger = s.logger
 	var days_28 int64 = 2419200
 
-	message, err := di.pushMessage(PingerNotificationRegister, days_28)
+	message, err := di.pushMessage(PingerNotificationRegister, "", days_28)
 	s.NoError(err)
 	s.NotEmpty(message)
 

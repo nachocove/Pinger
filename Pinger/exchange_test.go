@@ -36,19 +36,14 @@ func TestExchange(t *testing.T) {
 }
 
 func (s *exchangeTester) TestNewExchangeClient() {
-	di := &DeviceInfo{}
 	pi := &MailPingInformation{}
 	wg := &sync.WaitGroup{}
-	errCh := make(chan error)
-	exitCh := make(chan int)
 	debug := true
 
-	ex, err := NewExchangeClient(di, pi, wg, errCh, exitCh, debug, s.logger)
+	ex, err := NewExchangeClient(pi, wg, debug, s.logger)
 	s.NoError(err)
 	s.NotNil(ex)
 
-	s.NotNil(ex.di)
-	s.Equal(di, ex.di)
 	s.NotNil(ex.pi)
 	s.Equal(pi, ex.pi)
 	s.Equal(debug, ex.debug)
