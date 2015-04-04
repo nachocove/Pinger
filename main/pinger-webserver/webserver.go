@@ -75,9 +75,13 @@ func (context *Context) run() error {
 	}()
 
 	Utils.AddDebugToggleSignal(context)
-
-	// start the https server
-	err := http.ListenAndServeTLS(addr, config.Server.ServerCertFile, config.Server.ServerKeyFile, httpsMiddlewares)
+	var err error
+	if config.Server.ServerCertFile != "" && config.Server.ServerKeyFile != "" {
+		// start the https server
+		err = http.ListenAndServeTLS(addr, config.Server.ServerCertFile, config.Server.ServerKeyFile, httpsMiddlewares)
+	} else {
+		err = http.ListenAndServe(addr, httpsMiddlewares)
+	}
 	return err
 }
 
