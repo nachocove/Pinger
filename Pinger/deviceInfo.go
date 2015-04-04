@@ -741,11 +741,12 @@ func (di *DeviceInfo) validateClient() error {
 	return nil
 }
 
-func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger) error {
+func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger) {
 	devices, err := getAllMyDeviceInfo(dbm, aws, logger)
 	if err != nil {
-		return err
+		logger.Error("getAllMyDeviceInfo returned: %s", err.Error()) 
 	}
+	logger.Debug("Alerting %d devices", len(devices))
 	count := 0
 	for _, di := range devices {
 		logger.Info("%s: sending PingerNotificationRegister to device", di.getLogPrefix())
@@ -760,5 +761,5 @@ func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger
 			time.Sleep(time.Duration(1) * time.Second)
 		}
 	}
-	return nil
+	return
 }
