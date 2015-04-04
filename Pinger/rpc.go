@@ -227,8 +227,10 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 		delete((*pollMap), args.ClientId)
 		reply.Message = "Stopped"
 	} else {
-		// nothing on file. Just warn.
 		logger.Warning("%s: No active sessions found for key %s", args.getLogPrefix(), pollMapKey)
+		reply.Code = PollingReplyError
+		reply.Message = "No active sessions found"
+		return
 	}
 	reply.Code = PollingReplyOK
 	err = nil
@@ -274,8 +276,10 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 		}
 		go client.deferPoll(args.Timeout)
 	} else {
-		// nothing on file. Just warn
 		logger.Warning("%s: No active sessions found for key %s", args.getLogPrefix(), pollMapKey)
+		reply.Code = PollingReplyError
+		reply.Message = "No active sessions found"
+		return
 	}
 	reply.Code = PollingReplyOK
 	return nil
