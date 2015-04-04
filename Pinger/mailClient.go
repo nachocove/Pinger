@@ -357,7 +357,7 @@ func (client *MailClientContext) start() {
 				if rearmingCount < 3 {
 					rearmingCount++
 					client.WaitBeforeUse = int64(time.Duration(10)*time.Minute) / int64(time.Millisecond)
-					client.Debug("Rearming: %d", rearmingCount)
+					client.Info("Rearming LongPoll (%d)", rearmingCount)
 					err = client.fsm.Event(FSMDeferred)
 					if err != nil {
 						panic(err)
