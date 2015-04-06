@@ -292,7 +292,10 @@ func (client *MailClientContext) enterPinging(e *fsm.Event) {
 func (client *MailClientContext) enterStopped(e *fsm.Event) {
 	msg := e.Args[0].(string)
 	status := e.Args[1].(MailClientStatus)
-	err := e.Args[2].(error)
+	err, ok := e.Args[2].(error)
+	if !ok {
+		err = nil
+	}
 	client.Info(msg)
 	client.setStatus(status, err)
 }
