@@ -60,6 +60,8 @@ type BackendPoller interface {
 	Start(args *StartPollArgs, reply *StartPollingResponse) (err error)
 	Stop(args *StopPollArgs, reply *PollingResponse) (err error)
 	Defer(args *DeferPollArgs, reply *PollingResponse) (err error)
+	LockMap()
+	UnlockMap()
 }
 
 type pollMapType map[string]MailClientContextType
@@ -178,7 +180,14 @@ func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey st
 		logger.Error("%s: Could not create new client: %s", pollMapKey, err)
 		return
 	}
-	(*pollMap)[pollMapKey] = client
+	t.LockMap()
+	defer t.UnlockMap()
+	if _, ok := (*pollMap)[pollMapKey]; ok == true {
+		// something else snuck in there! Stop this one.
+		client.stop()
+	} else {
+		(*pollMap)[pollMapKey] = client
+	}
 }
 
 type StopPollArgs struct {
@@ -218,13 +227,15 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 	}()
 	logger.Info("%s: Received stopPoll request", args.getLogPrefix())
 	pollMapKey := args.pollMapKey()
+	t.LockMap()
+	defer t.UnlockMap()
 	client, ok := (*pollMap)[pollMapKey]
-	if ok != false {
+	if ok {
+		delete((*pollMap), args.ClientId)
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
 		}
 		go client.stop()
-		delete((*pollMap), args.ClientId)
 		reply.Message = "Stopped"
 	} else {
 		logger.Warning("%s: No active sessions found for key %s", args.getLogPrefix(), pollMapKey)

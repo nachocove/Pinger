@@ -4,15 +4,17 @@ import (
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
+	"sync"
 )
 
 type BackendPolling struct {
-	dbm         *gorp.DbMap
-	logger      *Logging.Logger
-	loggerLevel Logging.Level
-	debug       bool
-	pollMap     pollMapType
-	aws         *AWS.AWSHandle
+	dbm          *gorp.DbMap
+	logger       *Logging.Logger
+	loggerLevel  Logging.Level
+	debug        bool
+	pollMap      pollMapType
+	aws          *AWS.AWSHandle
+	pollMapMutex sync.Mutex
 }
 
 func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger) (*BackendPolling, error) {
@@ -21,12 +23,13 @@ func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger
 		return nil, err
 	}
 	backend := &BackendPolling{
-		dbm:         dbm,
-		logger:      logger,
-		loggerLevel: -1,
-		debug:       debug,
-		pollMap:     make(pollMapType),
-		aws:         config.Aws.NewHandle(),
+		dbm:          dbm,
+		logger:       logger,
+		loggerLevel:  -1,
+		debug:        debug,
+		pollMap:      make(pollMapType),
+		aws:          config.Aws.NewHandle(),
+		pollMapMutex: sync.Mutex{},
 	}
 	return backend, nil
 }
@@ -38,6 +41,14 @@ func (t *BackendPolling) newMailClientContext(pi *MailPingInformation, doStats b
 func (t *BackendPolling) ToggleDebug() {
 	t.debug = !t.debug
 	t.loggerLevel = Logging.ToggleLogging(t.logger, t.loggerLevel)
+}
+
+func (t *BackendPolling) LockMap() {
+	t.pollMapMutex.Lock()
+}
+
+func (t *BackendPolling) UnlockMap() {
+	t.pollMapMutex.Unlock()	
 }
 
 func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse) (err error) {
