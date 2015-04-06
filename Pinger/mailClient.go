@@ -21,6 +21,7 @@ type MailClientContextType interface {
 	stop()
 	updateLastContact() error
 	Status() (MailClientStatus, error)
+	setStatus(MailClientStatus, error)
 	Action(action PingerCommand) error
 	getSessionInfo() (*ClientSessionInfo, error)
 }
@@ -54,6 +55,11 @@ func (client *MailClientContext) getLogPrefix() string {
 		client.logPrefix = fmt.Sprintf("%s:%s:%s:%s", client.DeviceId, client.ClientId, client.ClientContext, client.sessionId)
 	}
 	return client.logPrefix
+}
+
+func (client *MailClientContext) setStatus(status MailClientStatus, err error) {
+	client.status = status
+	client.lastError = err
 }
 
 var LongPollReRegister error
@@ -269,7 +275,7 @@ func (client *MailClientContext) enterDeferred(e *fsm.Event) {
 	deferTime := time.Duration(client.WaitBeforeUse) * time.Millisecond
 	client.Debug("Starting deferTimer for %s", deferTime)
 	client.deferTimer.Reset(deferTime)
-	client.status = MailClientStatusDeferred
+	client.setStatus(MailClientStatusDeferred, nil)
 }
 
 func (client *MailClientContext) exitDeferred(e *fsm.Event) {
@@ -279,15 +285,16 @@ func (client *MailClientContext) exitDeferred(e *fsm.Event) {
 func (client *MailClientContext) enterPinging(e *fsm.Event) {
 	stopPollCh := e.Args[0].(chan int)
 	errCh := e.Args[1].(chan error)
-	client.status = MailClientStatusPinging
+	client.setStatus(MailClientStatusPinging, nil)
 	go client.mailClient.LongPoll(stopPollCh, client.stopAllCh, errCh)
 }
 
 func (client *MailClientContext) enterStopped(e *fsm.Event) {
 	msg := e.Args[0].(string)
 	status := e.Args[1].(MailClientStatus)
+	err := e.Args[2].(error)
 	client.Info(msg)
-	client.status = status
+	client.setStatus(status, err)
 }
 
 func logError(err error, logger *Logging.Logger) {
@@ -298,7 +305,7 @@ func logError(err error, logger *Logging.Logger) {
 func (client *MailClientContext) start() {
 	defer Utils.RecoverCrash(client.logger)
 	defer func() {
-		client.status = MailClientStatusStopped
+		client.setStatus(MailClientStatusStopped, nil)
 		client.Debug("Waiting for subroutines to finish")
 		client.wg.Wait()
 		client.Debug("Cleaning up")
@@ -321,7 +328,7 @@ func (client *MailClientContext) start() {
 		select {
 		case <-client.maxPollTimer.C:
 			client.di.PushRegister()
-			err = client.fsm.Event(FSMStopped, "maxPollTimer expired. Stopping everything.", MailClientStatusStopped)
+			err = client.fsm.Event(FSMStopped, "maxPollTimer expired. Stopping everything.", MailClientStatusStopped, nil)
 			if err != nil {
 				panic(err)
 			}
@@ -349,7 +356,7 @@ func (client *MailClientContext) start() {
 					}
 				}
 				client.Debug("New mail notification sent")
-				err = client.fsm.Event(FSMStopped, "Stopping (new mail push sent)", MailClientStatusStopped)
+				err = client.fsm.Event(FSMStopped, "Stopping (new mail push sent)", MailClientStatusStopped, nil)
 				if err != nil {
 					panic(err)
 				}
@@ -372,16 +379,15 @@ func (client *MailClientContext) start() {
 					// don't bother with this error. The real/main error is the http status. Just log it.
 					client.Error("Push failed but ignored: %s", err1.Error())
 				}
-				err = client.fsm.Event(FSMStopped, "Client needs reregister. Stopping.", MailClientStatusStopped)
+				err = client.fsm.Event(FSMStopped, "Client needs reregister. Stopping.", MailClientStatusStopped, nil)
 				if err != nil {
 					panic(err)
 				}
 				return
 
 			default:
-				client.lastError = err
 				// the mailClient.LongPoll has thrown an error. note it.
-				err = client.fsm.Event(FSMStopped, fmt.Sprintf("Error Thrown: %s. Stopping", err.Error), MailClientStatusError)
+				err = client.fsm.Event(FSMStopped, fmt.Sprintf("Error Thrown: %s. Stopping", err.Error), MailClientStatusError, err)
 				if err != nil {
 					panic(err)
 				}
@@ -392,14 +398,14 @@ func (client *MailClientContext) start() {
 			switch {
 			case cmd == PingerStop:
 				close(client.stopAllCh) // tell all goroutines listening on this channel that they can stop now.
-				err = client.fsm.Event(FSMStopped, "got 'PingerStop' command", MailClientStatusStopped)
+				err = client.fsm.Event(FSMStopped, "got 'PingerStop' command", MailClientStatusStopped, nil)
 				if err != nil {
 					panic(err)
 				}
 				return
 
 			case cmd == PingerDefer:
-				err = client.fsm.Event(FSMStopped, "Got 'PingerDefer' command", MailClientStatusStopped)
+				err = client.fsm.Event(FSMStopped, "Got 'PingerDefer' command", MailClientStatusStopped, nil)
 				if err != nil {
 					panic(err)
 				}
@@ -431,7 +437,7 @@ func (client *MailClientContext) Action(action PingerCommand) error {
 
 func (client *MailClientContext) stop() {
 	if client.mailClient == nil {
-		client.Warning("Client is stopped. Can not defer")
+		client.Warning("Client is stopped. Can not stop")
 		return
 	}
 	client.Debug("Stopping polls")

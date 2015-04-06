@@ -21,6 +21,8 @@ type RPCServerTester struct {
 	testMailServerUrl string
 	aws               *testHandler.TestAwsHandler
 	sessionId         string
+	mailInfo *MailPingInformation
+	
 }
 
 func (s *RPCServerTester) SetupSuite() {
@@ -41,7 +43,7 @@ func (s *RPCServerTester) SetupSuite() {
 		logger:      s.logger,
 		loggerLevel: -1,
 		debug:       true,
-		pollMap:     make(pollMapType),
+		pollMap:     nil,
 	}}
 	s.backend = testingBackend
 	s.testClientId = "sometestClientId"
@@ -51,16 +53,25 @@ func (s *RPCServerTester) SetupSuite() {
 	s.testMailServerUrl = "http://foo"
 	s.sessionId = "12345678"
 	s.aws = testHandler.NewTestAwsHandler()
+	s.mailInfo = &MailPingInformation{
+		ClientId:      s.testClientId,
+		ClientContext: s.testClientContext,
+		DeviceId:      s.testDeviceId,
+		Platform:      s.testPlatform,
+		MailServerUrl: s.testMailServerUrl,
+	}
+
 }
 
 func (s *RPCServerTester) SetupTest() {
+	s.backend.pollMap = make(pollMapType)
 }
 
 func (s *RPCServerTester) TearDownTest() {
 }
 
 func TestRPCServer(t *testing.T) {
-	s := new(deviceInfoTester)
+	s := new(RPCServerTester)
 	suite.Run(t, s)
 }
 
@@ -71,6 +82,7 @@ type TestingBackend struct {
 func (t *TestingBackend) newMailClientContext(pi *MailPingInformation, doStats bool) (MailClientContextType, error) {
 	return &testingMailClientContext{
 		logger: t.logger,
+		status: MailClientStatusPinging,
 	}, nil
 }
 
@@ -90,33 +102,142 @@ func (t *TestingBackend) FindActiveSessions(args *FindSessionsArgs, reply *FindS
 	return RPCFindActiveSessions(t, &t.pollMap, t.dbm, args, reply, t.logger)
 }
 
-func (s *RPCServerTester) TestRPCStartPoll() {
+//func (t *TestingBackend) LockMap() {
+//	return
+//}
+//
+//func (t *TestingBackend) UnlockMap() {
+//	return
+//}
+func (s *RPCServerTester) TestPollMap() {
+	args := StartPollArgs{
+		MailInfo: s.mailInfo,
+	}
+	
+	s.Equal(fmt.Sprintf("%s--%s--%s", s.mailInfo.ClientId, s.mailInfo.ClientContext, s.mailInfo.DeviceId), args.pollMapKey())
+}	
+
+func (s *RPCServerTester) TestStartPoll() {
 	mailInfo := &MailPingInformation{}
 	args := StartPollArgs{
 		MailInfo: mailInfo,
 	}
 	reply := StartPollingResponse{}
 
-	diInDb, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	err := s.backend.Start(&args, &reply)
 	s.NoError(err)
-	s.Nil(diInDb)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("", reply.Message)
 
+
+	ctx, err := s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
+	
+	ctx.setStatus(MailClientStatusPinging, nil)
 	err = s.backend.Start(&args, &reply)
-	fmt.Println(reply)
 	s.NoError(err)
-	s.Equal(PollingReplyError, reply.Code)
-	s.NotEmpty(reply.Message)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("", reply.Message)
 
-	args.MailInfo = &MailPingInformation{
-		ClientId:      s.testClientId,
-		ClientContext: s.testClientContext,
-		DeviceId:      s.testDeviceId,
-		Platform:      s.testPlatform,
-		MailServerUrl: s.testMailServerUrl,
+
+	ctx.setStatus(MailClientStatusDeferred, nil)
+	err = s.backend.Start(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("", reply.Message)
+
+	ctx.setStatus(MailClientStatusStopped, nil)
+	err = s.backend.Start(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("", reply.Message)
+
+	ctx.setStatus(MailClientStatusInitialized, nil)
+	err = s.backend.Start(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("", reply.Message)
+
+	ctx.setStatus(MailClientStatusError, fmt.Errorf("Foo"))
+	err = s.backend.Start(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyWarn, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyWarn, reply.Code))
+	s.Equal("Previous Ping failed with error: Foo", reply.Message)
+}
+
+
+func (s *RPCServerTester) TestDeferPoll() {
+	reply := PollingResponse{}
+	args := DeferPollArgs{
+		ClientId: s.mailInfo.ClientId,
+		ClientContext: s.mailInfo.ClientContext,
+		DeviceId: s.mailInfo.DeviceId,
+		Timeout: 30000,
 	}
-	err = s.backend.Start(&args, &reply)
-	fmt.Println(reply)
+
+	err := s.backend.Defer(&args, &reply)
 	s.NoError(err)
-	s.Equal(PollingReplyError, reply.Code)
-	s.NotEmpty(reply.Message)
+	s.Equal(PollingReplyError, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyError, reply.Code))
+	s.Equal("No active sessions found", reply.Message)
+
+	ctx, err := s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
+	
+	err = s.backend.Defer(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("", reply.Message)
+
+
+	ctx.setStatus(MailClientStatusStopped, nil)
+	err = s.backend.Defer(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyError, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyError, reply.Code))
+	s.Equal("Client is not pinging or deferred (Stopped). Can not defer.", reply.Message)
+}
+func (s *RPCServerTester) TestStopPoll() {
+	reply := PollingResponse{}
+	args := StopPollArgs{
+		ClientId: s.mailInfo.ClientId,
+		ClientContext: s.mailInfo.ClientContext,
+		DeviceId: s.mailInfo.DeviceId,
+	}
+
+	err := s.backend.Stop(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyError, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyError, reply.Code))
+	s.Equal("No active sessions found", reply.Message)
+
+	ctx, err := s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
+	
+	ctx.setStatus(MailClientStatusPinging, nil)
+	err = s.backend.Stop(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("Stopped", reply.Message)
+
+	ctx.setStatus(MailClientStatusDeferred, nil)
+	err = s.backend.Stop(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("Stopped", reply.Message)
+
+	ctx.setStatus(MailClientStatusStopped, nil)
+	err = s.backend.Stop(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("Stopped", reply.Message)
+
+	ctx.setStatus(MailClientStatusInitialized, nil)
+	err = s.backend.Stop(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("Stopped", reply.Message)
+
+	ctx.setStatus(MailClientStatusError, fmt.Errorf("Foo"))
+	err = s.backend.Stop(&args, &reply)
+	s.NoError(err)
+	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
+	s.Equal("Stopped", reply.Message)
 }

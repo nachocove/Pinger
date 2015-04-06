@@ -48,12 +48,25 @@ func NewRPCServerConfiguration() RPCServerConfiguration {
 }
 
 const RPCPort = 60600
-
+type PollingReplyType int
 const (
-	PollingReplyError = 0
-	PollingReplyOK    = 1
-	PollingReplyWarn  = 2
+	PollingReplyError PollingReplyType = 0
+	PollingReplyOK    PollingReplyType = 1
+	PollingReplyWarn  PollingReplyType = 2
 )
+
+func (r PollingReplyType) String() string {
+	switch {
+	case r == PollingReplyError:
+		return "Error"
+	case r == PollingReplyOK:
+		return "OK"
+	case r == PollingReplyWarn:
+		return "Warning"
+	default:
+		panic(fmt.Sprintf("Unknown PollingReplyType: %d", r))
+	}
+}
 
 type BackendPoller interface {
 	newMailClientContext(pi *MailPingInformation, doStats bool) (MailClientContextType, error)
@@ -103,7 +116,7 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 
 // StartPollingResponse is used by the start polling rpc
 type StartPollingResponse struct {
-	Code    int
+	Code    PollingReplyType
 	Message string
 }
 
@@ -138,8 +151,8 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			err = fmt.Errorf("%s: Could not find poll session in map", args.getLogPrefix())
 			return err
 		}
-		logger.Debug("%s: Found Existing polling session", args.getLogPrefix())
 		status, err := client.Status()
+		logger.Debug("%s: Found Existing polling session: status %s, err %v", args.getLogPrefix(), status, err)
 		switch {
 		case status == MailClientStatusStopped:
 			logger.Debug("%s: Polling has stopped.", args.getLogPrefix())
@@ -211,7 +224,7 @@ func (sp *StopPollArgs) getLogPrefix() string {
 
 // PollingResponse is used by Stop and Defer
 type PollingResponse struct {
-	Code    int
+	Code    PollingReplyType
 	Message string
 }
 
@@ -279,20 +292,30 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 		}
 	}()
 	logger.Info("%s: Received deferPoll request", args.getLogPrefix())
+	reply.Code = PollingReplyOK
+	reply.Message = ""
 	pollMapKey := args.pollMapKey()
 	client, ok := (*pollMap)[pollMapKey]
-	if ok != false {
+	if ok {
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
 		}
-		go client.deferPoll(args.Timeout)
+		status, err := client.Status()
+		if err != nil {
+			return err
+		}
+		if status != MailClientStatusPinging && status != MailClientStatusDeferred {
+			reply.Code = PollingReplyError
+			reply.Message = fmt.Sprintf("Client is not pinging or deferred (%s). Can not defer.", status)
+		} else {
+			go client.deferPoll(args.Timeout)
+		}
 	} else {
 		logger.Warning("%s: No active sessions found for key %s", args.getLogPrefix(), pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "No active sessions found"
 		return
 	}
-	reply.Code = PollingReplyOK
 	return nil
 }
 
@@ -306,7 +329,7 @@ type FindSessionsArgs struct {
 }
 
 type FindSessionsResponse struct {
-	Code         int
+	Code         PollingReplyType
 	Message      string
 	SessionInfos []ClientSessionInfo
 }
@@ -364,7 +387,7 @@ type AliveCheckArgs struct {
 }
 
 type AliveCheckResponse struct {
-	Code    int
+	Code    PollingReplyType
 	Message string
 }
 

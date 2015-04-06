@@ -57,30 +57,30 @@ func TestMailClient(t *testing.T) {
 
 type testingMailClientContext struct {
 	logger *Logging.Logger
+	status MailClientStatus
+	lastError error
 }
 
 func (client *testingMailClientContext) stop() {
-	client.logger.Debug("stop")
 	return
 }
 func (client *testingMailClientContext) deferPoll(timeout int64) {
-	client.logger.Debug("deferPoll")
 	return
 }
 func (client *testingMailClientContext) updateLastContact() error {
-	client.logger.Debug("updateLastContact")
 	return nil
 }
 func (client *testingMailClientContext) Status() (MailClientStatus, error) {
-	client.logger.Debug("Status")
-	return MailClientStatusPinging, nil
+	return client.status, client.lastError
+}
+func (client *testingMailClientContext) setStatus(status MailClientStatus, err error) {
+	client.status = status
+	client.lastError = err
 }
 func (client *testingMailClientContext) Action(action PingerCommand) error {
-	client.logger.Debug("Action")
 	return nil
 }
 func (client *testingMailClientContext) getSessionInfo() (*ClientSessionInfo, error) {
-	client.logger.Debug("getSessionInfo")
 	return nil, nil
 }
 
