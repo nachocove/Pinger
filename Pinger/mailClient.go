@@ -474,6 +474,7 @@ type ClientSessionInfo struct {
 	ClientId      string
 	ClientContext string
 	DeviceId      string
+	SessionId     string
 	Status        MailClientStatus
 	Error         string
 }
@@ -484,6 +485,7 @@ func (client *MailClientContext) sessionInfo() *ClientSessionInfo {
 		ClientId:      client.ClientId,
 		ClientContext: client.ClientContext,
 		DeviceId:      client.DeviceId,
+		SessionId:     client.sessionId,
 		Status:        status,
 	}
 	if err != nil {

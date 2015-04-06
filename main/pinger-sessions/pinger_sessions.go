@@ -85,18 +85,18 @@ func main() {
 		}
 		if verbose {
 			if singleLine {
-				fmt.Fprintf(os.Stdout, "ClientId;ClientContext;DeviceId;Url;Status;Error\n")
+				fmt.Fprintf(os.Stdout, "ClientId;ClientContext;DeviceId;SessionId;Status;Error\n")
 			} else {
 				fmt.Fprintf(os.Stdout, "Found %d sessions.\n", len(reply.SessionInfos))
 			}
 		}
 		for _, info := range reply.SessionInfos {
 			if singleLine {
-				fmt.Fprintf(os.Stdout, "%s;%s;%s;%s;%s\n",
-					info.ClientId, info.ClientContext, info.DeviceId, info.Status, info.Error)
+				fmt.Fprintf(os.Stdout, "%s;%s;%s;%s;%s;%s\n",
+					info.Status, info.ClientId, info.ClientContext, info.DeviceId, info.SessionId, info.Error)
 			} else {
-				fmt.Fprintf(os.Stdout, "ClientID:%s\nClientContext:%s\nDeviceId:%s\nStatus:%s\n",
-					info.ClientId, info.ClientContext, info.DeviceId, info.Status)
+				fmt.Fprintf(os.Stdout, "ClientID:%s\nClientContext:%s\nDeviceId:%s\nSessionId:%s\nStatus:%s\n",
+					info.ClientId, info.ClientContext, info.DeviceId, info.SessionId, info.Status)
 				if info.Status == Pinger.MailClientStatusError {
 					fmt.Fprintf(os.Stdout, "Error:%s\n", info.Error)
 				}
