@@ -21,8 +21,7 @@ type RPCServerTester struct {
 	testMailServerUrl string
 	aws               *testHandler.TestAwsHandler
 	sessionId         string
-	mailInfo *MailPingInformation
-	
+	mailInfo          *MailPingInformation
 }
 
 func (s *RPCServerTester) SetupSuite() {
@@ -113,9 +112,9 @@ func (s *RPCServerTester) TestPollMap() {
 	args := StartPollArgs{
 		MailInfo: s.mailInfo,
 	}
-	
+
 	s.Equal(fmt.Sprintf("%s--%s--%s", s.mailInfo.ClientId, s.mailInfo.ClientContext, s.mailInfo.DeviceId), args.pollMapKey())
-}	
+}
 
 func (s *RPCServerTester) TestStartPoll() {
 	mailInfo := &MailPingInformation{}
@@ -129,16 +128,14 @@ func (s *RPCServerTester) TestStartPoll() {
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("", reply.Message)
 
-
 	ctx, err := s.backend.newMailClientContext(s.mailInfo, false)
 	s.backend.pollMap[args.pollMapKey()] = ctx
-	
+
 	ctx.setStatus(MailClientStatusPinging, nil)
 	err = s.backend.Start(&args, &reply)
 	s.NoError(err)
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("", reply.Message)
-
 
 	ctx.setStatus(MailClientStatusDeferred, nil)
 	err = s.backend.Start(&args, &reply)
@@ -165,14 +162,13 @@ func (s *RPCServerTester) TestStartPoll() {
 	s.Equal("Previous Ping failed with error: Foo", reply.Message)
 }
 
-
 func (s *RPCServerTester) TestDeferPoll() {
 	reply := PollingResponse{}
 	args := DeferPollArgs{
-		ClientId: s.mailInfo.ClientId,
+		ClientId:      s.mailInfo.ClientId,
 		ClientContext: s.mailInfo.ClientContext,
-		DeviceId: s.mailInfo.DeviceId,
-		Timeout: 30000,
+		DeviceId:      s.mailInfo.DeviceId,
+		Timeout:       30000,
 	}
 
 	err := s.backend.Defer(&args, &reply)
@@ -182,12 +178,11 @@ func (s *RPCServerTester) TestDeferPoll() {
 
 	ctx, err := s.backend.newMailClientContext(s.mailInfo, false)
 	s.backend.pollMap[args.pollMapKey()] = ctx
-	
+
 	err = s.backend.Defer(&args, &reply)
 	s.NoError(err)
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("", reply.Message)
-
 
 	ctx.setStatus(MailClientStatusStopped, nil)
 	err = s.backend.Defer(&args, &reply)
@@ -198,9 +193,9 @@ func (s *RPCServerTester) TestDeferPoll() {
 func (s *RPCServerTester) TestStopPoll() {
 	reply := PollingResponse{}
 	args := StopPollArgs{
-		ClientId: s.mailInfo.ClientId,
+		ClientId:      s.mailInfo.ClientId,
 		ClientContext: s.mailInfo.ClientContext,
-		DeviceId: s.mailInfo.DeviceId,
+		DeviceId:      s.mailInfo.DeviceId,
 	}
 
 	err := s.backend.Stop(&args, &reply)
@@ -210,7 +205,7 @@ func (s *RPCServerTester) TestStopPoll() {
 
 	ctx, err := s.backend.newMailClientContext(s.mailInfo, false)
 	s.backend.pollMap[args.pollMapKey()] = ctx
-	
+
 	ctx.setStatus(MailClientStatusPinging, nil)
 	err = s.backend.Stop(&args, &reply)
 	s.NoError(err)

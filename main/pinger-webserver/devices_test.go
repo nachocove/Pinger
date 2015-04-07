@@ -23,7 +23,7 @@ type devicesTester struct {
 	pingerConfig    *Pinger.Configuration
 	config          *Pinger.Configuration
 	registerJson    string
-	rpcTestPort int
+	rpcTestPort     int
 }
 
 func (s *devicesTester) SetupSuite() {

@@ -48,7 +48,9 @@ func NewRPCServerConfiguration() RPCServerConfiguration {
 }
 
 const RPCPort = 60600
+
 type PollingReplyType int
+
 const (
 	PollingReplyError PollingReplyType = 0
 	PollingReplyOK    PollingReplyType = 1
@@ -184,7 +186,7 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			return nil
 		}
 		delete((*pollMap), pollMapKey)
-		
+
 		client = nil
 	} else {
 		if client != nil {
@@ -199,15 +201,15 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 
 func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey string, mi *MailPingInformation, logger *Logging.Logger) {
 	// nothing started. So start it.
-	logger.Debug("%s: Creating session", mi.getLogPrefix()) 
+	logger.Debug("%s: Creating session", mi.getLogPrefix())
 	client, err := t.newMailClientContext(mi, false)
 	if err != nil {
 		logger.Error("%s: Could not create new client: %s", pollMapKey, err)
 		return
 	}
 	t.LockMap()
-	defer func () {
-		logger.Debug("%s: Done creating session", mi.getLogPrefix()) 
+	defer func() {
+		logger.Debug("%s: Done creating session", mi.getLogPrefix())
 		t.UnlockMap()
 	}()
 	if _, ok := (*pollMap)[pollMapKey]; ok == true {

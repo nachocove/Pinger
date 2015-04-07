@@ -56,8 +56,8 @@ func TestMailClient(t *testing.T) {
 }
 
 type testingMailClientContext struct {
-	logger *Logging.Logger
-	status MailClientStatus
+	logger    *Logging.Logger
+	status    MailClientStatus
 	lastError error
 }
 

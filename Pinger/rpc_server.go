@@ -48,7 +48,7 @@ func (t *BackendPolling) LockMap() {
 }
 
 func (t *BackendPolling) UnlockMap() {
-	t.pollMapMutex.Unlock()	
+	t.pollMapMutex.Unlock()
 }
 
 func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse) (err error) {

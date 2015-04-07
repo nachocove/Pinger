@@ -744,7 +744,7 @@ func (di *DeviceInfo) validateClient() error {
 func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger) {
 	devices, err := getAllMyDeviceInfo(dbm, aws, logger)
 	if err != nil {
-		logger.Error("getAllMyDeviceInfo returned: %s", err.Error()) 
+		logger.Error("getAllMyDeviceInfo returned: %s", err.Error())
 	}
 	logger.Debug("Alerting %d devices", len(devices))
 	count := 0

@@ -1,13 +1,13 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
 	"os"
 	"path"
-	"crypto/sha256"
-	"encoding/hex"
 	"regexp"
 )
 
@@ -28,7 +28,8 @@ func makeContext(protoEmailString string) (string, error) {
 }
 
 var protoEmailRegex *regexp.Regexp
-func init () {
+
+func init() {
 	protoEmailRegex = regexp.MustCompile("^(exchange):\\w+@\\s$")
 }
 

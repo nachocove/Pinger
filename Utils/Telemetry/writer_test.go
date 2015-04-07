@@ -162,7 +162,7 @@ func (s *writerTester) TestClientRegex() {
 
 	message := fmt.Sprintf("%s:%s:%s:%s/%s: %s", deviceId, clientId, context, sessionId, protocol, messageStr)
 	s.False(deviceClientContextRegexp.MatchString(message), "should have matched deviceClientContextRegexp")
-	
+
 	s.True(deviceClientContextProtocolRegexp.MatchString(message), "should have matched deviceClientContextProtocolRegexp")
 	s.Equal(clientId, deviceClientContextProtocolRegexp.ReplaceAllString(message, "${client}"))
 	s.Equal(deviceId, deviceClientContextProtocolRegexp.ReplaceAllString(message, "${device}"))
@@ -174,10 +174,10 @@ func (s *writerTester) TestClientRegex() {
 
 	s.True(clientIdRegex.MatchString(message), "should have matched clientIdRegex")
 	s.Equal(clientId, clientIdRegex.ReplaceAllString(message, "${client}"))
-	
+
 	s.True(deviceIdIdRegex.MatchString(message), "should have matched deviceIdIdRegex")
 	s.Equal(deviceId, deviceIdIdRegex.ReplaceAllString(message, "${device}"))
-	
+
 	message = fmt.Sprintf("%s:%s:%s:%s: %s", deviceId, clientId, context, sessionId, messageStr)
 	s.True(deviceClientContextRegexp.MatchString(message), "should have matched deviceClientContextRegexp")
 	s.Equal(clientId, deviceClientContextRegexp.ReplaceAllString(message, "${client}"))
@@ -189,7 +189,7 @@ func (s *writerTester) TestClientRegex() {
 
 	s.True(clientIdRegex.MatchString(message), "should have matched clientIdRegex")
 	s.Equal(clientId, clientIdRegex.ReplaceAllString(message, "${client}"))
-	
+
 	s.True(deviceIdIdRegex.MatchString(message), "should have matched deviceIdIdRegex")
 	s.Equal(deviceId, deviceIdIdRegex.ReplaceAllString(message, "${device}"))
 }
