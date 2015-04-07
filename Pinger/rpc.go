@@ -145,6 +145,13 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 	pollMapKey := args.pollMapKey()
 	reply.Code = PollingReplyOK
 	var client MailClientContextType
+	t.LockMap()
+	need_unlock := true
+	defer func() {
+		if need_unlock {
+			t.UnlockMap()
+		}
+	}()
 	client, ok := (*pollMap)[pollMapKey]
 	if ok == true {
 		if client == nil {
@@ -176,12 +183,16 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			reply.Code = PollingReplyError
 			return nil
 		}
+		delete((*pollMap), pollMapKey)
+		
 		client = nil
 	} else {
 		if client != nil {
 			panic("Got a client but ok is false?")
 		}
 	}
+	t.UnlockMap()
+	need_unlock = false
 	go createNewPingerSession(t, pollMap, pollMapKey, args.MailInfo, logger)
 	return nil
 }
@@ -248,7 +259,7 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 	defer t.UnlockMap()
 	client, ok := (*pollMap)[pollMapKey]
 	if ok {
-		delete((*pollMap), args.ClientId)
+		delete((*pollMap), pollMapKey)
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
 		}
