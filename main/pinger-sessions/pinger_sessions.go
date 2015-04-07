@@ -6,12 +6,30 @@ import (
 	"github.com/nachocove/Pinger/Pinger"
 	"os"
 	"path"
+	"crypto/sha256"
+	"encoding/hex"
+	"regexp"
 )
 
 var usage = func() {
 	fmt.Printf("USAGE: %s <flags> <connection string>\n", path.Base(os.Args[0]))
 	flag.PrintDefaults()
 	fmt.Printf("\n  If no '-client', '-context', or '-device' is given, all active sessions are returned.\n")
+}
+
+func makeContext(protoEmailString string) (string, error) {
+	ha := sha256.Sum256([]byte(protoEmailString))
+	context := make([]byte, 8)
+	n := hex.Encode(context, ha[0:4])
+	if n <= 0 {
+		return "", fmt.Errorf("Could not encode to hex string")
+	}
+	return string(context), nil
+}
+
+var protoEmailRegex *regexp.Regexp
+func init () {
+	protoEmailRegex = regexp.MustCompile("^(exchange):\\w+@\\s$")
 }
 
 func main() {
@@ -62,6 +80,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	if len(clientContext) > 8 {
+		var err error
+		clientContext, err = makeContext(clientContext)
+		if err != nil {
+			panic(err)
+		}
+		if verbose || debug {
+			fmt.Printf("INFO: Converted context to %s\n", clientContext)
+		}
+	}
 	if debug {
 		fmt.Fprintf(os.Stdout, "Contacting RPC server at %s\n", rpcConnectString)
 		fmt.Fprintf(os.Stdout, "Arguments: ClientId:%s, ClientContext:%s, DeviceId:%s, maxSessions:%d\n", clientId, clientContext, deviceId, maxSessions)
