@@ -188,13 +188,17 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 
 func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey string, mi *MailPingInformation, logger *Logging.Logger) {
 	// nothing started. So start it.
+	logger.Debug("%s: Creating session", mi.getLogPrefix()) 
 	client, err := t.newMailClientContext(mi, false)
 	if err != nil {
 		logger.Error("%s: Could not create new client: %s", pollMapKey, err)
 		return
 	}
 	t.LockMap()
-	defer t.UnlockMap()
+	defer func () {
+		logger.Debug("%s: Done creating session", mi.getLogPrefix()) 
+		t.UnlockMap()
+	}()
 	if _, ok := (*pollMap)[pollMapKey]; ok == true {
 		// something else snuck in there! Stop this one.
 		client.stop()
