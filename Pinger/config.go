@@ -28,6 +28,7 @@ type BackendConfiguration struct {
 	APNSKeyFile        string
 	APNSCertFile       string
 	APNSFeedbackPeriod int
+	ReArmTimeout       int `gcfg:"rearm-timeout"`
 }
 
 func NewBackendConfiguration() *BackendConfiguration {
@@ -36,6 +37,7 @@ func NewBackendConfiguration() *BackendConfiguration {
 		DumpRequests:       defaultDumpRequests,
 		PingerUpdater:      defaultPingerUpdater,
 		APNSFeedbackPeriod: defaultAPNSFeedbackPeriod,
+		ReArmTimeout:       defaultReArmTimeout,
 	}
 }
 
@@ -69,6 +71,7 @@ const (
 	defaultLogFileLevel       = "INFO"
 	defaultPingerUpdater      = 0
 	defaultAPNSFeedbackPeriod = 10
+	defaultReArmTimeout       = 10
 )
 
 func NewLoggingConfiguration() *LoggingConfiguration {

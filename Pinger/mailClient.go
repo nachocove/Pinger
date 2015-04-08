@@ -27,27 +27,28 @@ type MailClientContextType interface {
 }
 
 type MailClientContext struct {
-	mailClient     MailClient // a mail client with the MailClient interface
-	logger         *Logging.Logger
-	stopAllCh      chan int // (broadcast) closed when client is exiting, so that any sub-routine can exit
-	command        chan PingerCommand
-	lastError      error
-	stats          *Utils.StatLogger
-	di             *DeviceInfo
-	ClientId       string
-	ClientContext  string
-	DeviceId       string
-	Protocol       string
-	sessionId      string
-	WaitBeforeUse  int64 // in milliseconds
-	MaxPollTimeout int64 // max polling lifetime in milliseconds. Default 2 days.
-	wg             sync.WaitGroup
-	status         MailClientStatus
-	logPrefix      string
-	fsm            *fsm.FSM
-	deferTimer     *time.Timer
-	maxPollTime    time.Duration
-	maxPollTimer   *time.Timer
+	mailClient      MailClient // a mail client with the MailClient interface
+	logger          *Logging.Logger
+	stopAllCh       chan int // (broadcast) closed when client is exiting, so that any sub-routine can exit
+	command         chan PingerCommand
+	lastError       error
+	stats           *Utils.StatLogger
+	di              *DeviceInfo
+	ClientId        string
+	ClientContext   string
+	DeviceId        string
+	Protocol        string
+	sessionId       string
+	WaitBeforeUse   int64 // in milliseconds
+	MaxPollTimeout  int64 // max polling lifetime in milliseconds. Default 2 days.
+	ResponseTimeout int64 // in milliseconds
+	wg              sync.WaitGroup
+	status          MailClientStatus
+	logPrefix       string
+	fsm             *fsm.FSM
+	deferTimer      *time.Timer
+	maxPollTime     time.Duration
+	maxPollTimer    *time.Timer
 }
 
 func (client *MailClientContext) getLogPrefix() string {
@@ -116,18 +117,19 @@ const (
 
 func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
-		logger:         logger.Copy(),
-		stopAllCh:      make(chan int),
-		command:        make(chan PingerCommand, 10),
-		stats:          nil,
-		status:         MailClientStatusInitialized,
-		ClientId:       pi.ClientId,
-		ClientContext:  pi.ClientContext,
-		DeviceId:       pi.DeviceId,
-		Protocol:       pi.Protocol,
-		WaitBeforeUse:  pi.WaitBeforeUse,
-		MaxPollTimeout: pi.MaxPollTimeout,
-		sessionId:      pi.SessionId,
+		logger:          logger.Copy(),
+		stopAllCh:       make(chan int),
+		command:         make(chan PingerCommand, 10),
+		stats:           nil,
+		status:          MailClientStatusInitialized,
+		ClientId:        pi.ClientId,
+		ClientContext:   pi.ClientContext,
+		DeviceId:        pi.DeviceId,
+		Protocol:        pi.Protocol,
+		WaitBeforeUse:   pi.WaitBeforeUse,
+		MaxPollTimeout:  pi.MaxPollTimeout,
+		ResponseTimeout: pi.ResponseTimeout,
+		sessionId:       pi.SessionId,
 	}
 	err := aws.ValidateCognitoID(pi.ClientId)
 	if err != nil {
@@ -321,6 +323,9 @@ func (client *MailClientContext) start() {
 	stopPollCh := make(chan int)
 	errCh := make(chan error)
 	rearmingCount := 0
+	tooFastResponse := (time.Duration(client.ResponseTimeout) * time.Millisecond) / 4
+	var timeSent time.Time
+	rearmTimeout := time.Duration(globals.config.ReArmTimeout) * time.Minute
 
 	client.initFsm()
 	err := client.fsm.Event(FSMDeferred)
@@ -342,38 +347,48 @@ func (client *MailClientContext) start() {
 			if err != nil {
 				panic(err)
 			}
+			timeSent = time.Now()
 
 		case err := <-errCh:
 			switch {
 			case err == LongPollNewMail:
-				// TODO Should we send a push notification each time we've rearmed? Or just
-				// on the first go-around (rearmingCount == 0)?
-				client.Info("Sending push message for new mail")
-				err = client.di.PushNewMail()
-				if err != nil {
-					if client.di.aws.IgnorePushFailures() == false {
-						client.Error("Failed to push: %s", err)
-						logError(err, client.logger)
-						return
-					} else {
-						client.Warning("Push failed but ignored: %s", err.Error())
+				client.Debug("New Mail response in %s, rearmingCount %d", time.Since(timeSent), rearmingCount)
+				pushSent := false
+				if time.Since(timeSent) > tooFastResponse || rearmingCount == 0 {
+					client.Info("Sending push message for new mail")
+					err = client.di.PushNewMail()
+					if err != nil {
+						if client.di.aws.IgnorePushFailures() == false {
+							client.Error("Failed to push: %s", err)
+							logError(err, client.logger)
+							return
+						} else {
+							client.Warning("Push failed but ignored: %s", err.Error())
+						}
 					}
+					pushSent = true
+					client.Debug("New mail notification sent")
 				}
-				client.Debug("New mail notification sent")
-				err = client.fsm.Event(FSMStopped, "Stopping (new mail push sent)", MailClientStatusStopped, nil)
+				var msg string
+				if pushSent {
+					msg = "Stopping (new mail push sent)"
+				} else {
+					msg = "Stopping (no push sent)"
+				}
+				err = client.fsm.Event(FSMStopped, msg, MailClientStatusStopped, nil)
 				if err != nil {
 					panic(err)
 				}
-
 				if rearmingCount < 3 {
 					rearmingCount++
-					client.WaitBeforeUse = int64(time.Duration(10)*time.Minute) / int64(time.Millisecond)
-					client.Info("Rearming LongPoll (%d)", rearmingCount)
+					client.WaitBeforeUse = int64(rearmTimeout) / int64(time.Millisecond)
+					client.Info("Rearming LongPoll (%d) for %s", rearmingCount, rearmTimeout)
 					err = client.fsm.Event(FSMDeferred)
 					if err != nil {
 						panic(err)
 					}
 				} else {
+					client.Info("Rearming count exceeded. Stopping.")
 					return
 				}
 
