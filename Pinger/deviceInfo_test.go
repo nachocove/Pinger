@@ -314,7 +314,6 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 func (s *deviceInfoTester) TestDeviceInfoDelete() {
 	var err error
 
-	// insert then delete
 	di, err := newDeviceInfo(
 		s.testClientId,
 		s.testClientContext,
@@ -337,70 +336,6 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 	s.NoError(err)
 	s.NotNil(di)
 
-	di.cleanup()
-
-	di = nil
-	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
-	s.NoError(err)
-	s.Nil(di)
-
-	// insert, modify the Id, then delete.
-	di, err = newDeviceInfo(
-		s.testClientId,
-		s.testClientContext,
-		s.testDeviceId,
-		s.testPushToken,
-		s.testPushService,
-		s.testPlatform,
-		s.testOSVersion,
-		s.testAppVersion,
-		s.testAppNumber,
-		s.sessionId,
-		s.aws,
-		s.logger)
-	s.NoError(err)
-	require.NotNil(s.T(), di)
-
-	err = di.insert(s.dbmap)
-	s.NoError(err)
-	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
-	s.NoError(err)
-	s.NotNil(di)
-	di.Id = di.Id+10  // change ID to cause an OptimisticLockError in di.cleanup()
-
-	di.cleanup()
-
-	di = nil
-
-	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
-	s.NoError(err)
-	s.Nil(di)
-
-	// insert, then double delete
-	di, err = newDeviceInfo(
-		s.testClientId,
-		s.testClientContext,
-		s.testDeviceId,
-		s.testPushToken,
-		s.testPushService,
-		s.testPlatform,
-		s.testOSVersion,
-		s.testAppVersion,
-		s.testAppNumber,
-		s.sessionId,
-		s.aws,
-		s.logger)
-	s.NoError(err)
-	require.NotNil(s.T(), di)
-
-	err = di.insert(s.dbmap)
-	s.NoError(err)
-	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
-	s.NoError(err)
-	s.NotNil(di)
-	
-	di.dbm.Delete(di)
-	
 	di.cleanup()
 
 	di = nil

@@ -220,42 +220,15 @@ func (di *DeviceInfo) Warning(format string, args ...interface{}) {
 	di.logger.Warning(fmt.Sprintf("%s: %s", di.getLogPrefix(), format), args...)
 }
 
-func (di *DeviceInfo) deleteSelf() {
+func (di *DeviceInfo) cleanup() {
+	di.Debug("Cleaning up DeviceInfo")
 	n, err := di.dbm.Delete(di)
 	if n == 0 {
 		di.Error("Not deleted from DB!")
 	}
 	if err != nil {
-		optErr, ok := err.(gorp.OptimisticLockError)
-		if ok {
-			switch {
-			case strings.Contains(optErr.Error(), "no row found"):
-				// nothing to do
-
-			case strings.Contains(optErr.Error(), "out of date"):
-				otherDi, err := getDeviceInfo(di.dbm, di.aws, di.ClientId, di.ClientContext, di.DeviceId, di.sessionId, di.logger)
-				if err != nil {
-					di.Error("Could not fetch updated entry: %s", err)
-				} else {
-					if otherDi != nil {
-						n, err = di.dbm.Delete(otherDi)
-						if err != nil {
-							di.Error("Could not delete fresh entry: %s", err)
-						}
-					}
-				}
-			default:
-				di.Warning("Not deleted from DB/OptimisticLockError: %s", optErr.Error())
-			}
-		} else {
-			di.Warning("Not deleted from DB: %s", err.Error())
-		}
+		di.Error("Not deleted from DB: %s", err)
 	}
-}
-
-func (di *DeviceInfo) cleanup() {
-	di.Debug("Cleaning up DeviceInfo")
-	di.deleteSelf()
 	di.ClientId = ""
 	di.ClientContext = ""
 	di.DeviceId = ""
