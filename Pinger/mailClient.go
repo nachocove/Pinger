@@ -89,6 +89,7 @@ const (
 	MailClientStatusPinging     MailClientStatus = iota
 	MailClientStatusDeferred    MailClientStatus = iota
 	MailClientStatusStopped     MailClientStatus = iota
+	MailClientStatusReDeferred     MailClientStatus = iota
 )
 
 func (status MailClientStatus) String() string {
@@ -104,6 +105,9 @@ func (status MailClientStatus) String() string {
 
 	case status == MailClientStatusDeferred:
 		return "Waiting"
+
+	case status == MailClientStatusReDeferred:
+		return "Re-Armed"
 
 	case status == MailClientStatusStopped:
 		return "Stopped"
@@ -273,11 +277,12 @@ func (client *MailClientContext) leaveInit(e *fsm.Event) {
 }
 
 func (client *MailClientContext) enterDeferred(e *fsm.Event) {
+	status := e.Args[0].(MailClientStatus)
 	client.deferTimer.Stop()
 	deferTime := time.Duration(client.WaitBeforeUse) * time.Millisecond
 	client.Debug("Starting deferTimer for %s", deferTime)
 	client.deferTimer.Reset(deferTime)
-	client.setStatus(MailClientStatusDeferred, nil)
+	client.setStatus(status, nil)
 }
 
 func (client *MailClientContext) exitDeferred(e *fsm.Event) {
@@ -328,7 +333,7 @@ func (client *MailClientContext) start() {
 	rearmTimeout := time.Duration(globals.config.ReArmTimeout) * time.Minute
 
 	client.initFsm()
-	err := client.fsm.Event(FSMDeferred)
+	err := client.fsm.Event(FSMDeferred, MailClientStatusDeferred)
 	if err != nil {
 		panic(err)
 	}
@@ -383,7 +388,7 @@ func (client *MailClientContext) start() {
 					rearmingCount++
 					client.WaitBeforeUse = int64(rearmTimeout) / int64(time.Millisecond)
 					client.Info("Rearming LongPoll (%d) for %s", rearmingCount, rearmTimeout)
-					err = client.fsm.Event(FSMDeferred)
+					err = client.fsm.Event(FSMDeferred, MailClientStatusReDeferred)
 					if err != nil {
 						panic(err)
 					}
@@ -430,7 +435,7 @@ func (client *MailClientContext) start() {
 				}
 				// this comes from the client, which means we need to reset the count.
 				rearmingCount = 0
-				err = client.fsm.Event(FSMDeferred)
+				err = client.fsm.Event(FSMDeferred, MailClientStatusDeferred)
 				if err != nil {
 					panic(err)
 				}
