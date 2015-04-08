@@ -78,7 +78,7 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert string, 
 	pingerMap := make(map[string]interface{})
 	pingerMap[di.ClientContext] = string(message)
 	pingerMap["timestamp"] = time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat)
-	pingerMap["session"] = di.sessionId
+	pingerMap["session"] = di.SessionId
 	pn.Set("pinger", pingerMap)
 
 	msg, _ := pn.PayloadString()

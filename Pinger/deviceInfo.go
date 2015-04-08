@@ -22,7 +22,8 @@ type DeviceInfo struct {
 	Updated         int64  `db:"updated"`
 	ClientId        string `db:"client_id"` // us-east-1a-XXXXXXXX
 	ClientContext   string `db:"client_context"`
-	DeviceId        string `db:"device_id"`       // NCHO348348384384.....
+	DeviceId        string `db:"device_id"` // NCHO348348384384.....
+	SessionId       string `db:"session_id"`
 	Platform        string `db:"device_platform"` // "ios", "android", etc..
 	PushToken       string `db:"push_token"`
 	PushService     string `db:"push_service"` // APNS, GCM, ...
@@ -36,7 +37,6 @@ type DeviceInfo struct {
 	logger    *Logging.Logger `db:"-"`
 	logPrefix string          `db:"-"`
 	aws       AWS.AWSHandler  `db:"-"`
-	sessionId string          `db:"-"`
 }
 
 type deviceContact struct {
@@ -57,7 +57,7 @@ const (
 
 func addDeviceInfoTable(dbmap *gorp.DbMap) {
 	tMap := dbmap.AddTableWithName(DeviceInfo{}, deviceTableName)
-	if tMap.SetKeys(false, "ClientId", "ClientContext", "DeviceId") == nil {
+	if tMap.SetKeys(false, "ClientId", "ClientContext", "DeviceId", "SessionId") == nil {
 		panic(fmt.Sprintf("Could not create key on %s:ID", deviceTableName))
 	}
 	tMap.SetVersionCol("Id")
@@ -175,6 +175,7 @@ func newDeviceInfo(
 		ClientId:        clientID,
 		ClientContext:   clientContext,
 		DeviceId:        deviceId,
+		SessionId:       sessionId,
 		PushToken:       pushToken,
 		PushService:     pushService,
 		Platform:        platform,
@@ -182,7 +183,6 @@ func newDeviceInfo(
 		AppBuildVersion: appBuildVersion,
 		AppBuildNumber:  appBuildNumber,
 		aws:             aws,
-		sessionId:       sessionId,
 	}
 	di.SetLogger(logger)
 	err := di.validate()
@@ -199,7 +199,7 @@ func (di *DeviceInfo) SetLogger(logger *Logging.Logger) {
 
 func (di *DeviceInfo) getLogPrefix() string {
 	if di.logPrefix == "" {
-		di.logPrefix = fmt.Sprintf("%s:%s:%s:%s", di.DeviceId, di.ClientId, di.ClientContext, di.sessionId)
+		di.logPrefix = fmt.Sprintf("%s:%s:%s:%s", di.DeviceId, di.ClientId, di.ClientContext, di.SessionId)
 	}
 	return di.logPrefix
 }
@@ -259,7 +259,7 @@ func init() {
 
 func getDeviceInfo(dbm *gorp.DbMap, aws AWS.AWSHandler, clientId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
 	var device *DeviceInfo
-	obj, err := dbm.Get(&DeviceInfo{}, clientId, clientContext, deviceId)
+	obj, err := dbm.Get(&DeviceInfo{}, clientId, clientContext, deviceId, sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +267,6 @@ func getDeviceInfo(dbm *gorp.DbMap, aws AWS.AWSHandler, clientId, clientContext,
 		device = obj.(*DeviceInfo)
 		device.dbm = dbm
 		device.aws = aws
-		device.sessionId = sessionId
 		device.SetLogger(logger)
 		if device.Pinger != pingerHostId {
 			device.Warning("device belongs to a different pinger (%s). Stealing it", device.Pinger)
@@ -564,7 +563,7 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, alert string, ttl 
 	pingerMap := make(map[string]interface{})
 	pingerMap[di.ClientContext] = string(message)
 	pingerMap["timestamp"] = time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat)
-	pingerMap["session"] = di.sessionId
+	pingerMap["session"] = di.SessionId
 
 	pingerJson, err := json.Marshal(pingerMap)
 	if err != nil {
@@ -741,25 +740,34 @@ func (di *DeviceInfo) validateClient() error {
 	return nil
 }
 
-func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger) {
+func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger) int {
 	devices, err := getAllMyDeviceInfo(dbm, aws, logger)
 	if err != nil {
 		logger.Error("getAllMyDeviceInfo returned: %s", err.Error())
 	}
 	logger.Debug("Alerting %d devices", len(devices))
 	count := 0
+	alreadyPushed := make(map[string]bool)
+	pushesSent := 0
 	for _, di := range devices {
-		logger.Info("%s: sending PingerNotificationRegister to device", di.getLogPrefix())
-		err = di.PushRegister()
-		if err != nil {
-			logger.Warning("%s: Could not send push: %s", di.getLogPrefix(), err.Error())
+		key := fmt.Sprintf("%s:%s", di.PushService, di.PushToken)
+		if !alreadyPushed[key] {
+			di.Info("sending PingerNotificationRegister to device (%s)", key)
+			err = di.PushRegister()
+			if err != nil {
+				di.Warning("Could not send push: %s", err.Error())
+			} else {
+				alreadyPushed[key] = true
+				pushesSent++
+				count++
+			}
+			if count >= 10 {
+				count = 0
+				time.Sleep(time.Duration(1) * time.Second)
+			}
 		} else {
-			count++
-		}
-		if count >= 10 {
-			count = 0
-			time.Sleep(time.Duration(1) * time.Second)
+			di.Debug("push already sent (%s)", key)
 		}
 	}
-	return
+	return pushesSent
 }

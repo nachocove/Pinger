@@ -47,12 +47,13 @@ func (s *deviceInfoTester) SetupSuite() {
 	s.testAppVersion = "0.9"
 	s.testAppNumber = "(dev) Foo"
 	s.sessionId = "12345678"
-	s.aws = testHandler.NewTestAwsHandler()
-
+	config := NewBackendConfiguration()
+	setGlobal(config)
 }
 
 func (s *deviceInfoTester) SetupTest() {
 	s.dbmap.TruncateTables()
+	s.aws = testHandler.NewTestAwsHandler()
 }
 
 func (s *deviceInfoTester) TearDownTest() {
@@ -401,4 +402,48 @@ func (s *deviceInfoTester) TestRegisterAWS() {
 	err = di.registerAws()
 	s.NoError(err)
 	s.Equal(testArn, di.AWSEndpointArn)
+}
+
+func (s *deviceInfoTester) TestSendToAll() {
+	di, err := newDeviceInfo(
+		s.testClientId,
+		s.testClientContext,
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppNumber,
+		"1",
+		s.aws,
+		s.logger)
+	s.NoError(err)
+	require.NotNil(s.T(), di)
+	di.AWSEndpointArn = "12345"
+	di.insert(s.dbmap)
+
+	di, err = newDeviceInfo(
+		s.testClientId,
+		s.testClientContext,
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppNumber,
+		"2",
+		s.aws,
+		s.logger)
+	s.NoError(err)
+	require.NotNil(s.T(), di)
+	di.AWSEndpointArn = "12345"
+	di.insert(s.dbmap)
+	
+	deviceList, err := getAllMyDeviceInfo(s.dbmap, s.aws, s.logger)
+	s.Equal(2, len(deviceList))
+	
+	n := alertAllDevices(s.dbmap, s.aws, s.logger)
+	s.Equal(1, n)
 }
