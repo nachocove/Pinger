@@ -47,16 +47,17 @@ func (s *deviceInfoTester) SetupSuite() {
 	s.testAppVersion = "0.9"
 	s.testAppNumber = "(dev) Foo"
 	s.sessionId = "12345678"
-	config := NewBackendConfiguration()
-	setGlobal(config)
 }
 
 func (s *deviceInfoTester) SetupTest() {
 	s.dbmap.TruncateTables()
 	s.aws = testHandler.NewTestAwsHandler()
+	globals = nil
+	setGlobal(NewBackendConfiguration())
 }
 
 func (s *deviceInfoTester) TearDownTest() {
+	globals = nil
 }
 
 func TestDeviceInfo(t *testing.T) {
