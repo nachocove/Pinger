@@ -352,6 +352,7 @@ func (client *MailClientContext) start() {
 				err = client.di.PushNewMail()
 				if err != nil {
 					if client.di.aws.IgnorePushFailures() == false {
+						client.Error("Failed to push: %s", err)
 						logError(err, client.logger)
 						return
 					} else {
