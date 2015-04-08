@@ -29,6 +29,7 @@ type BackendConfiguration struct {
 	APNSCertFile       string
 	APNSFeedbackPeriod int
 	ReArmTimeout       int `gcfg:"rearm-timeout"`
+	APNSAlert          bool
 }
 
 func NewBackendConfiguration() *BackendConfiguration {
@@ -38,6 +39,7 @@ func NewBackendConfiguration() *BackendConfiguration {
 		PingerUpdater:      defaultPingerUpdater,
 		APNSFeedbackPeriod: defaultAPNSFeedbackPeriod,
 		ReArmTimeout:       defaultReArmTimeout,
+		APNSAlert:          true,
 	}
 }
 

@@ -545,11 +545,19 @@ func (di *DeviceInfo) Push(message PingerNotification, alert string, ttl int64) 
 var days_28 int64 = 2419200
 
 func (di *DeviceInfo) PushRegister() error {
-	return di.Push(PingerNotificationRegister, "Nacho says: Reregister!", days_28)
+	var alert string
+	if globals.config.APNSAlert {
+		alert = "Nacho says: Reregister!"
+	}
+	return di.Push(PingerNotificationRegister, alert, days_28)
 }
 
 func (di *DeviceInfo) PushNewMail() error {
-	return di.Push(PingerNotificationNewMail, "Nacho says: You have mail!", days_28)
+	var alert string
+	if globals.config.APNSAlert {
+		alert = "Nacho says: You have mail!"
+	}
+	return di.Push(PingerNotificationNewMail, alert, days_28)
 }
 
 // AWS Push message code
