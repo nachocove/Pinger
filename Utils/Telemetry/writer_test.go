@@ -61,6 +61,7 @@ func (s *writerTester) TestFileCreation() {
 		"some hostid",
 		"some device id",
 		"some session Id",
+		"some context",
 		time.Now().Round(time.Millisecond).UTC(),
 	)
 	messages[0] = msg
@@ -83,6 +84,7 @@ func (s *writerTester) TestFileCreation() {
 		"some hostid",
 		"some device id",
 		"some session Id",
+		"some context",
 		time.Now().Round(time.Millisecond).UTC().Add(time.Duration(-1)*time.Minute),
 	)
 	messages[0] = msg
@@ -94,6 +96,7 @@ func (s *writerTester) TestFileCreation() {
 		"some hostid",
 		"some device id",
 		"some session Id",
+		"some context",
 		time.Now().Round(time.Millisecond).UTC(),
 	)
 	messages[1] = msg
@@ -116,6 +119,7 @@ func (s *writerTester) TestFileCreation() {
 		"some hostid",
 		"some device id",
 		"some session Id",
+		"some context",
 		time.Now().Round(time.Millisecond).UTC().Add(time.Duration(-2)*time.Minute),
 	)
 	messages[0] = msg
@@ -127,6 +131,7 @@ func (s *writerTester) TestFileCreation() {
 		"some hostid",
 		"some device id",
 		"some session Id",
+		"some context",
 		time.Now().Round(time.Millisecond).UTC().Add(time.Duration(-1)*time.Minute),
 	)
 	messages[1] = msg
@@ -138,6 +143,7 @@ func (s *writerTester) TestFileCreation() {
 		"some hostid",
 		"some device id",
 		"some session Id",
+		"some context",
 		time.Now().Round(time.Millisecond).UTC(),
 	)
 	messages[2] = msg

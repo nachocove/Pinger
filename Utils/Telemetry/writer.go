@@ -91,18 +91,20 @@ func init() {
 }
 func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record, hostId string) telemetryLogMsg {
 	message := rec.Message()
-	var client, deviceId, sessionId string
+	var client, deviceId, sessionId, context string
 	switch {
 	case deviceClientContextRegexp.MatchString(message):
 		client = deviceClientContextRegexp.ReplaceAllString(message, "${client}")
 		deviceId = deviceClientContextRegexp.ReplaceAllString(message, "${device}")
 		sessionId = deviceClientContextRegexp.ReplaceAllString(message, "${session}")
+		context = deviceClientContextRegexp.ReplaceAllString(message, "${context}")
 		message = deviceClientContextRegexp.ReplaceAllString(message, "${message} (context ${context}, device ${device}, session ${session})")
 
 	case deviceClientContextProtocolRegexp.MatchString(message):
 		client = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${client}")
 		deviceId = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${device}")
 		sessionId = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${session}")
+		context = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${context}")
 		message = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${message} (protocol ${protocol}, context ${context}, device ${device}, session ${session})")
 	}
 	if client == "" && clientIdRegex.MatchString(message) {
@@ -111,7 +113,7 @@ func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Rec
 	if deviceId == "" && clientIdRegex.MatchString(message) {
 		deviceId = deviceIdIdRegex.ReplaceAllString(message, "${device}")
 	}
-	return NewTelemetryMsg(eventType, rec.Module, client, deviceId, sessionId, message, hostId, rec.Time.Round(time.Millisecond).UTC())
+	return NewTelemetryMsg(eventType, rec.Module, client, deviceId, sessionId, context, message, hostId, rec.Time.Round(time.Millisecond).UTC())
 }
 
 // Log Implements the logging Interface so this can be used as a logger backend.

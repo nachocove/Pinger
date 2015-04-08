@@ -23,16 +23,17 @@ func (t telemetryLogEventType) String() string {
 
 // telemetryLogMsg a telemetry message entry. Also used to generate the DB table
 type telemetryLogMsg struct {
-	Id         string                `db:"id"`
-	EventType  telemetryLogEventType `db:"event_type"`
-	Timestamp  time.Time             `db:"timestamp"`
-	UploadedAt time.Time             `db:"-"`
-	Client     string                `db:"client"`
-	DeviceId   string                `db:"device"`
-	SessionId  string                `db:"session"`
-	Module     string                `db:"module"`
-	Message    string                `db:"message"`
-	Pinger     string                `db:"pinger"`
+	Id            string                `db:"id"`
+	EventType     telemetryLogEventType `db:"event_type"`
+	Timestamp     time.Time             `db:"timestamp"`
+	UploadedAt    time.Time             `db:"-"`
+	Client        string                `db:"client"`
+	DeviceId      string                `db:"device"`
+	SessionId     string                `db:"session"`
+	ClientContext string                `db:"context"`
+	Module        string                `db:"module"`
+	Message       string                `db:"message"`
+	Pinger        string                `db:"pinger"`
 }
 
 func (msg *telemetryLogMsg) prepareForUpload() error {
@@ -56,6 +57,7 @@ func (msg *telemetryLogMsg) toMap() telemetryLogMsgMap {
 	msgMap["client"] = msg.Client
 	msgMap["device"] = msg.DeviceId
 	msgMap["session"] = msg.SessionId
+	msgMap["context"] = msg.ClientContext
 	msgMap["module"] = msg.Module
 	msgMap["message"] = msg.Message
 	msgMap["pinger"] = msg.Pinger
@@ -63,16 +65,17 @@ func (msg *telemetryLogMsg) toMap() telemetryLogMsgMap {
 }
 
 // NewTelemetryMsg Create a new telemetry message instance
-func NewTelemetryMsg(eventType telemetryLogEventType, module, client, device, session, message, hostId string, timestamp time.Time) telemetryLogMsg {
+func NewTelemetryMsg(eventType telemetryLogEventType, module, client, device, session, context, message, hostId string, timestamp time.Time) telemetryLogMsg {
 	return telemetryLogMsg{
-		Id:        newId(),
-		EventType: eventType,
-		Timestamp: timestamp,
-		Module:    module,
-		Client:    client,
-		DeviceId:  device,
-		SessionId: session,
-		Message:   message,
-		Pinger:    hostId,
+		Id:            newId(),
+		EventType:     eventType,
+		Timestamp:     timestamp,
+		Module:        module,
+		Client:        client,
+		DeviceId:      device,
+		SessionId:     session,
+		ClientContext: context,
+		Message:       message,
+		Pinger:        hostId,
 	}
 }
