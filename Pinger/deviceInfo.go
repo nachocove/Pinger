@@ -521,10 +521,20 @@ const (
 
 func (di *DeviceInfo) Push(message PingerNotification, alert string, ttl int64) error {
 	var err error
-	if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
-		err = di.awsPushMessage(message, alert, ttl)
-	} else {
-		err = di.APNSpushMessage(message, alert, ttl)
+	retryInterval := time.Duration(1)*time.Second
+	for i := 0; i< 10; i++ {
+		if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
+			err = di.awsPushMessage(message, alert, ttl)
+		} else {
+			err = di.APNSpushMessage(message, alert, ttl)
+		}
+		if err != nil {
+			di.Warning("Push error %s. Retrying attempt %d in %s", err, i, retryInterval)
+			time.Sleep(retryInterval)
+		} else {
+			di.Debug("Successfully pushed after %d tries", i)
+			break
+		}
 	}
 	if err == nil {
 		err = di.updateLastContactRequest()
