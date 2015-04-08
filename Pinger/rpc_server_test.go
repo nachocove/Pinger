@@ -130,31 +130,39 @@ func (s *RPCServerTester) TestStartPoll() {
 
 	ctx, err := s.backend.newMailClientContext(s.mailInfo, false)
 	s.backend.pollMap[args.pollMapKey()] = ctx
-
 	ctx.setStatus(MailClientStatusPinging, nil)
 	err = s.backend.Start(&args, &reply)
 	s.NoError(err)
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("", reply.Message)
+	s.Empty(s.backend.pollMap[args.pollMapKey()], "Start should have deleted the entry, replaced with a new one")
 
+	ctx, err = s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
 	ctx.setStatus(MailClientStatusDeferred, nil)
 	err = s.backend.Start(&args, &reply)
 	s.NoError(err)
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("", reply.Message)
 
+	ctx, err = s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
 	ctx.setStatus(MailClientStatusStopped, nil)
 	err = s.backend.Start(&args, &reply)
 	s.NoError(err)
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("", reply.Message)
 
+	ctx, err = s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
 	ctx.setStatus(MailClientStatusInitialized, nil)
 	err = s.backend.Start(&args, &reply)
 	s.NoError(err)
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("", reply.Message)
 
+	ctx, err = s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
 	ctx.setStatus(MailClientStatusError, fmt.Errorf("Foo"))
 	err = s.backend.Start(&args, &reply)
 	s.NoError(err)
@@ -205,31 +213,39 @@ func (s *RPCServerTester) TestStopPoll() {
 
 	ctx, err := s.backend.newMailClientContext(s.mailInfo, false)
 	s.backend.pollMap[args.pollMapKey()] = ctx
-
 	ctx.setStatus(MailClientStatusPinging, nil)
 	err = s.backend.Stop(&args, &reply)
 	s.NoError(err)
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("Stopped", reply.Message)
+	s.Empty(s.backend.pollMap[args.pollMapKey()], "Stop should have deleted the entry")
 
+	ctx, err = s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
 	ctx.setStatus(MailClientStatusDeferred, nil)
 	err = s.backend.Stop(&args, &reply)
 	s.NoError(err)
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("Stopped", reply.Message)
 
+	ctx, err = s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
 	ctx.setStatus(MailClientStatusStopped, nil)
 	err = s.backend.Stop(&args, &reply)
 	s.NoError(err)
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("Stopped", reply.Message)
 
+	ctx, err = s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
 	ctx.setStatus(MailClientStatusInitialized, nil)
 	err = s.backend.Stop(&args, &reply)
 	s.NoError(err)
 	s.Equal(PollingReplyOK, reply.Code, fmt.Sprintf("Should have gotten %s. Got %s", PollingReplyOK, reply.Code))
 	s.Equal("Stopped", reply.Message)
 
+	ctx, err = s.backend.newMailClientContext(s.mailInfo, false)
+	s.backend.pollMap[args.pollMapKey()] = ctx
 	ctx.setStatus(MailClientStatusError, fmt.Errorf("Foo"))
 	err = s.backend.Stop(&args, &reply)
 	s.NoError(err)
