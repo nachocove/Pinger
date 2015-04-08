@@ -44,7 +44,7 @@ func FeedbackListener(logger *Logging.Logger) {
 			case resp := <-apns.FeedbackChannel:
 				logger.Warning("APNS FEEDBACK recv'd:", resp.DeviceToken)
 			case <-apns.ShutdownChannel:
-				logger.Info("APNS FEEDBACK nothing returned from the feedback service")
+				logger.Debug("APNS FEEDBACK nothing returned from the feedback service")
 			}
 		}
 	}
