@@ -595,7 +595,9 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, alert string, ttl 
 		APNSMap := map[string]interface{}{}
 		APNSMap["pinger"] = pingerMap
 		apsMap := make(map[string]interface{})
-		apsMap["content-available"] = 1
+		if globals.config.APNSContentAvailable > 0 {
+			apsMap["content-available"] = globals.config.APNSContentAvailable
+		}
 		if globals.config.APNSSound != "" {
 			apsMap["sound"] = globals.config.APNSSound
 		}
