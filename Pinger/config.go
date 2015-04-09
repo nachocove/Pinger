@@ -21,29 +21,33 @@ type Configuration struct {
 }
 
 type BackendConfiguration struct {
-	Debug                bool
-	DumpRequests         bool
-	PingerUpdater        int `gcfg:"pinger-updater"`
-	APNSSandbox          bool
-	APNSKeyFile          string
-	APNSCertFile         string
-	APNSFeedbackPeriod   int
-	ReArmTimeout         int `gcfg:"rearm-timeout"`
-	APNSAlert            bool
-	APNSSound            string
-	APNSContentAvailable int
+	Debug                 bool
+	DumpRequests          bool
+	PingerUpdater         int `gcfg:"pinger-updater"`
+	APNSSandbox           bool
+	APNSKeyFile           string
+	APNSCertFile          string
+	APNSFeedbackPeriod    int
+	ReArmTimeout          int `gcfg:"rearm-timeout"`
+	APNSAlert             bool
+	APNSSound             string
+	APNSContentAvailable  int
+	APNSExpirationSeconds int64
 }
+
+var days_28 int64 = 28 * 24 * 60 * 60
 
 func NewBackendConfiguration() *BackendConfiguration {
 	return &BackendConfiguration{
-		Debug:                defaultDebug,
-		DumpRequests:         defaultDumpRequests,
-		PingerUpdater:        defaultPingerUpdater,
-		APNSFeedbackPeriod:   defaultAPNSFeedbackPeriod,
-		ReArmTimeout:         defaultReArmTimeout,
-		APNSAlert:            true,
-		APNSSound:            "silent.wav",
-		APNSContentAvailable: 1,
+		Debug:                 defaultDebug,
+		DumpRequests:          defaultDumpRequests,
+		PingerUpdater:         defaultPingerUpdater,
+		APNSFeedbackPeriod:    defaultAPNSFeedbackPeriod,
+		ReArmTimeout:          defaultReArmTimeout,
+		APNSAlert:             true,
+		APNSSound:             "silent.wav",
+		APNSContentAvailable:  1,
+		APNSExpirationSeconds: days_28,
 	}
 }
 

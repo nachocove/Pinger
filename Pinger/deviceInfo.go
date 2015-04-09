@@ -519,14 +519,14 @@ const (
 	PingerNotificationNewMail  PingerNotification = "new"
 )
 
-func (di *DeviceInfo) Push(message PingerNotification, alert string, ttl int64) error {
+func (di *DeviceInfo) Push(message PingerNotification, alert, sound string, contentAvailable int, ttl int64) error {
 	var err error
-	retryInterval := time.Duration(1)*time.Second
-	for i := 0; i< 10; i++ {
+	retryInterval := time.Duration(1) * time.Second
+	for i := 0; i < 10; i++ {
 		if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
-			err = di.awsPushMessage(message, alert, ttl)
+			err = di.awsPushMessage(message, alert, sound, contentAvailable, ttl)
 		} else {
-			err = di.APNSpushMessage(message, alert, ttl)
+			err = di.APNSpushMessage(message, alert, sound, contentAvailable, ttl)
 		}
 		if err != nil {
 			di.Warning("Push error %s. Retrying attempt %d in %s", err, i, retryInterval)
@@ -542,14 +542,13 @@ func (di *DeviceInfo) Push(message PingerNotification, alert string, ttl int64) 
 	return err
 }
 
-var days_28 int64 = 2419200
-
 func (di *DeviceInfo) PushRegister() error {
 	var alert string
 	if globals.config.APNSAlert {
 		alert = "Nacho says: Reregister!"
 	}
-	return di.Push(PingerNotificationRegister, alert, days_28)
+	ttl := globals.config.APNSExpirationSeconds
+	return di.Push(PingerNotificationRegister, alert, globals.config.APNSSound, globals.config.APNSContentAvailable, ttl)
 }
 
 func (di *DeviceInfo) PushNewMail() error {
@@ -557,16 +556,18 @@ func (di *DeviceInfo) PushNewMail() error {
 	if globals.config.APNSAlert {
 		alert = "Nacho says: You have mail!"
 	}
-	return di.Push(PingerNotificationNewMail, alert, days_28)
+	ttl := globals.config.APNSExpirationSeconds
+
+	return di.Push(PingerNotificationNewMail, alert, globals.config.APNSSound, globals.config.APNSContentAvailable, ttl)
 }
 
 // AWS Push message code
 
-func (di *DeviceInfo) awsPushMessage(message PingerNotification, alert string, ttl int64) error {
+func (di *DeviceInfo) awsPushMessage(message PingerNotification, alert, sound string, contentAvailable int, ttl int64) error {
 	if di.AWSEndpointArn == "" {
 		return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", di.PushService, di.PushToken)
 	}
-	pushMessage, err := di.pushMessage(message, alert, ttl)
+	pushMessage, err := di.pushMessage(message, alert, sound, contentAvailable, ttl)
 	if err != nil {
 		return err
 	}
@@ -574,7 +575,7 @@ func (di *DeviceInfo) awsPushMessage(message PingerNotification, alert string, t
 	return di.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
 }
 
-func (di *DeviceInfo) pushMessage(message PingerNotification, alert string, ttl int64) (string, error) {
+func (di *DeviceInfo) pushMessage(message PingerNotification, alert, sound string, contentAvailable int, ttl int64) (string, error) {
 	if message == "" {
 		return "", fmt.Errorf("Message can not be empty")
 	}
@@ -595,11 +596,11 @@ func (di *DeviceInfo) pushMessage(message PingerNotification, alert string, ttl 
 		APNSMap := map[string]interface{}{}
 		APNSMap["pinger"] = pingerMap
 		apsMap := make(map[string]interface{})
-		if globals.config.APNSContentAvailable > 0 {
-			apsMap["content-available"] = globals.config.APNSContentAvailable
+		if contentAvailable > 0 {
+			apsMap["content-available"] = contentAvailable
 		}
-		if globals.config.APNSSound != "" {
-			apsMap["sound"] = globals.config.APNSSound
+		if sound != "" {
+			apsMap["sound"] = sound
 		}
 		if alert != "" {
 			apsMap["alert"] = alert

@@ -50,7 +50,7 @@ func FeedbackListener(logger *Logging.Logger) {
 	}
 }
 
-func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert string, ttl int64) error {
+func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert, sound string, contentAvailable int, ttl int64) error {
 	if globals.config.APNSCertFile == "" {
 		panic("No apns cert set. Can not push to APNS")
 	}
@@ -64,17 +64,21 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert string, 
 	}
 	pn.DeviceToken = token
 	pn.Priority = 10
-	//pn.Expiry = ttl
+	if ttl > 0 {
+		expiration := time.Now().Add(time.Duration(ttl) * time.Second).UTC()
+		di.Debug("Setting push expiration to %s (unix utc %d)", expiration, expiration.Unix())
+		pn.Expiry = uint32(expiration.UTC().Unix())
+	}
 
 	payload := make(map[string]interface{})
 	if alert != "" {
 		payload["alert"] = alert
 	}
-	if globals.config.APNSSound != "" {
-		payload["sound"] = globals.config.APNSSound
+	if sound != "" {
+		payload["sound"] = sound
 	}
-	if globals.config.APNSContentAvailable > 0 {
-		payload["content-available"] = globals.config.APNSContentAvailable
+	if contentAvailable > 0 {
+		payload["content-available"] = contentAvailable
 	}
 
 	pn.Set("aps", payload)
