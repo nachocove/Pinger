@@ -30,6 +30,7 @@ type BackendConfiguration struct {
 	APNSFeedbackPeriod int
 	ReArmTimeout       int `gcfg:"rearm-timeout"`
 	APNSAlert          bool
+	APNSSound          string
 }
 
 func NewBackendConfiguration() *BackendConfiguration {
@@ -40,6 +41,7 @@ func NewBackendConfiguration() *BackendConfiguration {
 		APNSFeedbackPeriod: defaultAPNSFeedbackPeriod,
 		ReArmTimeout:       defaultReArmTimeout,
 		APNSAlert:          true,
+		APNSSound:          "silent.wav",
 	}
 }
 

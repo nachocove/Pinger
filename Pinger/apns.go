@@ -70,7 +70,9 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert string, 
 	if alert != "" {
 		payload["alert"] = alert
 	}
-	payload["sound"] = "silent.wav"
+	if globals.config.APNSSound != "" {
+		payload["sound"] = globals.config.APNSSound
+	}
 	payload["content-available"] = 1
 
 	pn.Set("aps", payload)
