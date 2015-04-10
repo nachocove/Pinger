@@ -1,0 +1,113 @@
+{
+	"ImportPath": "github.com/nachocove/Pinger",
+	"GoVersion": "go1.4.2",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/gcfg",
+			"Rev": "c2d3050044d05357eaf6c3547249ba57c5e235cb"
+		},
+		{
+			"ImportPath": "github.com/Go-SQL-Driver/MySQL",
+			"Comment": "v1.2-88-ga197e5d",
+			"Rev": "a197e5d40516f2e9f74dcee085a5f2d4604e94df"
+		},
+		{
+			"ImportPath": "github.com/anachronistic/apns",
+			"Rev": "f90152b7e0ae845938ce1258d90072fd116131ac"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/aws",
+			"Rev": "1355efa4e35cd429590baeaef5e84d2dfbc44efc"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/cognito/identity",
+			"Rev": "1355efa4e35cd429590baeaef5e84d2dfbc44efc"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/endpoints",
+			"Rev": "1355efa4e35cd429590baeaef5e84d2dfbc44efc"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/sns",
+			"Rev": "1355efa4e35cd429590baeaef5e84d2dfbc44efc"
+		},
+		{
+			"ImportPath": "github.com/codegangsta/negroni",
+			"Comment": "v0.1-70-gc7477ad",
+			"Rev": "c7477ad8e330bef55bf1ebe300cf8aa67c492d1b"
+		},
+		{
+			"ImportPath": "github.com/coopernurse/gorp",
+			"Comment": "v1.7-1-g236e138",
+			"Rev": "236e1383df4c6b402e251d3fe2dcea50dab1faf1"
+		},
+		{
+			"ImportPath": "github.com/gorilla/context",
+			"Rev": "215affda49addc4c8ef7e2534915df2c8c35c6cd"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Rev": "8096f47503459bcc74d1f4c487b7e6e42e5746b5"
+		},
+		{
+			"ImportPath": "github.com/gorilla/securecookie",
+			"Rev": "a54a6f264e283c7afd37f9d7a772965e7a72408c"
+		},
+		{
+			"ImportPath": "github.com/gorilla/sessions",
+			"Rev": "1f45645972a051deb63c8e8e3c594041a6145e35"
+		},
+		{
+			"ImportPath": "github.com/looplab/fsm",
+			"Rev": "406628531e6e20c817c9ff2260f60b3284b5966a"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-sqlite3",
+			"Rev": "ff38c8ec02230a8eb61cb8b93cad1dc2f5411e74"
+		},
+		{
+			"ImportPath": "github.com/op/go-logging",
+			"Rev": "e5fb9bb8a3a168cc269b38f092b65d2e18cebb9a"
+		},
+		{
+			"ImportPath": "github.com/rlmcpherson/s3gof3r",
+			"Comment": "v0.4.10-3-ge6c862d",
+			"Rev": "e6c862d3128ea3285965d454652154176a2a5987"
+		},
+		{
+			"ImportPath": "github.com/stretchr/objx",
+			"Rev": "cbeaeb16a013161a98496fad62933b1d21786672"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Rev": "e4ec8152c15fc46bd5056ce65997a07c7d415325"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/mock",
+			"Rev": "e4ec8152c15fc46bd5056ce65997a07c7d415325"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/require",
+			"Rev": "e4ec8152c15fc46bd5056ce65997a07c7d415325"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/suite",
+			"Rev": "e4ec8152c15fc46bd5056ce65997a07c7d415325"
+		},
+		{
+			"ImportPath": "github.com/twinj/uuid",
+			"Rev": "4d772442af203e27723acc7d1eea6c93cd319c57"
+		},
+		{
+			"ImportPath": "github.com/ugorji/go/codec",
+			"Rev": "141348dbea35c4425d2a70b3bae4c9b8925c3c59"
+		},
+		{
+			"ImportPath": "github.com/vaughan0/go-ini",
+			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
+		}
+	]
+}
