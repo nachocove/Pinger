@@ -85,10 +85,6 @@ func APNSpushMessage(token string, alert, sound string, contentAvailable int, tt
 	pn.Set("pinger", pingerMap)
 
 	msg, _ := pn.PayloadString()
-	if len(msg) >= 256 {
-		logger.Error("Push message to APNS exceeds 256 bytes: pushToken: %s %s", token, msg)
-		return APNSMessageTooLarge
-	}
 	logger.Debug("Sending push message to APNS: pushToken: %s %s", token, msg)
 
 	var apnsHost string

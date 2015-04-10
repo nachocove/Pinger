@@ -539,7 +539,7 @@ func (di *DeviceInfo) insert(dbm *gorp.DbMap) error {
 type PingerNotification string
 
 const (
-	PingerNotificationRegister PingerNotification = "reg"
+	PingerNotificationRegister PingerNotification = "register"
 	PingerNotificationNewMail  PingerNotification = "new"
 )
 
@@ -560,7 +560,8 @@ func (di *DeviceInfo) PushNewMail() error {
 }
 
 func (di *DeviceInfo) Push(message PingerNotification, alert, sound string, contentAvailable int) error {
-	pingerMap := pingerPushMessageMapV2([](*sessionContextMessage){newSessionContextMessage(message, di.ClientContext, di.SessionId)})
+	contextIds := []string{di.ClientContext}
+	pingerMap := pingerPushMessageMap(message, contextIds, di.SessionId)
 	ttl := globals.config.APNSExpirationSeconds
 	err := Push(di.aws, di.Platform, di.PushService, di.PushToken, di.AWSEndpointArn, alert, sound, contentAvailable, ttl, pingerMap, di.logger)
 	if err == nil {

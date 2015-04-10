@@ -2,11 +2,10 @@ package Pinger
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/nachocove/Pinger/Utils/Logging"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"testing"
+	"fmt"
 )
 
 type pushTester struct {
@@ -27,12 +26,12 @@ func TestPushMessages(t *testing.T) {
 	suite.Run(t, s)
 }
 
-func (s *pushTester) TestDevicePushMessageCreateV1() {
+func (s *deviceInfoTester) TestIOSDevicePushMessageCreate() {
 	var days_28 int64 = 2419200
 
 	contexts := []string{"context1234567"}
 	sessionId := "sessionid1234"
-	pingerMessage := pingerPushMessageMapV1(PingerNotificationRegister, contexts, sessionId)
+	pingerMessage := pingerPushMessageMap(PingerNotificationRegister, contexts, sessionId)
 	s.NotEmpty(pingerMessage)
 	s.Equal(sessionId, pingerMessage["session"])
 	s.NotEqual("", pingerMessage["timestamp"])
@@ -46,7 +45,7 @@ func (s *pushTester) TestDevicePushMessageCreateV1() {
 	alert := "foo"
 	sound := "bar"
 	contentAvailable := 1
-
+	
 	message, err := awsPushMessageString(platform, alert, sound, contentAvailable, days_28, pingerMessage, s.logger)
 	s.NoError(err)
 	s.NotEmpty(message)
@@ -65,54 +64,28 @@ func (s *pushTester) TestDevicePushMessageCreateV1() {
 		s.NoError(err)
 		s.NotEmpty(secMap)
 	}
-
-	platform = "android"
-	message, err = awsPushMessageString(platform, alert, sound, contentAvailable, days_28, pingerMessage, s.logger)
-	s.NoError(err)
-	s.NotEmpty(message)
-
-	pushMessage = make(map[string]string)
-	err = json.Unmarshal([]byte(message), &pushMessage)
-	s.NoError(err)
-
-	sections = []string{"default", "GCM"}
-	for _, sec := range sections {
-		secStr, ok := pushMessage[sec]
-		s.True(ok, sec)
-		s.NotEqual("", secStr)
-		secMap := make(map[string]interface{})
-		err := json.Unmarshal([]byte(secStr), &secMap)
-		s.NoError(err)
-		s.NotEmpty(secMap)
-	}
 }
 
-func (s *pushTester) TestDevicePushMessageCreateV2() {
+func (s *deviceInfoTester) TestAndroidDevicePushMessageCreate() {
 	var days_28 int64 = 2419200
-	context := "context1234567"
-	session := "sessionid1234"
-	sessionContext := newSessionContextMessage(PingerNotificationRegister, context, session)
-	pingerMessage := pingerPushMessageMapV2([](*sessionContextMessage){sessionContext})
+
+	contexts := []string{"context1234567"}
+	sessionId := "sessionid1234"
+	pingerMessage := pingerPushMessageMap(PingerNotificationRegister, contexts, sessionId)
 	s.NotEmpty(pingerMessage)
-	_, ok := pingerMessage["meta"]
-	require.True(s.T(), ok, "meta not in pinger message")
-	meta := pingerMessage["meta"].(map[string]string)
-	t, ok := meta["time"]
-	s.True(ok, "time not in pinger message['meta']")
-	s.NotEqual("", t)
+	s.Equal(sessionId, pingerMessage["session"])
+	s.NotEqual("", pingerMessage["timestamp"])
+	for _, c := range contexts {
+		_, ok := pingerMessage[c]
+		s.True(ok, fmt.Sprintf("Context %s not in pinger message", c))
+	}
+	s.Equal(len(contexts)+2, len(pingerMessage))
 
-	_, ok = pingerMessage["ctxs"]
-	s.True(ok, "ctxs not in pinger message")
-	ctxs := pingerMessage["ctxs"].(map[string]map[string]string)
-	c, ok := ctxs[context]
-	s.True(ok, fmt.Sprintf("context %s not in pinger message['ctxs']", context))
-	s.Equal(session, c["ses"])
-
-	platform := "ios"
+	platform := "android"
 	alert := "foo"
 	sound := "bar"
 	contentAvailable := 1
-
+	
 	message, err := awsPushMessageString(platform, alert, sound, contentAvailable, days_28, pingerMessage, s.logger)
 	s.NoError(err)
 	s.NotEmpty(message)
@@ -121,27 +94,7 @@ func (s *pushTester) TestDevicePushMessageCreateV2() {
 	err = json.Unmarshal([]byte(message), &pushMessage)
 	s.NoError(err)
 
-	sections := []string{"APNS", "APNS_SANDBOX", "default"}
-	for _, sec := range sections {
-		secStr, ok := pushMessage[sec]
-		s.True(ok, sec)
-		s.NotEqual("", secStr)
-		secMap := make(map[string]interface{})
-		err := json.Unmarshal([]byte(secStr), &secMap)
-		s.NoError(err)
-		s.NotEmpty(secMap)
-	}
-
-	platform = "android"
-	message, err = awsPushMessageString(platform, alert, sound, contentAvailable, days_28, pingerMessage, s.logger)
-	s.NoError(err)
-	s.NotEmpty(message)
-
-	pushMessage = make(map[string]string)
-	err = json.Unmarshal([]byte(message), &pushMessage)
-	s.NoError(err)
-
-	sections = []string{"default", "GCM"}
+	sections := []string{"default", "GCM"}
 	for _, sec := range sections {
 		secStr, ok := pushMessage[sec]
 		s.True(ok, sec)
@@ -152,3 +105,4 @@ func (s *pushTester) TestDevicePushMessageCreateV2() {
 		s.NotEmpty(secMap)
 	}
 }
+
