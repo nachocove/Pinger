@@ -1,7 +1,6 @@
 package Pinger
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS/testHandler"
@@ -345,31 +344,6 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.Nil(di)
-}
-
-func (s *deviceInfoTester) TestDevicePushMessageCreate() {
-	di := DeviceInfo{Platform: "ios", PushService: PushServiceAPNS, ClientContext: "FOO"}
-	di.logger = s.logger
-	var days_28 int64 = 2419200
-
-	message, err := di.pushMessage(PingerNotificationRegister, "", days_28)
-	s.NoError(err)
-	s.NotEmpty(message)
-
-	pushMessage := make(map[string]string)
-	err = json.Unmarshal([]byte(message), &pushMessage)
-	s.NoError(err)
-
-	sections := []string{"APNS", "APNS_SANDBOX", "default"}
-	for _, sec := range sections {
-		secStr, ok := pushMessage[sec]
-		s.True(ok, sec)
-		s.NotEqual("", secStr)
-		secMap := make(map[string]interface{})
-		err := json.Unmarshal([]byte(secStr), &secMap)
-		s.NoError(err)
-		s.NotEmpty(secMap)
-	}
 }
 
 func (s *deviceInfoTester) TestRegisterAWS() {

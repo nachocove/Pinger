@@ -89,7 +89,7 @@ const (
 	MailClientStatusPinging     MailClientStatus = iota
 	MailClientStatusDeferred    MailClientStatus = iota
 	MailClientStatusStopped     MailClientStatus = iota
-	MailClientStatusReDeferred     MailClientStatus = iota
+	MailClientStatusReDeferred  MailClientStatus = iota
 )
 
 func (status MailClientStatus) String() string {

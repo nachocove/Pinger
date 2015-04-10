@@ -1,15 +1,12 @@
 package Pinger
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
-	"github.com/nachocove/Pinger/Utils/Telemetry"
 	"reflect"
 	"regexp"
 	"strings"
@@ -242,19 +239,46 @@ func (di *DeviceInfo) cleanup() {
 }
 
 var getAllMyDeviceInfoSql string
+var distinctPushServiceTokenSql string
+var clientContextsSql string
 
 func init() {
 	var ok bool
-	var deviceInfoReflection reflect.Type
-	var pingerField reflect.StructField
-	deviceInfoReflection = reflect.TypeOf(DeviceInfo{})
-	pingerField, ok = deviceInfoReflection.FieldByName("Pinger")
+	deviceInfoReflection := reflect.TypeOf(DeviceInfo{})
+	pingerField, ok := deviceInfoReflection.FieldByName("Pinger")
+	if ok == false {
+		panic("Could not get Pinger Field information")
+	}
+	pushServiceField, ok := deviceInfoReflection.FieldByName("PushService")
+	if ok == false {
+		panic("Could not get Pinger Field information")
+	}
+	pushTokenField, ok := deviceInfoReflection.FieldByName("PushToken")
+	if ok == false {
+		panic("Could not get Pinger Field information")
+	}
+	platformField, ok := deviceInfoReflection.FieldByName("Platform")
+	if ok == false {
+		panic("Could not get Pinger Field information")
+	}
+	awsEndpointField, ok := deviceInfoReflection.FieldByName("AWSEndpointArn")
+	if ok == false {
+		panic("Could not get Pinger Field information")
+	}
+	clientContextField, ok := deviceInfoReflection.FieldByName("ClientContext")
 	if ok == false {
 		panic("Could not get Pinger Field information")
 	}
 	getAllMyDeviceInfoSql = fmt.Sprintf("select * from %s where %s=?",
 		deviceTableName,
 		pingerField.Tag.Get("db"))
+	distinctPushServiceTokenSql = fmt.Sprintf("select distinct %s, %s, %s, %s from %s where %s=?",
+		pushServiceField.Tag.Get("db"), pushTokenField.Tag.Get("db"), platformField.Tag.Get("db"), awsEndpointField.Tag.Get("db"),
+		deviceTableName,
+		pingerField.Tag.Get("db"),
+	)
+	clientContextsSql = fmt.Sprintf("select distinct %s from %s where %s=? and %s=?",
+		clientContextField.Tag.Get("db"), deviceTableName, pushServiceField.Tag.Get("db"), pushTokenField.Tag.Get("db"))
 }
 
 func getDeviceInfo(dbm *gorp.DbMap, aws AWS.AWSHandler, clientId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
@@ -519,36 +543,12 @@ const (
 	PingerNotificationNewMail  PingerNotification = "new"
 )
 
-func (di *DeviceInfo) Push(message PingerNotification, alert, sound string, contentAvailable int, ttl int64) error {
-	var err error
-	retryInterval := time.Duration(1) * time.Second
-	for i := 0; i < 10; i++ {
-		if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
-			err = di.awsPushMessage(message, alert, sound, contentAvailable, ttl)
-		} else {
-			err = di.APNSpushMessage(message, alert, sound, contentAvailable, ttl)
-		}
-		if err != nil {
-			di.Warning("Push error %s. Retrying attempt %d in %s", err, i, retryInterval)
-			time.Sleep(retryInterval)
-		} else {
-			di.Debug("Successfully pushed after %d tries", i)
-			break
-		}
-	}
-	if err == nil {
-		err = di.updateLastContactRequest()
-	}
-	return err
-}
-
 func (di *DeviceInfo) PushRegister() error {
 	var alert string
 	if globals.config.APNSAlert {
 		alert = "Nacho says: Reregister!"
 	}
-	ttl := globals.config.APNSExpirationSeconds
-	return di.Push(PingerNotificationRegister, alert, globals.config.APNSSound, globals.config.APNSContentAvailable, ttl)
+	return di.Push(PingerNotificationRegister, alert, globals.config.APNSSound, globals.config.APNSContentAvailable)
 }
 
 func (di *DeviceInfo) PushNewMail() error {
@@ -556,96 +556,18 @@ func (di *DeviceInfo) PushNewMail() error {
 	if globals.config.APNSAlert {
 		alert = "Nacho says: You have mail!"
 	}
+	return di.Push(PingerNotificationNewMail, alert, globals.config.APNSSound, globals.config.APNSContentAvailable)
+}
+
+func (di *DeviceInfo) Push(message PingerNotification, alert, sound string, contentAvailable int) error {
+	contextIds := []string{di.ClientContext}
+	pingerMap := pingerPushMessageMap(message, contextIds, di.SessionId)
 	ttl := globals.config.APNSExpirationSeconds
-
-	return di.Push(PingerNotificationNewMail, alert, globals.config.APNSSound, globals.config.APNSContentAvailable, ttl)
-}
-
-// AWS Push message code
-
-func (di *DeviceInfo) awsPushMessage(message PingerNotification, alert, sound string, contentAvailable int, ttl int64) error {
-	if di.AWSEndpointArn == "" {
-		return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", di.PushService, di.PushToken)
+	err := Push(di.aws, di.Platform, di.PushService, di.PushToken, di.AWSEndpointArn, alert, sound, contentAvailable, ttl, pingerMap, di.logger)
+	if err == nil {
+		err = di.updateLastContactRequest()
 	}
-	pushMessage, err := di.pushMessage(message, alert, sound, contentAvailable, ttl)
-	if err != nil {
-		return err
-	}
-	di.Debug("Sending push message to AWS: pushToken: %s/%s AWSEndpointArn:%s %s", di.PushService, di.PushToken, di.AWSEndpointArn, pushMessage)
-	return di.aws.SendPushNotification(di.AWSEndpointArn, pushMessage)
-}
-
-func (di *DeviceInfo) pushMessage(message PingerNotification, alert, sound string, contentAvailable int, ttl int64) (string, error) {
-	if message == "" {
-		return "", fmt.Errorf("Message can not be empty")
-	}
-	pingerMap := make(map[string]interface{})
-	pingerMap[di.ClientContext] = string(message)
-	pingerMap["timestamp"] = time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat)
-	pingerMap["session"] = di.SessionId
-
-	pingerJson, err := json.Marshal(pingerMap)
-	if err != nil {
-		return "", err
-	}
-	notificationMap := map[string]string{}
-	notificationMap["default"] = string(pingerJson)
-
-	switch {
-	case di.Platform == "ios":
-		APNSMap := map[string]interface{}{}
-		APNSMap["pinger"] = pingerMap
-		apsMap := make(map[string]interface{})
-		if contentAvailable > 0 {
-			apsMap["content-available"] = contentAvailable
-		}
-		if sound != "" {
-			apsMap["sound"] = sound
-		}
-		if alert != "" {
-			apsMap["alert"] = alert
-		}
-		APNSMap["aps"] = apsMap
-		b, err := json.Marshal(APNSMap)
-		if err != nil {
-			return "", err
-		}
-		if len(b) > 256 {
-			di.Warning("Length of push message is %d > 256", len(b))
-		} else {
-			di.Debug("Length of push message %d", len(b))
-		}
-		notificationMap["APNS"] = string(b)
-		notificationMap["APNS_SANDBOX"] = string(b)
-
-	case di.Platform == "android":
-		hash := sha1.New()
-		hash.Write(pingerJson)
-		md := hash.Sum(nil)
-		pingerMapSha := hex.EncodeToString(md)
-
-		GCMMap := map[string]interface{}{}
-		GCMMap["data"] = pingerMap
-		GCMMap["collapse_key"] = string(pingerMapSha)
-		GCMMap["time_to_live"] = ttl
-		GCMMap["delay_while_idle"] = false
-
-		b, err := json.Marshal(GCMMap)
-		if err != nil {
-			return "", err
-		}
-		notificationMap["GCM"] = string(b)
-	}
-
-	var notificationBytes []byte
-	notificationBytes, err = json.Marshal(notificationMap)
-	if err != nil {
-		return "", err
-	}
-	if len(notificationBytes) == 0 {
-		return "", fmt.Errorf("No notificationBytes created")
-	}
-	return string(notificationBytes), nil
+	return err
 }
 
 func (di *DeviceInfo) customerData() string {
@@ -761,36 +683,4 @@ func (di *DeviceInfo) validateClient() error {
 		}
 	}
 	return nil
-}
-
-func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger) int {
-	devices, err := getAllMyDeviceInfo(dbm, aws, logger)
-	if err != nil {
-		logger.Error("getAllMyDeviceInfo returned: %s", err.Error())
-	}
-	logger.Debug("Alerting %d devices", len(devices))
-	count := 0
-	alreadyPushed := make(map[string]bool)
-	pushesSent := 0
-	for _, di := range devices {
-		key := fmt.Sprintf("%s:%s", di.PushService, di.PushToken)
-		if !alreadyPushed[key] {
-			di.Info("sending PingerNotificationRegister to device (%s)", key)
-			err = di.PushRegister()
-			if err != nil {
-				di.Warning("Could not send push: %s", err.Error())
-			} else {
-				alreadyPushed[key] = true
-				pushesSent++
-				count++
-			}
-			if count >= 10 {
-				count = 0
-				time.Sleep(time.Duration(1) * time.Second)
-			}
-		} else {
-			di.Debug("push already sent (%s)", key)
-		}
-	}
-	return pushesSent
 }

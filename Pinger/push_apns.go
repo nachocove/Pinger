@@ -5,7 +5,6 @@ import (
 	"github.com/anachronistic/apns"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
-	"github.com/nachocove/Pinger/Utils/Telemetry"
 	"time"
 )
 
@@ -50,7 +49,7 @@ func FeedbackListener(logger *Logging.Logger) {
 	}
 }
 
-func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert, sound string, contentAvailable int, ttl int64) error {
+func APNSpushMessage(token string, alert, sound string, contentAvailable int, ttl int64, pingerMap map[string]interface{}, logger *Logging.Logger) error {
 	if globals.config.APNSCertFile == "" {
 		panic("No apns cert set. Can not push to APNS")
 	}
@@ -58,7 +57,7 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert, sound s
 		panic("No apns key set. Can not push to APNS")
 	}
 	pn := apns.NewPushNotification()
-	token, err := AWS.DecodeAPNSPushToken(di.PushToken)
+	token, err := AWS.DecodeAPNSPushToken(token)
 	if err != nil {
 		return err
 	}
@@ -66,7 +65,7 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert, sound s
 	pn.Priority = 10
 	if ttl > 0 {
 		expiration := time.Now().Add(time.Duration(ttl) * time.Second).UTC()
-		di.Debug("Setting push expiration to %s (unix utc %d)", expiration, expiration.Unix())
+		logger.Debug("Setting push expiration to %s (unix utc %d)", expiration, expiration.Unix())
 		pn.Expiry = uint32(expiration.UTC().Unix())
 	}
 
@@ -83,14 +82,10 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert, sound s
 
 	pn.Set("aps", payload)
 
-	pingerMap := make(map[string]interface{})
-	pingerMap[di.ClientContext] = string(message)
-	pingerMap["timestamp"] = time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat)
-	pingerMap["session"] = di.SessionId
 	pn.Set("pinger", pingerMap)
 
 	msg, _ := pn.PayloadString()
-	di.Debug("Sending push message to APNS: pushToken: %s %s", di.PushToken, msg)
+	logger.Debug("Sending push message to APNS: pushToken: %s %s", token, msg)
 
 	var apnsHost string
 	if globals.config.APNSSandbox {
@@ -101,13 +96,13 @@ func (di *DeviceInfo) APNSpushMessage(message PingerNotification, alert, sound s
 	client := apns.NewClient(apnsHost, globals.config.APNSCertFile, globals.config.APNSKeyFile)
 	resp := client.Send(pn)
 	if resp.AppleResponse != "" {
-		di.Debug("Response from apple: %s", resp.AppleResponse)
+		logger.Debug("Response from apple: %s", resp.AppleResponse)
 	}
 	if resp.Error != nil {
 		return fmt.Errorf("APNS Push error: %s", resp.Error)
 	}
 	if !resp.Success {
-		di.Error("response is not success, but no error indicated")
+		logger.Error("response is not success, but no error indicated")
 		return fmt.Errorf("Unknown error occurred during push")
 	}
 	return nil
