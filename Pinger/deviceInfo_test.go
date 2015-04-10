@@ -441,10 +441,10 @@ func (s *deviceInfoTester) TestSendToAll() {
 	require.NotNil(s.T(), di)
 	di.AWSEndpointArn = "12345"
 	di.insert(s.dbmap)
-	
+
 	deviceList, err := getAllMyDeviceInfo(s.dbmap, s.aws, s.logger)
 	s.Equal(2, len(deviceList))
-	
+
 	n := alertAllDevices(s.dbmap, s.aws, s.logger)
 	s.Equal(1, n)
 }
