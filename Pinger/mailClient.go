@@ -142,8 +142,8 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 	}
 
 	client.logger.SetCallDepth(1)
-
-	di, err := newDeviceInfoPI(dbm, aws, pi, logger)
+	
+	di, err := pi.newDeviceInfo(newDeviceInfoSqlHandler(dbm), aws, logger)
 	if err != nil {
 		return nil, err
 	}

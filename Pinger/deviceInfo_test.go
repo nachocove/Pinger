@@ -12,7 +12,8 @@ import (
 
 type deviceInfoTester struct {
 	suite.Suite
-	dbmap             *gorp.DbMap
+	dbm *gorp.DbMap
+	db DeviceInfoDbHandler
 	logger            *Logging.Logger
 	testClientId      string
 	testClientContext string
@@ -32,10 +33,11 @@ func (s *deviceInfoTester) SetupSuite() {
 	var err error
 	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
-	s.dbmap, err = initDB(&dbconfig, true, s.logger)
+	s.dbm, err = initDB(&dbconfig, true, s.logger)
 	if err != nil {
 		panic("Could not create DB")
 	}
+	s.db = newDeviceInfoSqlHandler(s.dbm)
 	s.testClientId = "sometestClientId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"
@@ -49,7 +51,7 @@ func (s *deviceInfoTester) SetupSuite() {
 }
 
 func (s *deviceInfoTester) SetupTest() {
-	s.dbmap.TruncateTables()
+	s.dbm.TruncateTables()
 	s.aws = testHandler.NewTestAwsHandler()
 	globals = nil
 	setGlobal(NewBackendConfiguration())
@@ -79,6 +81,7 @@ func (s *deviceInfoTester) TestDeviceInfoValidate() {
 		s.testAppNumber,
 		s.sessionId,
 		s.aws,
+		s.db,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
@@ -134,11 +137,12 @@ func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 		s.testAppNumber,
 		s.sessionId,
 		s.aws,
+		s.db,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
 
-	di.insert(s.dbmap)
+	di.insert(nil)
 
 	di.cleanup()
 	s.Equal("", di.ClientId)
@@ -155,7 +159,7 @@ func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 
 func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	var err error
-	deviceList, err := getAllMyDeviceInfo(s.dbmap, s.aws, s.logger)
+	deviceList, err := getAllMyDeviceInfo(s.db, s.aws, s.logger)
 	s.Equal(len(deviceList), 0)
 
 	di, err := newDeviceInfo(
@@ -170,6 +174,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 		s.testAppNumber,
 		s.sessionId,
 		s.aws,
+		s.db,
 		s.logger)
 	s.Error(err, "ClientContext can not be empty")
 	s.Nil(di)
@@ -186,6 +191,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 		s.testAppNumber,
 		s.sessionId,
 		s.aws,
+		s.db,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
@@ -206,20 +212,19 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.Equal(0, di.Updated)
 	s.Empty(di.AWSEndpointArn)
 
-	di.dbm = s.dbmap
 	lastContact, lastContactRequest, err := di.getContactInfo(false)
 	s.Error(err)
 	s.Equal(0, lastContact)
 	s.Equal(0, lastContactRequest)
 
-	deviceList, err = getAllMyDeviceInfo(s.dbmap, s.aws, s.logger)
+	deviceList, err = getAllMyDeviceInfo(s.db, s.aws, s.logger)
 	s.Equal(0, len(deviceList))
 
-	diInDb, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	diInDb, err := getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.Nil(diInDb)
 
-	err = di.insert(s.dbmap)
+	err = di.insert(nil)
 	s.NoError(err)
 	s.NotEmpty(di.Pinger)
 	s.True(di.Created > 0)
@@ -232,15 +237,15 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 
 	s.Equal(pingerHostId, di.Pinger)
 
-	diInDb, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	diInDb, err = getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(diInDb)
 	s.Equal(di.Id, diInDb.Id)
 
-	deviceList, err = getAllMyDeviceInfo(s.dbmap, s.aws, s.logger)
+	deviceList, err = getAllMyDeviceInfo(s.db, s.aws, s.logger)
 	s.NoError(err)
 	s.Equal(1, len(deviceList))
-	s.NotNil(di.dbm)
+	s.NotNil(di.db)
 	di.cleanup()
 }
 
@@ -257,18 +262,19 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 		s.testAppNumber,
 		s.sessionId,
 		s.aws,
+		s.db,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
 
-	err = di.insert(s.dbmap)
+	err = di.insert(nil)
 	s.NoError(err)
 
-	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	di, err = getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(di)
 
-	di2, err := getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	di2, err := getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(di2)
 	s.Equal(di.Id, di2.Id)
@@ -327,13 +333,14 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 		s.testAppNumber,
 		s.sessionId,
 		s.aws,
+		s.db,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
 
-	err = di.insert(s.dbmap)
+	err = di.insert(nil)
 	s.NoError(err)
-	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	di, err = getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(di)
 
@@ -341,7 +348,7 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 
 	di = nil
 
-	di, err = getDeviceInfo(s.dbmap, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	di, err = getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.Nil(di)
 }
@@ -359,11 +366,12 @@ func (s *deviceInfoTester) TestRegisterAWS() {
 		s.testAppNumber,
 		s.sessionId,
 		s.aws,
+		s.db,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
 
-	err = di.insert(s.dbmap)
+	err = di.insert(nil)
 	s.NoError(err)
 
 	fmt.Println(di.AWSEndpointArn)
@@ -392,11 +400,12 @@ func (s *deviceInfoTester) TestSendToAll() {
 		s.testAppNumber,
 		"1",
 		s.aws,
+		s.db,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
 	di.AWSEndpointArn = "12345"
-	di.insert(s.dbmap)
+	di.insert(nil)
 
 	di, err = newDeviceInfo(
 		s.testClientId,
@@ -410,15 +419,16 @@ func (s *deviceInfoTester) TestSendToAll() {
 		s.testAppNumber,
 		"2",
 		s.aws,
+		s.db,
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
 	di.AWSEndpointArn = "12345"
-	di.insert(s.dbmap)
+	di.insert(nil)
 
-	deviceList, err := getAllMyDeviceInfo(s.dbmap, s.aws, s.logger)
+	deviceList, err := getAllMyDeviceInfo(s.db, s.aws, s.logger)
 	s.Equal(2, len(deviceList))
 
-	n := alertAllDevices(s.dbmap, s.aws, s.logger)
+	n := alertAllDevices(s.dbm, s.aws, s.logger)
 	s.Equal(1, n)
 }
