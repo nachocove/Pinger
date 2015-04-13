@@ -23,7 +23,7 @@ type deviceContact struct {
 }
 
 func deviceContactGet(db DeviceContactDbHandler, clientId, clientContext, deviceId string) (*deviceContact, error) {
-	obj, err := db.get(clientId, clientContext, deviceId)
+	obj, err := db.Get(clientId, clientContext, deviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func newDeviceContact(db DeviceContactDbHandler, clientId, clientContext, device
 }
 
 func (dc *deviceContact) insert() error {
-	return dc.db.insert(dc)
+	return dc.db.Insert(dc)
 }
 
 func (di *DeviceInfo) updateLastContact() error {
@@ -55,7 +55,7 @@ func (di *DeviceInfo) updateLastContact() error {
 		return err
 	}
 	dc.LastContact = time.Now().UnixNano()
-	_, err = dc.db.update(dc)
+	_, err = dc.db.Update(dc)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (di *DeviceInfo) updateLastContactRequest() error {
 		return err
 	}
 	dc.LastContactRequest = time.Now().UnixNano()
-	_, err = dc.db.update(dc)
+	_, err = dc.db.Update(dc)
 	if err != nil {
 		return err
 	}

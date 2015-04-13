@@ -15,12 +15,12 @@ type DeviceInfoSqlHandler struct {
 func newDeviceInfoSqlHandler(dbm *gorp.DbMap) *DeviceInfoSqlHandler {
 	return &DeviceInfoSqlHandler{dbm: dbm,}
 }
-func (h *DeviceInfoSqlHandler) insert(i interface{}) error {
+func (h *DeviceInfoSqlHandler) Insert(i interface{}) error {
 	di := i.(*DeviceInfo)
 	return h.dbm.Insert(di)
 }
 
-func (h *DeviceInfoSqlHandler) update(i interface{}) (int64, error) {
+func (h *DeviceInfoSqlHandler) Update(i interface{}) (int64, error) {
 	n, err := h.dbm.Update(i.(*DeviceInfo))
 	if err != nil {
 		return n, err
@@ -28,13 +28,17 @@ func (h *DeviceInfoSqlHandler) update(i interface{}) (int64, error) {
 	return n, nil
 }
 
-func (h *DeviceInfoSqlHandler) delete(i interface{}) error {
+func (h *DeviceInfoSqlHandler) Delete(i interface{}) error {
 	_, err := h.dbm.Delete(i.(*DeviceInfo))
 	return err
 }
 
-func (h *DeviceInfoSqlHandler) get(args ...interface{}) (interface{}, error) {
+func (h *DeviceInfoSqlHandler) Get(args ...interface{}) (interface{}, error) {
 	return h.dbm.Get(&DeviceInfo{}, args...)
+}
+
+func (h *DeviceInfoSqlHandler) Search(keys []DBKeyValue) (interface{}, error) {
+	return nil, nil
 }
 
 func (h *DeviceInfoSqlHandler) findByPingerId(pingerId string) ([]DeviceInfo, error) {

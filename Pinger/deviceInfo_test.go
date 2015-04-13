@@ -3,7 +3,7 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
-	"github.com/nachocove/Pinger/Utils/AWS/testHandler"
+	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -25,7 +25,7 @@ type deviceInfoTester struct {
 	testOSVersion     string
 	testAppVersion    string
 	testAppNumber     string
-	aws               *testHandler.TestAwsHandler
+	aws               *AWS.TestAwsHandler
 	sessionId         string
 }
 
@@ -52,7 +52,7 @@ func (s *deviceInfoTester) SetupSuite() {
 
 func (s *deviceInfoTester) SetupTest() {
 	s.dbm.TruncateTables()
-	s.aws = testHandler.NewTestAwsHandler()
+	s.aws = AWS.NewTestAwsHandler()
 	globals = nil
 	setGlobal(NewBackendConfiguration())
 }

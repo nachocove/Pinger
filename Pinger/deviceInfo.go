@@ -10,11 +10,24 @@ import (
 	"strings"
 )
 
+type KeyComparison int
+const (
+	KeyComparisonEq = iota
+	KeyComparisonGt = iota
+	KeyComparisonLt = iota
+	KeyComparisonIn = iota
+)
+type DBKeyValue struct {
+	Key string
+	Value string
+	Comparison KeyComparison
+}
 type DbHandler interface {
-	insert(i interface{}) error
-	update(i interface{}) (int64, error)
-	delete(i interface{}) error
-	get(args ...interface{}) (interface{}, error)
+	Insert(i interface{}) error
+	Update(i interface{}) (int64, error)
+	Delete(i interface{}) error
+	Get(keys []DBKeyValue) (map[string]interface{}, error)
+	Search(keys []DBKeyValue) ([]map[string]interface{}, error)
 }
 type DeviceInfoDbHandler interface {
 	DbHandler
@@ -142,12 +155,12 @@ func (di *DeviceInfo) Warning(format string, args ...interface{}) {
 }
 
 func (di *DeviceInfo) delete() error {
-	return di.db.delete(di)
+	return di.db.Delete(di)
 }
 
 func (di *DeviceInfo) cleanup() {
 	di.Debug("Cleaning up DeviceInfo")
-	err := di.db.delete(di)
+	err := di.db.Delete(di)
 	if err != nil {
 		di.Error("Not deleted from DB: %s", err)
 	}
@@ -164,7 +177,13 @@ func (di *DeviceInfo) cleanup() {
 }
 
 func getDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, clientId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
-	obj, err := db.get(clientId, clientContext, deviceId, sessionId)
+	keys := []DBKeyValue{
+		DBKeyValue{Key: "clientId", Value: clientId, Comparison: KeyComparisonEq},
+		DBKeyValue{Key: "clientContext", Value: clientContext, Comparison: KeyComparisonEq},
+		DBKeyValue{Key: "deviceId", Value: deviceId, Comparison: KeyComparisonEq},
+		DBKeyValue{Key: "sessionId", Value: sessionId, Comparison: KeyComparisonEq},
+	}
+	obj, err := db.Get(keys)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +277,7 @@ func (di *DeviceInfo) update() (int64, error) {
 	if di.db == nil {
 		panic("Can not update device info without having fetched it")
 	}
-	n, err := di.db.update(di)
+	n, err := di.db.Update(di)
 	if err != nil {
 		panic(fmt.Sprintf("%s: update error: %s", di.getLogPrefix(), err.Error()))
 	}
@@ -275,7 +294,7 @@ func (di *DeviceInfo) insert(db DeviceInfoDbHandler) error {
 	if di.db == nil {
 		di.db = db
 	}
-	err := db.insert(di)
+	err := db.Insert(di)
 	if err != nil {
 		panic(fmt.Sprintf("%s: insert error: %s", di.getLogPrefix(), err.Error()))
 	}
