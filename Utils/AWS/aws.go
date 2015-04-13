@@ -17,6 +17,7 @@ type AWSHandler interface {
 	ValidateCognitoID(clientId string) error
 	PutFile(bucket, srcFilePath, destFilePath string) error
 	IgnorePushFailures() bool
+	GetDynamoDbSession() DynamoDbHandler
 }
 
 // AWSHandle is the collection of AWS related information
