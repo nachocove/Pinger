@@ -3,7 +3,7 @@ package Pinger
 import (
 	"fmt"
 	"github.com/coopernurse/gorp"
-	"github.com/nachocove/Pinger/Utils/AWS/testHandler"
+	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -19,7 +19,7 @@ type RPCServerTester struct {
 	testDeviceId      string
 	testPlatform      string
 	testMailServerUrl string
-	aws               *testHandler.TestAwsHandler
+	aws               *AWS.TestAwsHandler
 	sessionId         string
 	mailInfo          *MailPingInformation
 }
@@ -51,7 +51,7 @@ func (s *RPCServerTester) SetupSuite() {
 	s.testPlatform = "ios"
 	s.testMailServerUrl = "http://foo"
 	s.sessionId = "12345678"
-	s.aws = testHandler.NewTestAwsHandler()
+	s.aws = AWS.NewTestAwsHandler()
 	s.mailInfo = &MailPingInformation{
 		ClientId:      s.testClientId,
 		ClientContext: s.testClientContext,
