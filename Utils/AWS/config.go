@@ -16,6 +16,7 @@ type AWSConfiguration struct {
 	CognitoIdentityPoolID     string
 	S3RegionName              string
 	IgnorePushFailure         bool
+	DynamoDbRegionName        string
 }
 
 // NewHandle creates a new AWSHandle from the information from the config file.
@@ -37,6 +38,9 @@ func (config *AWSConfiguration) Validate() error {
 	}
 	if config.S3RegionName == "" {
 		config.S3RegionName = config.RegionName
+	}
+	if config.DynamoDbRegionName == "" {
+		config.DynamoDbRegionName = config.RegionName
 	}
 	return nil
 }

@@ -1,6 +1,7 @@
-package testHandler
+package AWS
 
-import ()
+import (
+)
 
 type TestAwsHandler struct {
 	registeredEndpoint    string
@@ -90,4 +91,8 @@ func (ah *TestAwsHandler) PutFile(bucket, srcFilePath, destFilePath string) erro
 }
 func (ah *TestAwsHandler) IgnorePushFailures() bool {
 	return ah.ignorePushFailure
+}
+
+func (ah *TestAwsHandler) GetDynamoDbSession() DynamoDbHandler {
+	return nil
 }
