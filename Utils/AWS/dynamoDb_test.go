@@ -10,18 +10,23 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"time"
+	"net"
 )
 
 type awsDynamoDbTester struct {
 	suite.Suite
 	dynDb        *DynamoDb
 	clientRecord map[string]interface{}
+	dynamoProcess *os.Process
 }
 
 func (s *awsDynamoDbTester) SetupSuite() {
-	readyCh := make(chan int)
-	go doJavaDynamoLocal(readyCh)
+	readyCh := make(chan int, 1)
+	
+	go s.doJavaDynamoLocal(readyCh)
 	<-readyCh
+	
 	s.dynDb = newDynamoDbSession("AKIAIEKBHZUDER5TYR7Q", "9bSGWoFxSGRLS+J4EhLbR3NMkjWUbdVu+itcYT6g", "local")
 	s.clientRecord = map[string]interface{}{
 		"client":       "foo12334",
@@ -30,6 +35,10 @@ func (s *awsDynamoDbTester) SetupSuite() {
 		"push_service": "APNS",
 		"push_token":   "12345678",
 	}
+}
+
+func (s *awsDynamoDbTester) TearDownSuite() {
+	s.dynamoProcess.Kill()
 }
 
 func (s *awsDynamoDbTester) cleanUp() {
@@ -45,26 +54,36 @@ func (s *awsDynamoDbTester) TearDownTest() {
 	s.cleanUp()
 }
 
-func doJavaDynamoLocal(readyCh chan int) {
+func (s *awsDynamoDbTester) doJavaDynamoLocal(readyCh chan int) {
 	java, err := exec.LookPath("java")
 	if err != nil {
 		panic(err)
 	}
-	cmd := exec.Command(java, "-Djava.library.path=./DynamoDBLocal_lib", "-jar", "DynamoDBLocal.jar")
 	nachoHome := os.Getenv("NACHO_HOME")
 	if nachoHome == "" {
 		nachoHome = fmt.Sprintf("%s/src/nacho", os.Getenv("HOME"))
 	}
+	cmd := exec.Command(java, "-Djava.library.path=./DynamoDBLocal_lib", "-jar", "DynamoDBLocal.jar")
 	cmd.Dir = fmt.Sprintf("%s/dynamodb_local_2013-12-12", nachoHome)
-	cmd.Stdout = os.Stdout
+	//cmd.Stdout = os.Stdout
+	//cmd.Stderr = os.Stderr
+	//cmd.Stdin = os.Stdin
 	err = cmd.Start()
 	if err != nil {
 		panic(err)
 	}
-	readyCh <- 1
+	s.dynamoProcess = cmd.Process
+	time.Sleep(1*time.Second)
+	for {
+		conn, err := net.Dial("tcp", "localhost:8000")
+		if err == nil && conn != nil {
+			conn.Close()
+			readyCh <- 1
+			break
+		}
+		time.Sleep(1*time.Second)
+	}
 	err = cmd.Wait()
-	fmt.Printf("Java Dynamodb finished with err %v\n", err)
-
 }
 
 func TestAWSDynamoDb(t *testing.T) {
@@ -117,10 +136,9 @@ func (s *awsDynamoDbTester) TestTableCreate() {
 	descReq := dynamodb.DescribeTableInput{
 		TableName: aws.String(UnitTestTableName),
 	}
-	descResp, err := s.dynDb.session.ListTables(&descReq)
+	descResp, err := s.dynDb.session.DescribeTable(&descReq)
 	s.NoError(err)
-	fmt.Printf("DESCRIBE: %+v\n", descResp)
-	
+	s.NotEmpty(descResp.Table.GlobalSecondaryIndexes)
 }
 
 func (s *awsDynamoDbTester) itemCreate() string {
