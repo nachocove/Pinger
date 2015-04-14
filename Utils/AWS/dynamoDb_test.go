@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"time"
+	"net"
 )
 
 type awsDynamoDbTester struct {
@@ -32,6 +34,10 @@ func (s *awsDynamoDbTester) SetupSuite() {
 	}
 }
 
+func (s *awsDynamoDbTester) TearDownSuite() {
+	s.dynamoProcess.Kill()
+}
+
 func (s *awsDynamoDbTester) cleanUp() {
 	req := dynamodb.DeleteTableInput{TableName: aws.String(UnitTestTableName)}
 	s.dynDb.session.DeleteTable(&req) // don't care about response or error
@@ -45,7 +51,7 @@ func (s *awsDynamoDbTester) TearDownTest() {
 	s.cleanUp()
 }
 
-func doJavaDynamoLocal(readyCh chan int) {
+func (s *awsDynamoDbTester) doJavaDynamoLocal(readyCh chan int) {
 	java, err := exec.LookPath("java")
 	if err != nil {
 		panic(err)
@@ -56,15 +62,22 @@ func doJavaDynamoLocal(readyCh chan int) {
 		nachoHome = fmt.Sprintf("%s/src/nacho", os.Getenv("HOME"))
 	}
 	cmd.Dir = fmt.Sprintf("%s/dynamodb_local_2013-12-12", nachoHome)
-	cmd.Stdout = os.Stdout
 	err = cmd.Start()
 	if err != nil {
 		panic(err)
 	}
-	readyCh <- 1
+	s.dynamoProcess = cmd.Process
+	time.Sleep(1*time.Second)
+	for {
+		conn, err := net.Dial("tcp", "localhost:8000")
+		if err == nil && conn != nil {
+			conn.Close()
+			readyCh <- 1
+			break
+		}
+		time.Sleep(1*time.Second)
+	}
 	err = cmd.Wait()
-	fmt.Printf("Java Dynamodb finished with err %v\n", err)
-
 }
 
 func TestAWSDynamoDb(t *testing.T) {
@@ -117,10 +130,9 @@ func (s *awsDynamoDbTester) TestTableCreate() {
 	descReq := dynamodb.DescribeTableInput{
 		TableName: aws.String(UnitTestTableName),
 	}
-	descResp, err := s.dynDb.session.ListTables(&descReq)
+	descResp, err := s.dynDb.session.DescribeTable(&descReq)
 	s.NoError(err)
-	fmt.Printf("DESCRIBE: %+v\n", descResp)
-	
+	s.NotEmpty(descResp.Table.GlobalSecondaryIndexes)
 }
 
 func (s *awsDynamoDbTester) itemCreate() string {
