@@ -7,22 +7,23 @@ import (
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"net"
 	"os"
 	"os/exec"
 	"testing"
 	"time"
-	"net"
 )
 
 type awsDynamoDbTester struct {
 	suite.Suite
-	dynDb        *DynamoDb
-	clientRecord map[string]interface{}
+	dynDb         *DynamoDb
+	clientRecord  map[string]interface{}
+	dynamoProcess *os.Process
 }
 
 func (s *awsDynamoDbTester) SetupSuite() {
 	readyCh := make(chan int)
-	go doJavaDynamoLocal(readyCh)
+	go s.doJavaDynamoLocal(readyCh)
 	<-readyCh
 	s.dynDb = newDynamoDbSession("AKIAIEKBHZUDER5TYR7Q", "9bSGWoFxSGRLS+J4EhLbR3NMkjWUbdVu+itcYT6g", "local")
 	s.clientRecord = map[string]interface{}{
@@ -67,7 +68,7 @@ func (s *awsDynamoDbTester) doJavaDynamoLocal(readyCh chan int) {
 		panic(err)
 	}
 	s.dynamoProcess = cmd.Process
-	time.Sleep(1*time.Second)
+	time.Sleep(1 * time.Second)
 	for {
 		conn, err := net.Dial("tcp", "localhost:8000")
 		if err == nil && conn != nil {
@@ -75,7 +76,7 @@ func (s *awsDynamoDbTester) doJavaDynamoLocal(readyCh chan int) {
 			readyCh <- 1
 			break
 		}
-		time.Sleep(1*time.Second)
+		time.Sleep(1 * time.Second)
 	}
 	err = cmd.Wait()
 }
@@ -126,7 +127,7 @@ func (s *awsDynamoDbTester) TestTableCreate() {
 	listResp, err := s.dynDb.session.ListTables(&listReq)
 	s.NoError(err)
 	s.NotEmpty(listResp.TableNames)
-	
+
 	descReq := dynamodb.DescribeTableInput{
 		TableName: aws.String(UnitTestTableName),
 	}

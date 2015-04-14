@@ -10,28 +10,12 @@ import (
 	"strings"
 )
 
-type KeyComparison int
-const (
-	KeyComparisonEq = iota
-	KeyComparisonGt = iota
-	KeyComparisonLt = iota
-	KeyComparisonIn = iota
-)
-type DBKeyValue struct {
-	Key string
-	Value string
-	Comparison KeyComparison
-}
-type DbHandler interface {
-	Insert(i interface{}) error
-	Update(i interface{}) (int64, error)
-	Delete(i interface{}) error
-	Get(keys []DBKeyValue) (map[string]interface{}, error)
-	Search(keys []DBKeyValue) ([]map[string]interface{}, error)
-}
 type DeviceInfoDbHandler interface {
-	DbHandler
-	findByPingerId(pingerId string) ([]DeviceInfo, error)
+	insert(di *DeviceInfo) error
+	update(di *DeviceInfo) (int64, error)
+	delete(di *DeviceInfo) error
+	get(keys []AWS.DBKeyValue) (*DeviceInfo, error)
+	findByPingerId(pingerId string) ([]*DeviceInfo, error)
 }
 
 type DeviceInfo struct {
@@ -51,10 +35,10 @@ type DeviceInfo struct {
 	AWSEndpointArn  string `db:"aws_endpoint_arn"`
 	Pinger          string `db:"pinger"`
 
-	db DeviceInfoDbHandler    `db:"-"`
-	logger    *Logging.Logger `db:"-"`
-	logPrefix string          `db:"-"`
-	aws       AWS.AWSHandler  `db:"-"`
+	db        DeviceInfoDbHandler `db:"-"`
+	logger    *Logging.Logger     `db:"-"`
+	logPrefix string              `db:"-"`
+	aws       AWS.AWSHandler      `db:"-"`
 }
 
 func (di *DeviceInfo) validate() error {
@@ -116,7 +100,7 @@ func newDeviceInfo(
 		AppBuildVersion: appBuildVersion,
 		AppBuildNumber:  appBuildNumber,
 		aws:             aws,
-		db: db,
+		db:              db,
 	}
 	di.SetLogger(logger)
 	err := di.validate()
@@ -155,12 +139,12 @@ func (di *DeviceInfo) Warning(format string, args ...interface{}) {
 }
 
 func (di *DeviceInfo) delete() error {
-	return di.db.Delete(di)
+	return di.db.delete(di)
 }
 
 func (di *DeviceInfo) cleanup() {
 	di.Debug("Cleaning up DeviceInfo")
-	err := di.db.Delete(di)
+	err := di.db.delete(di)
 	if err != nil {
 		di.Error("Not deleted from DB: %s", err)
 	}
@@ -177,22 +161,17 @@ func (di *DeviceInfo) cleanup() {
 }
 
 func getDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, clientId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
-	keys := []DBKeyValue{
-		DBKeyValue{Key: "clientId", Value: clientId, Comparison: KeyComparisonEq},
-		DBKeyValue{Key: "clientContext", Value: clientContext, Comparison: KeyComparisonEq},
-		DBKeyValue{Key: "deviceId", Value: deviceId, Comparison: KeyComparisonEq},
-		DBKeyValue{Key: "sessionId", Value: sessionId, Comparison: KeyComparisonEq},
+	keys := []AWS.DBKeyValue{
+		AWS.DBKeyValue{Key: "clientId", Value: clientId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "clientContext", Value: clientContext, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "deviceId", Value: deviceId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "sessionId", Value: sessionId, Comparison: AWS.KeyComparisonEq},
 	}
-	obj, err := db.Get(keys)
+	di, err := db.get(keys)
 	if err != nil {
 		return nil, err
 	}
-	var di *DeviceInfo
-	if obj != nil {
-		di = obj.(*DeviceInfo)
-		if di == nil {
-			panic("di can not be nil")
-		}
+	if di != nil {
 		di.db = db
 		di.aws = aws
 		di.SetLogger(logger)
@@ -205,7 +184,7 @@ func getDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, clientId, clientC
 	return di, nil
 }
 
-func getAllMyDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, logger *Logging.Logger) ([]DeviceInfo, error) {
+func getAllMyDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, logger *Logging.Logger) ([]*DeviceInfo, error) {
 	devices, err := db.findByPingerId(pingerHostId)
 	if err != nil {
 		return nil, err
@@ -277,7 +256,7 @@ func (di *DeviceInfo) update() (int64, error) {
 	if di.db == nil {
 		panic("Can not update device info without having fetched it")
 	}
-	n, err := di.db.Update(di)
+	n, err := di.db.update(di)
 	if err != nil {
 		panic(fmt.Sprintf("%s: update error: %s", di.getLogPrefix(), err.Error()))
 	}
@@ -294,7 +273,7 @@ func (di *DeviceInfo) insert(db DeviceInfoDbHandler) error {
 	if di.db == nil {
 		di.db = db
 	}
-	err := db.Insert(di)
+	err := db.insert(di)
 	if err != nil {
 		panic(fmt.Sprintf("%s: insert error: %s", di.getLogPrefix(), err.Error()))
 	}
@@ -455,4 +434,3 @@ func (di *DeviceInfo) validateClient() error {
 	}
 	return nil
 }
-

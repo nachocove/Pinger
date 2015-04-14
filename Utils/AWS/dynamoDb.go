@@ -4,68 +4,79 @@ import (
 	"fmt"
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
-	"strconv"
 	"github.com/satori/go.uuid"
+	"strconv"
 )
 
-type DynamoDbHandler interface {
-	Get(tableName string, args ...interface{}) (*map[string]interface{}, error)
-	Insert(tableName string, entry map[string]interface{}) (string, error)
-	Update(tableName string, entry map[string]interface{}) error
-	Delete(args ...interface{}) error
-}
 type DynamoDb struct {
-	DynamoDbHandler
 	session *dynamodb.DynamoDB
-	tableDefinitions map[string]string
+}
+
+type KeyComparisonType int
+
+const (
+	KeyComparisonEq KeyComparisonType = iota
+	KeyComparisonGt KeyComparisonType = iota
+	KeyComparisonLt KeyComparisonType = iota
+	KeyComparisonIn KeyComparisonType = iota
+)
+
+type DBKeyValue struct {
+	Key        string
+	Value      string
+	Comparison KeyComparisonType
 }
 
 func newDynamoDbSession(accessKey, secretKey, region string) *DynamoDb {
-	return &DynamoDb{
-		session: dynamodb.New(aws.Creds(accessKey, secretKey, ""), region, nil),
-	}
+	return &DynamoDb{session: dynamodb.New(aws.Creds(accessKey, secretKey, ""), region, nil)}
 }
 
-func (ah *AWSHandle) GetDynamoDbSession() DynamoDbHandler {
+func (ah *AWSHandle) GetDynamoDbSession() *DynamoDb {
 	return newDynamoDbSession(ah.AccessKey, ah.SecretKey, ah.DynamoDbRegionName)
 }
 
-func (d *DynamoDb) Get(tableName string, args ...interface{}) (*map[string]interface{}, error) {
-//	getReq := dynamodb.GetItemInput{
-//		TableName: aws.String(tableName),
-//		Key: map[string]dynamodb.AttributeValue{
-//			
-//		},
-//	}
-	return nil, nil
+func (d *DynamoDb) Get(tableName string, keys []DBKeyValue) (*map[string]interface{}, error) {
+	dKeys := make(map[string]dynamodb.AttributeValue)
+	for _, k := range keys {
+		dKeys[k.Key] = goTypeToAttributeValue(k.Value)
+	}
+	getReq := dynamodb.GetItemInput{
+		TableName: aws.String(tableName),
+		Key:       dKeys,
+	}
+	getResp, err := d.session.GetItem(&getReq)
+	if err != nil {
+		return nil, err
+	}
+	return awsAttributeMapToGo(&getResp.Item), nil
 }
 
-func (d *DynamoDb) Search(tableName string, values map[string]map[string]interface{}) ([]map[string]interface{}, error) {
-//	queReq := dynamodb.QueryInput{
-//		TableName: aws.String(tableName),
-//		ConsistentRead: aws.Boolean(false),
-//		//IndexName:      aws.String(UnitTestIndexName),
-//		KeyConditions: map[string]dynamodb.Condition{
-//			"pinger": dynamodb.Condition{
-//				AttributeValueList: []dynamodb.AttributeValue{
-//					//goTypeToAttributeValue(s.clientRecord["pinger"]),
-//				},
-//				ComparisonOperator: aws.String("EQ"),
-//			},
-//		},
-//	}
-//	queResp, err := d.session.Query(&queReq)
-//	return awsAttributeMapToGo(&queResp.Item), nil
+func (d *DynamoDb) Search(tableName string, keys []DBKeyValue) ([]map[string]interface{}, error) {
+	//	queReq := dynamodb.QueryInput{
+	//		TableName: aws.String(tableName),
+	//		ConsistentRead: aws.Boolean(false),
+	//		//IndexName:      aws.String(UnitTestIndexName),
+	//		KeyConditions: map[string]dynamodb.Condition{
+	//			"pinger": dynamodb.Condition{
+	//				AttributeValueList: []dynamodb.AttributeValue{
+	//					//goTypeToAttributeValue(s.clientRecord["pinger"]),
+	//				},
+	//				ComparisonOperator: aws.String("EQ"),
+	//			},
+	//		},
+	//	}
+	//	queResp, err := d.session.Query(&queReq)
+	//	return awsAttributeMapToGo(&queResp.Item), nil
 	return nil, nil
 }
 
 func (d *DynamoDb) Insert(tableName string, entry map[string]interface{}) (string, error) {
 	req := dynamodb.PutItemInput{
 		TableName: aws.StringValue(&tableName),
-		Item: *goMaptoAwsAttributeMap(&entry),
+		Item:      *goMaptoAwsAttributeMap(&entry),
 	}
 	var id string
-	if _, ok := req.Item["id"] ; ok == false {
+	if _, ok := req.Item["id"]; ok == false {
 		id = uuid.NewV4().String()
 		req.Item["id"] = goTypeToAttributeValue(id)
 	} else {
@@ -148,4 +159,3 @@ func goMaptoAwsAttributeMap(x *map[string]interface{}) *map[string]dynamodb.Attr
 	}
 	return &awsMap
 }
-

@@ -12,8 +12,8 @@ import (
 
 type deviceInfoTester struct {
 	suite.Suite
-	dbm *gorp.DbMap
-	db DeviceInfoDbHandler
+	dbm               *gorp.DbMap
+	db                DeviceInfoDbHandler
 	logger            *Logging.Logger
 	testClientId      string
 	testClientContext string

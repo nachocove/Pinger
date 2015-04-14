@@ -1,12 +1,16 @@
 package Pinger
 
 import (
-	"time"
 	"fmt"
+	"github.com/nachocove/Pinger/Utils/AWS"
+	"time"
 )
 
 type DeviceContactDbHandler interface {
-	DbHandler	
+	insert(dc *deviceContact) error
+	update(dc *deviceContact) (int64, error)
+	delete(dc *deviceContact) error
+	get(keys []AWS.DBKeyValue) (*deviceContact, error)
 }
 
 type deviceContact struct {
@@ -23,30 +27,34 @@ type deviceContact struct {
 }
 
 func deviceContactGet(db DeviceContactDbHandler, clientId, clientContext, deviceId string) (*deviceContact, error) {
-	obj, err := db.Get(clientId, clientContext, deviceId)
+	keys := []AWS.DBKeyValue{
+		// TODO Need to look into the struct for the db tags to get the column names
+		// Note these are really only relevant to the dynamoDB sql handler. for gorp,
+		// the keys should be in order they are in the struct, so we need to make sure
+		// the order is correct here, as well as the values, but don't care about the column name.
+		AWS.DBKeyValue{Key: "client_id", Value: clientId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "client_context", Value: clientContext, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "device_id", Value: deviceId, Comparison: AWS.KeyComparisonEq},
+	}
+	dc, err := db.get(keys)
 	if err != nil {
 		return nil, err
-	}
-	var dc *deviceContact
-	if obj != nil {
-		dc = obj.(*deviceContact)
-		dc.db = db
 	}
 	return dc, nil
 }
 
 func newDeviceContact(db DeviceContactDbHandler, clientId, clientContext, deviceId string) *deviceContact {
 	dc := deviceContact{
-		ClientId: clientId,
+		ClientId:      clientId,
 		ClientContext: clientContext,
-		DeviceId: deviceId,
+		DeviceId:      deviceId,
 	}
 	dc.db = db
 	return &dc
 }
 
 func (dc *deviceContact) insert() error {
-	return dc.db.Insert(dc)
+	return dc.db.insert(dc)
 }
 
 func (di *DeviceInfo) updateLastContact() error {
@@ -55,7 +63,7 @@ func (di *DeviceInfo) updateLastContact() error {
 		return err
 	}
 	dc.LastContact = time.Now().UnixNano()
-	_, err = dc.db.Update(dc)
+	_, err = dc.db.update(dc)
 	if err != nil {
 		return err
 	}
@@ -68,7 +76,7 @@ func (di *DeviceInfo) updateLastContactRequest() error {
 		return err
 	}
 	dc.LastContactRequest = time.Now().UnixNano()
-	_, err = dc.db.Update(dc)
+	_, err = dc.db.update(dc)
 	if err != nil {
 		return err
 	}
@@ -82,9 +90,11 @@ func (di *DeviceInfo) getContactInfoObj(insert bool) (*deviceContact, error) {
 	var db DeviceContactDbHandler
 	diSql, ok := di.db.(*DeviceInfoSqlHandler)
 	if ok {
+		di.Debug("Using sql handler")
 		db = newDeviceContactSqlDbHandler(diSql.dbm)
 	} else {
-		panic("Need to create gorp dbm stuff here")
+		di.Debug("Using dynamo handler")
+		db = newDeviceContactDynamoDbHandler(di.aws)
 	}
 	dc, err := deviceContactGet(db, di.ClientId, di.ClientContext, di.DeviceId)
 	if err != nil {
