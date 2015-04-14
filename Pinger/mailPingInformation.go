@@ -138,4 +138,3 @@ func (pi *MailPingInformation) newDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWS
 	}
 	return di, nil
 }
-

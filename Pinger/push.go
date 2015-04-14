@@ -14,7 +14,8 @@ import (
 )
 
 var APNSMessageTooLarge error
-func init () {
+
+func init() {
 	APNSMessageTooLarge = fmt.Errorf("APNS message exceeds 256 bytes")
 }
 
@@ -92,7 +93,7 @@ func pingerPushMessageMapV2(contexts [](*sessionContextMessage)) map[string]inte
 			if context.session != "" {
 				ctxMap["ses"] = context.session
 			}
-			contextsMap[context.context] = ctxMap 
+			contextsMap[context.context] = ctxMap
 		}
 		pingerMap["ctxs"] = contextsMap
 	}
