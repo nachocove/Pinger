@@ -389,9 +389,6 @@ func RPCFindActiveSessions(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMa
 
 		case args.DeviceId != "" && session.DeviceId == args.DeviceId:
 			reply.SessionInfos = append(reply.SessionInfos, *session)
-
-		default:
-			logger.Debug("%s: Unknown case!", key)
 		}
 	}
 	reply.Code = PollingReplyOK
