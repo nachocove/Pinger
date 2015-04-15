@@ -24,6 +24,7 @@ vet:
 	go vet ./... 2>&1 | grep -v 'possible formatting directive in Error call'
 	
 install: git-update
+	godep restore
 	go install ./...
 	sh scripts/webserver-capabilities.sh
 
