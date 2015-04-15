@@ -48,7 +48,7 @@ Recommends just sticking with one goroutine per connection. Seems it can handle 
 Dependencies
 ------------
 
-Dependencies re generated with the 'godep' program (https://github.com/tools/godep).
+Dependencies are generated with the 'godep' program (https://github.com/tools/godep).
 
 After adding another package, run
 ```
