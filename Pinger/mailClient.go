@@ -30,6 +30,7 @@ type MailClientContext struct {
 	mailClient      MailClient // a mail client with the MailClient interface
 	logger          *Logging.Logger
 	stopAllCh       chan int // (broadcast) closed when client is exiting, so that any sub-routine can exit
+	stopPollCh      chan int // (unicast) closed when we want the longpoll to stop
 	command         chan PingerCommand
 	lastError       error
 	stats           *Utils.StatLogger
@@ -290,10 +291,14 @@ func (client *MailClientContext) exitDeferred(e *fsm.Event) {
 }
 
 func (client *MailClientContext) enterPinging(e *fsm.Event) {
-	stopPollCh := e.Args[0].(chan int)
-	errCh := e.Args[1].(chan error)
+	client.stopPollCh = make(chan int)
+	errCh := e.Args[0].(chan error)
 	client.setStatus(MailClientStatusPinging, nil)
-	go client.mailClient.LongPoll(stopPollCh, client.stopAllCh, errCh)
+	go client.mailClient.LongPoll(client.stopPollCh, client.stopAllCh, errCh)
+}
+
+func (client *MailClientContext) exitPinging(e *fsm.Event) {
+	close(client.stopPollCh)
 }
 
 func (client *MailClientContext) enterStopped(e *fsm.Event) {
@@ -325,7 +330,6 @@ func (client *MailClientContext) start() {
 		go client.stats.TallyResponseTimes()
 	}
 
-	stopPollCh := make(chan int)
 	errCh := make(chan error)
 	rearmingCount := 0
 	tooFastResponse := (time.Duration(client.ResponseTimeout) * time.Millisecond) / 4
@@ -348,7 +352,7 @@ func (client *MailClientContext) start() {
 			return
 
 		case <-client.deferTimer.C:
-			err = client.fsm.Event(FSMPinging, stopPollCh, errCh)
+			err = client.fsm.Event(FSMPinging, errCh)
 			if err != nil {
 				panic(err)
 			}
