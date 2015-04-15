@@ -172,7 +172,10 @@ func getDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, clientId, clientC
 		return nil, err
 	}
 	if di != nil {
-		di.db = db
+		if di.db == nil {
+			panic("db handler must fill this in")
+		}
+		
 		di.aws = aws
 		di.SetLogger(logger)
 		if di.Pinger != pingerHostId {
@@ -196,20 +199,10 @@ func getAllMyDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, logger *Logg
 	return devices, nil
 }
 
-func (di *DeviceInfo) updateDeviceInfo(
-	clientContext, deviceId,
-	pushService, pushToken,
-	platform, osVersion,
-	appBuildVersion, appBuildNumber string) (bool, error) {
+func (di *DeviceInfo) updateDeviceInfo(pushService, pushToken, platform, osVersion, appBuildVersion, appBuildNumber string) (bool, error) {
 	changed := false
-	if di.ClientContext != clientContext {
-		di.ClientContext = clientContext
-		changed = true
-	}
-	if di.DeviceId != deviceId {
-		di.DeviceId = deviceId
-		changed = true
-	}
+	deleteAWSEndpoint := false
+	
 	if di.OSVersion != osVersion {
 		di.OSVersion = osVersion
 		changed = true
@@ -223,22 +216,28 @@ func (di *DeviceInfo) updateDeviceInfo(
 		changed = true
 	}
 	if di.Platform != platform {
+		// TODO a change in platform seems unlikely. Should we even allow this? Need to reset all push parameters
 		di.Platform = platform
+		di.PushService = ""
+		di.PushToken = ""
+		di.AWSEndpointArn = ""
 		changed = true
+		deleteAWSEndpoint = true
 	}
-	// TODO if the push token or service change, then the AWS endpoint is no longer valid: We should send a delete to AWS for the endpoint
 	if di.PushService != pushService {
 		di.Warning("Resetting Token ('%s') and AWSEndpointArn ('%s')", di.PushToken, di.AWSEndpointArn)
 		di.PushService = pushService
 		di.PushToken = ""
 		di.AWSEndpointArn = ""
 		changed = true
+		deleteAWSEndpoint = true
 	}
 	if di.PushToken != pushToken {
 		di.Warning("Resetting AWSEndpointArn ('%s')", di.AWSEndpointArn)
 		di.PushToken = pushToken
 		di.AWSEndpointArn = ""
 		changed = true
+		deleteAWSEndpoint = true
 	}
 	if changed {
 		n, err := di.update()
@@ -248,6 +247,10 @@ func (di *DeviceInfo) updateDeviceInfo(
 		if n <= 0 {
 			return false, errors.New("No rows updated but should have")
 		}
+	}
+	if deleteAWSEndpoint {
+		// TODO if the push token or service change, then the AWS endpoint is no longer valid: We should send a delete to AWS for the endpoint
+		di.Warning("Need to delete the AWS endpoint to clean up")		
 	}
 	return changed, nil
 }
@@ -285,6 +288,61 @@ func (di *DeviceInfo) insert(db DeviceInfoDbHandler) error {
 		panic(fmt.Sprintf("%s: insert error(2)", di.getLogPrefix()))
 	}
 	return nil
+}
+
+func (di *DeviceInfo) getContactInfoObj(insert bool) (*deviceContact, error) {
+	if di.db == nil {
+		panic("Must have fetched di first")
+	}
+	var db DeviceContactDbHandler
+	diSql, ok := di.db.(*DeviceInfoSqlHandler)
+	if ok {
+		di.Debug("Using sql handler")
+		db = newDeviceContactSqlDbHandler(diSql.dbm)
+	} else {
+		di.Debug("Using dynamo handler")
+		db = newDeviceContactDynamoDbHandler(di.aws)
+	}
+	dc, err := deviceContactGet(db, di.ClientId, di.ClientContext, di.DeviceId)
+	if err != nil {
+		return nil, err
+	}
+	if dc == nil {
+		if insert {
+			dc = newDeviceContact(db, di.ClientId, di.ClientContext, di.DeviceId)
+			err = dc.insert()
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			return nil, fmt.Errorf("No object found")
+		}
+	}
+	return dc, nil
+}
+
+func (di *DeviceInfo) getContactInfo(insert bool) (int64, int64, error) {
+	dc, err := di.getContactInfoObj(insert)
+	if err != nil {
+		return 0, 0, err
+	}
+	return dc.LastContact, dc.LastContactRequest, nil
+}
+
+func (di *DeviceInfo) updateLastContact() error {
+	dc, err := di.getContactInfoObj(false)
+	if err != nil {
+		return err
+	}
+	return dc.updateLastContact()
+}
+
+func (di *DeviceInfo) updateLastContactRequest() error {
+	dc, err := di.getContactInfoObj(false)
+	if err != nil {
+		return err
+	}
+	return dc.updateLastContactRequest()
 }
 
 type PingerNotification string

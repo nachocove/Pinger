@@ -211,7 +211,8 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.Equal(0, di.Created)
 	s.Equal(0, di.Updated)
 	s.Empty(di.AWSEndpointArn)
-
+	
+	// get but don't create. Since it doesn't exist, there will be an error
 	lastContact, lastContactRequest, err := di.getContactInfo(false)
 	s.Error(err)
 	s.Equal(0, lastContact)
@@ -230,6 +231,8 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.True(di.Created > 0)
 	s.True(di.Updated > 0)
 	s.Empty(di.AWSEndpointArn)
+	
+	// getDeviceInfo creates the data. Fetch it here and verify
 	lastContact, lastContactRequest, err = di.getContactInfo(false)
 	s.NoError(err)
 	s.True(lastContact > 0)
@@ -246,7 +249,6 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.NoError(err)
 	s.Equal(1, len(deviceList))
 	s.NotNil(di.db)
-	di.cleanup()
 }
 
 func (s *deviceInfoTester) TestDeviceInfoUpdate() {
@@ -282,29 +284,83 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 	di.AWSEndpointArn = "some endpoint"
 	_, err = di.update()
 	s.NoError(err)
-	s.NotEmpty(di.AWSEndpointArn)
+	s.NotEqual("", di.AWSEndpointArn)
 
 	di.AWSEndpointArn = "some other endpoint"
 	_, err = di.update()
 	s.NoError(err)
-	s.NotEmpty(di.AWSEndpointArn)
+	s.NotEqual("", di.AWSEndpointArn)
 
 	di2.AWSEndpointArn = "yet another endpoint"
 	s.Panics(func() { di2.update() })
 
-	changed, err := di.updateDeviceInfo(di.ClientContext, di.DeviceId, di.PushService, di.PushToken,
-		di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
+	changed, err := di.updateDeviceInfo(di.PushService, di.PushToken, di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
 	s.NoError(err)
 	s.False(changed)
-	s.NotEmpty(di.AWSEndpointArn)
 
 	newToken := "some updated token"
-	changed, err = di.updateDeviceInfo(di.ClientContext, di.DeviceId, di.PushService, newToken,
-		di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
+	changed, err = di.updateDeviceInfo(di.PushService, newToken, di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
 	s.NoError(err)
 	s.True(changed)
 	s.Equal(newToken, di.PushToken)
-	s.Empty(di.AWSEndpointArn)
+	s.Equal("", di.AWSEndpointArn)
+
+	newService := "GCM"
+	changed, err = di.updateDeviceInfo(newService, di.PushToken, di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
+	s.NoError(err)
+	s.True(changed)
+	s.Equal(newService, di.PushService)
+	s.NotEqual("", di.PushToken) // this should have gotten set to the passed in value (which is the same as before)
+	s.Equal("", di.AWSEndpointArn)
+
+	newPlatform := "android"
+	changed, err = di.updateDeviceInfo(di.PushService, di.PushToken, newPlatform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
+	s.NoError(err)
+	s.True(changed)
+	s.Equal(newPlatform, di.Platform)
+	s.NotEqual("", di.PushToken) // this should have gotten set to the passed in value (which is the same as before)
+	s.NotEqual("", di.PushService) // this should have gotten set to the passed in value (which is the same as before)
+	s.Equal("", di.AWSEndpointArn)
+
+	newOsVersion := "11111"
+	changed, err = di.updateDeviceInfo(di.PushService, di.PushToken, di.Platform, newOsVersion, di.AppBuildVersion, di.AppBuildNumber)
+	s.NoError(err)
+	s.True(changed)
+	s.Equal(newOsVersion, di.OSVersion)
+
+	newAppBuildVersion := "22222"
+	changed, err = di.updateDeviceInfo(di.PushService, di.PushToken, di.Platform, di.OSVersion, newAppBuildVersion, di.AppBuildNumber)
+	s.NoError(err)
+	s.True(changed)
+	s.Equal(newAppBuildVersion, di.AppBuildVersion)
+
+	newAppBuildNumber := "33333"
+	changed, err = di.updateDeviceInfo(di.PushService, di.PushToken, di.Platform, di.OSVersion, di.AppBuildVersion, newAppBuildNumber)
+	s.NoError(err)
+	s.True(changed)
+	s.Equal(newAppBuildNumber, di.AppBuildNumber)
+}
+
+func (s *deviceInfoTester) TestDeviceInfoUpdateContact() {
+	di, err := newDeviceInfo(
+		s.testClientId,
+		s.testClientContext,
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppNumber,
+		s.sessionId,
+		s.aws,
+		s.db,
+		s.logger)
+	s.NoError(err)
+	require.NotNil(s.T(), di)
+
+	err = di.insert(nil)
+	s.NoError(err)
 
 	lastContact, _, err := di.getContactInfo(false)
 	s.NoError(err)
@@ -315,7 +371,16 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 	s.NoError(err)
 
 	s.True(lastContact2 > lastContact)
-	di.cleanup()
+
+	_, lastContactRequest, err := di.getContactInfo(false)
+	s.NoError(err)
+	err = di.updateLastContactRequest()
+	s.NoError(err)
+
+	_, lastContactRequest2, err := di.getContactInfo(false)
+	s.NoError(err)
+
+	s.True(lastContactRequest2 > lastContactRequest)
 }
 
 func (s *deviceInfoTester) TestDeviceInfoDelete() {
@@ -431,4 +496,35 @@ func (s *deviceInfoTester) TestSendToAll() {
 
 	n := alertAllDevices(s.dbm, s.aws, s.logger)
 	s.Equal(1, n)
+}
+
+func (s *deviceInfoTester) TestPingerStealing() {
+	di, err := newDeviceInfo(
+		s.testClientId,
+		s.testClientContext,
+		s.testDeviceId,
+		s.testPushToken,
+		s.testPushService,
+		s.testPlatform,
+		s.testOSVersion,
+		s.testAppVersion,
+		s.testAppNumber,
+		"1",
+		s.aws,
+		s.db,
+		s.logger)
+	s.NoError(err)
+	require.NotNil(s.T(), di)
+	di.AWSEndpointArn = "12345"
+	di.insert(nil)
+	s.Equal(pingerHostId, di.Pinger)
+	
+	pingerHostId = "12345"
+	
+	d1, err := getDeviceInfo(s.db, s.aws, di.ClientId, di.ClientContext, di.DeviceId, di.SessionId, s.logger)
+	s.NoError(err)
+	require.NotNil(s.T(), d1)
+	
+	s.Equal(pingerHostId, d1.Pinger)
+	s.NotEqual(pingerHostId, di.Pinger)
 }

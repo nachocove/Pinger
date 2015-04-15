@@ -131,7 +131,7 @@ func (pi *MailPingInformation) newDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWS
 			return nil, err
 		}
 	} else {
-		_, err := di.updateDeviceInfo(pi.ClientContext, pi.DeviceId, pi.PushService, pi.PushToken, pi.Platform, pi.OSVersion, pi.AppBuildVersion, pi.AppBuildNumber)
+		_, err := di.updateDeviceInfo(pi.PushService, pi.PushToken, pi.Platform, pi.OSVersion, pi.AppBuildVersion, pi.AppBuildNumber)
 		if err != nil {
 			return nil, err
 		}

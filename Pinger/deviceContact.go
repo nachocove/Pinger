@@ -1,7 +1,6 @@
 package Pinger
 
 import (
-	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"time"
 )
@@ -57,67 +56,21 @@ func (dc *deviceContact) insert() error {
 	return dc.db.insert(dc)
 }
 
-func (di *DeviceInfo) updateLastContact() error {
-	dc, err := di.getContactInfoObj(false)
-	if err != nil {
-		return err
-	}
+func (dc *deviceContact) updateLastContact() error {
 	dc.LastContact = time.Now().UnixNano()
-	_, err = dc.db.update(dc)
+	_, err := dc.db.update(dc)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (di *DeviceInfo) updateLastContactRequest() error {
-	dc, err := di.getContactInfoObj(false)
-	if err != nil {
-		return err
-	}
+func (dc *deviceContact) updateLastContactRequest() error {
 	dc.LastContactRequest = time.Now().UnixNano()
-	_, err = dc.db.update(dc)
+	_, err := dc.db.update(dc)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (di *DeviceInfo) getContactInfoObj(insert bool) (*deviceContact, error) {
-	if di.db == nil {
-		panic("Must have fetched di first")
-	}
-	var db DeviceContactDbHandler
-	diSql, ok := di.db.(*DeviceInfoSqlHandler)
-	if ok {
-		di.Debug("Using sql handler")
-		db = newDeviceContactSqlDbHandler(diSql.dbm)
-	} else {
-		di.Debug("Using dynamo handler")
-		db = newDeviceContactDynamoDbHandler(di.aws)
-	}
-	dc, err := deviceContactGet(db, di.ClientId, di.ClientContext, di.DeviceId)
-	if err != nil {
-		return nil, err
-	}
-	if dc == nil {
-		if insert {
-			dc = newDeviceContact(db, di.ClientId, di.ClientContext, di.DeviceId)
-			err = dc.insert()
-			if err != nil {
-				panic(err)
-			}
-		} else {
-			return nil, fmt.Errorf("No object found")
-		}
-	}
-	return dc, nil
-}
-
-func (di *DeviceInfo) getContactInfo(insert bool) (int64, int64, error) {
-	dc, err := di.getContactInfoObj(insert)
-	if err != nil {
-		return 0, 0, err
-	}
-	return dc.LastContact, dc.LastContactRequest, nil
-}
