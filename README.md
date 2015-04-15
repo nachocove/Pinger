@@ -48,37 +48,18 @@ Recommends just sticking with one goroutine per connection. Seems it can handle 
 Dependencies
 ------------
 
-Web server Dependencies (will get pulled in with 'go get ...' during the initial pull of Pinger):
+Dependencies re generated with the 'godep' program (https://github.com/tools/godep).
 
+After adding another package, run
 ```
-code.google.com/p/gcfg
-github.com/Go-SQL-Driver/MySQL
-github.com/codegangsta/negroni
-github.com/coopernurse/gorp
-github.com/juju/errors
-github.com/mattn/go-sqlite3
-github.com/op/go-logging
-github.com/stripe/aws-go
-github.com/twinj/uuid
-github.com/vaughan0/go-ini
-github.com/gorilla/context
-github.com/gorilla/mux
-github.com/gorilla/securecookie
-github.com/gorilla/sessions
+godep save
 ```
 
-To get the list of dependencies, use:
-```
-go list -f '{{join .Deps "\n"}}' ./... |  xargs go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}'
-```
+and add and commit everything under the ./GoDeps directory.
 
-To install all dependencies (assuming they didn't get pull in in the initial fetch, or perhaps you're updating):
-```
-go get -u github.com/nachocove/Pinger/...
-```
+To restore (on a builder, for example):
 
-or
 ```
-go list -f '{{join .Deps "\n"}}' ./... |  xargs go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}' | xargs go get
+godep restore
 ```
-
+ 
