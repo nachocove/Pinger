@@ -27,6 +27,10 @@
 			"Rev": "1355efa4e35cd429590baeaef5e84d2dfbc44efc"
 		},
 		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/dynamodb",
+			"Rev": "1355efa4e35cd429590baeaef5e84d2dfbc44efc"
+		},
+		{
 			"ImportPath": "github.com/awslabs/aws-sdk-go/gen/endpoints",
 			"Rev": "1355efa4e35cd429590baeaef5e84d2dfbc44efc"
 		},
@@ -76,6 +80,10 @@
 			"ImportPath": "github.com/rlmcpherson/s3gof3r",
 			"Comment": "v0.4.10-3-ge6c862d",
 			"Rev": "e6c862d3128ea3285965d454652154176a2a5987"
+		},
+		{
+			"ImportPath": "github.com/satori/go.uuid",
+			"Rev": "242673bbc820e051ef00033e274d32e08ece9e15"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
