@@ -415,7 +415,7 @@ func (client *MailClientContext) start() {
 
 			default:
 				// the mailClient.LongPoll has thrown an error. note it.
-				err = client.fsm.Event(FSMStopped, fmt.Sprintf("Error Thrown: %s. Stopping", err.Error), MailClientStatusError, err)
+				err = client.fsm.Event(FSMStopped, fmt.Sprintf("Error Thrown: %s. Stopping", err.Error()), MailClientStatusError, err)
 				if err != nil {
 					panic(err)
 				}
