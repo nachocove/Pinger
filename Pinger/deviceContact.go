@@ -73,4 +73,3 @@ func (dc *deviceContact) updateLastContactRequest() error {
 	}
 	return nil
 }
-

@@ -175,7 +175,7 @@ func getDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, clientId, clientC
 		if di.db == nil {
 			panic("db handler must fill this in")
 		}
-		
+
 		di.aws = aws
 		di.SetLogger(logger)
 		if di.Pinger != pingerHostId {
@@ -202,7 +202,7 @@ func getAllMyDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, logger *Logg
 func (di *DeviceInfo) updateDeviceInfo(pushService, pushToken, platform, osVersion, appBuildVersion, appBuildNumber string) (bool, error) {
 	changed := false
 	deleteAWSEndpoint := false
-	
+
 	if di.OSVersion != osVersion {
 		di.OSVersion = osVersion
 		changed = true
@@ -250,7 +250,7 @@ func (di *DeviceInfo) updateDeviceInfo(pushService, pushToken, platform, osVersi
 	}
 	if deleteAWSEndpoint {
 		// TODO if the push token or service change, then the AWS endpoint is no longer valid: We should send a delete to AWS for the endpoint
-		di.Warning("Need to delete the AWS endpoint to clean up")		
+		di.Warning("Need to delete the AWS endpoint to clean up")
 	}
 	return changed, nil
 }

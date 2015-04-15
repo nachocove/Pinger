@@ -69,25 +69,25 @@ func (s *deviceContactTester) TestDeviceContactUpdate() {
 	s.NoError(err)
 	s.Equal(dc.Created, dc.LastContact)
 	s.Equal(0, dc.LastContactRequest)
-	
+
 	err = dc.updateLastContact()
 	s.NoError(err)
 	s.True(dc.Created < dc.LastContact)
 	s.Equal(0, dc.LastContactRequest)
-	
+
 	dc1, err := deviceContactGet(s.db, s.testClientId, s.testClientContext, s.testDeviceId)
 	s.NoError(err)
 	require.NotNil(s.T(), dc1)
-	
+
 	s.Equal(dc1.LastContact, dc.LastContact)
-	
+
 	err = dc.updateLastContactRequest()
 	s.NoError(err)
 	s.NotEqual(0, dc.LastContactRequest)
-	
+
 	dc1, err = deviceContactGet(s.db, s.testClientId, s.testClientContext, s.testDeviceId)
 	s.NoError(err)
 	require.NotNil(s.T(), dc1)
-	
+
 	s.Equal(dc1.LastContactRequest, dc.LastContactRequest)
 }

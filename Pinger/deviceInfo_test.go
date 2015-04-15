@@ -211,7 +211,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.Equal(0, di.Created)
 	s.Equal(0, di.Updated)
 	s.Empty(di.AWSEndpointArn)
-	
+
 	// get but don't create. Since it doesn't exist, there will be an error
 	lastContact, lastContactRequest, err := di.getContactInfo(false)
 	s.Error(err)
@@ -231,7 +231,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.True(di.Created > 0)
 	s.True(di.Updated > 0)
 	s.Empty(di.AWSEndpointArn)
-	
+
 	// getDeviceInfo creates the data. Fetch it here and verify
 	lastContact, lastContactRequest, err = di.getContactInfo(false)
 	s.NoError(err)
@@ -318,7 +318,7 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 	s.NoError(err)
 	s.True(changed)
 	s.Equal(newPlatform, di.Platform)
-	s.NotEqual("", di.PushToken) // this should have gotten set to the passed in value (which is the same as before)
+	s.NotEqual("", di.PushToken)   // this should have gotten set to the passed in value (which is the same as before)
 	s.NotEqual("", di.PushService) // this should have gotten set to the passed in value (which is the same as before)
 	s.Equal("", di.AWSEndpointArn)
 
@@ -518,13 +518,13 @@ func (s *deviceInfoTester) TestPingerStealing() {
 	di.AWSEndpointArn = "12345"
 	di.insert(nil)
 	s.Equal(pingerHostId, di.Pinger)
-	
+
 	pingerHostId = "12345"
-	
+
 	d1, err := getDeviceInfo(s.db, s.aws, di.ClientId, di.ClientContext, di.DeviceId, di.SessionId, s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), d1)
-	
+
 	s.Equal(pingerHostId, d1.Pinger)
 	s.NotEqual(pingerHostId, di.Pinger)
 }
