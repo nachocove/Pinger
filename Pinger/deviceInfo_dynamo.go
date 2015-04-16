@@ -28,10 +28,10 @@ func (h *DeviceContactDynamoDbHandler) get(keys []AWS.DBKeyValue) (*deviceContac
 	if err != nil {
 		return nil, err
 	}
-	return fromMap(dcMap), nil
+	return fromDeviceInfoMap(dcMap), nil
 }
 
-func fromMap(dcMap *map[string]interface{}) *deviceContact {
+func fromDeviceInfoMap(dcMap *map[string]interface{}) *deviceContact {
 	dc := deviceContact{}
 	for k, v := range *dcMap {
 		switch v := v.(type) {
@@ -83,27 +83,26 @@ func (dc *deviceContact) toMap() map[string]interface{} {
 	dcMap["client"] = dc.ClientId
 	dcMap["context"] = dc.ClientContext
 	dcMap["device"] = dc.DeviceId
-	dcMap["created"] = time.Now().UnixNano()
-	dcMap["updated"] = dcMap["created"]
-	dcMap["last_contact"] = dcMap["created"]
+	dcMap["created"] = dc.Created
+	dcMap["updated"] = dc.Updated
+	dcMap["last_contact"] = dc.LastContact
+	dcMap["last_contact_request"] = dc.LastContactRequest
 	return dcMap
 }
 
 func (h *DeviceContactDynamoDbHandler) insert(dc *deviceContact) error {
+	if dc.Created == 0 {
+		dc.Created = time.Now().UnixNano()
+	}
+	dc.Updated = dc.Created
+	dc.LastContact = dc.Created
 	_, err := h.dynamo.Insert(dynamoDeviceInfoTableName, dc.toMap())
 	return err
 }
 
 func (h *DeviceContactDynamoDbHandler) update(dc *deviceContact) (int64, error) {
-	dcMap := make(map[string]interface{})
-	dcMap["client"] = dc.ClientId
-	dcMap["context"] = dc.ClientContext
-	dcMap["device"] = dc.DeviceId
-	dcMap["created"] = dc.Created
-	dcMap["updated"] = time.Now().UnixNano()
-	dcMap["last_contact"] = dc.LastContact
-
-	err := h.dynamo.Update(dynamoDeviceInfoTableName, dcMap)
+	dc.Updated = time.Now().UnixNano()
+	err := h.dynamo.Update(dynamoDeviceInfoTableName, dc.toMap())
 	if err != nil {
 		return 0, err
 	}
