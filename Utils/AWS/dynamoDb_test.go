@@ -178,25 +178,15 @@ func (s *awsDynamoDbTester) TestItemQuery() {
 	s.createTestTable()
 	s.itemCreate(s.clientRecord)
 
-	queReq := dynamodb.QueryInput{
-		TableName: aws.String(UnitTestTableName),
-		//AttributesToGet: []string{"id", "client", "pinger", "device", "push_service", "push_token"},
-		ConsistentRead: aws.Boolean(false),
-		IndexName:      aws.String(UnitTestIndexName),
-		KeyConditions: map[string]dynamodb.Condition{
-			"pinger": dynamodb.Condition{
-				AttributeValueList: []dynamodb.AttributeValue{
-					goTypeToAttributeValue(s.clientRecord["pinger"]),
-				},
-				ComparisonOperator: aws.String("EQ"),
-			},
+	resp, err := s.dynDb.Search(UnitTestTableName, []DBKeyValue{
+			{Key: "id", Value: s.clientRecord["id"], Comparison: KeyComparisonEq},
 		},
-	}
-	queResp, err := s.dynDb.session.Query(&queReq)
+	)
 	s.NoError(err)
-	s.NotEmpty(queResp.Items)
-	for _, item := range queResp.Items {
-		s.itemValidate(awsAttributeMapToGo(&item))
+	s.NotNil(resp)
+	s.Equal(1, len(resp))
+	for _, item := range resp {
+		s.itemValidate(&item)		
 	}
 }
 
