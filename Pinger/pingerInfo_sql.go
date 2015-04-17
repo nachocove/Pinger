@@ -33,6 +33,7 @@ type PingerInfoSqlHandler struct {
 	PingerInfoDbHandler
 	dbm *gorp.DbMap
 }
+
 func newPingerInfoSqlHandler(dbm *gorp.DbMap) *PingerInfoSqlHandler {
 	return &PingerInfoSqlHandler{dbm: dbm}
 }
@@ -86,7 +87,7 @@ func (h *PingerInfoSqlHandler) get(keys []AWS.DBKeyValue) (*PingerInfo, error) {
 		pinger.db = h
 	}
 	return pinger, nil
-	
+
 }
 
 func (pinger *PingerInfo) PreInsert(s gorp.SqlExecutor) error {

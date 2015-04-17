@@ -179,28 +179,28 @@ func (s *awsDynamoDbTester) TestItemQuery() {
 	s.itemCreate(s.clientRecord)
 
 	resp, err := s.dynDb.Search(UnitTestTableName, []DBKeyValue{
-			{Key: "id", Value: s.clientRecord["id"], Comparison: KeyComparisonEq},
-		},
+		{Key: "id", Value: s.clientRecord["id"], Comparison: KeyComparisonEq},
+	},
 	)
 	s.NoError(err)
 	s.NotNil(resp)
 	s.Equal(1, len(resp))
 	for _, item := range resp {
-		s.itemValidate(&item)		
+		s.itemValidate(&item)
 	}
 }
 
 func (s *awsDynamoDbTester) TestItemBatchGet() {
 	s.createTestTable()
 	s.itemCreate(s.clientRecord)
-	
+
 	resp, err := s.dynDb.Get(UnitTestTableName, []DBKeyValue{
-			{Key: "id", Value: s.clientRecord["id"], Comparison: KeyComparisonEq},
-		},
+		{Key: "id", Value: s.clientRecord["id"], Comparison: KeyComparisonEq},
+	},
 	)
 	s.NoError(err)
 	s.NotNil(resp)
-	
+
 	getReq := dynamodb.BatchGetItemInput{
 		RequestItems: map[string]dynamodb.KeysAndAttributes{
 			UnitTestTableName: dynamodb.KeysAndAttributes{

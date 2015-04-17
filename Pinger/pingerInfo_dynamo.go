@@ -38,7 +38,7 @@ func newPingerInfoDynamoDbHandler(aws AWS.AWSHandler) (*PingerInfoDynamoDbHandle
 		if err != nil {
 			return nil, err
 		}
-	} 
+	}
 	return &PingerInfoDynamoDbHandler{
 		dynamo:    dynamo,
 		tableName: dynamoPingerInfoTableName,

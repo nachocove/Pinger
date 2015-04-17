@@ -2,8 +2,8 @@ package Pinger
 
 import (
 	"fmt"
-	"github.com/nachocove/Pinger/Utils/HostId"
 	"github.com/nachocove/Pinger/Utils/AWS"
+	"github.com/nachocove/Pinger/Utils/HostId"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"time"
 )
@@ -15,7 +15,6 @@ type PingerInfoDbHandler interface {
 	get(keys []AWS.DBKeyValue) (*PingerInfo, error)
 }
 
-
 type PingerInfo struct {
 	Id      int64  `db:"id"`
 	Pinger  string `db:"pinger"`
@@ -23,7 +22,7 @@ type PingerInfo struct {
 	Updated int64  `db:"updated"`
 
 	db     PingerInfoDbHandler `db:"-"`
-	logger *Logging.Logger `db:"-"`
+	logger *Logging.Logger     `db:"-"`
 }
 
 var pingerHostId string
@@ -31,7 +30,6 @@ var pingerHostId string
 func init() {
 	pingerHostId = HostId.HostId()
 }
-
 
 func (pinger *PingerInfo) Updater(minutes int) {
 	d := time.Duration(minutes) * time.Minute

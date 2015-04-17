@@ -12,6 +12,7 @@ type DynamoDb struct {
 }
 
 type DBAttributeType int
+
 const (
 	String DBAttributeType = iota
 	Number DBAttributeType = iota
@@ -21,7 +22,7 @@ func (a DBAttributeType) AwsString() aws.StringValue {
 	switch a {
 	case String:
 		return aws.String("S")
-		
+
 	case Number:
 		return aws.String("N")
 	}
@@ -29,8 +30,8 @@ func (a DBAttributeType) AwsString() aws.StringValue {
 }
 
 type DBAttrDefinition struct {
-	Name       string
-	Type       DBAttributeType
+	Name string
+	Type DBAttributeType
 }
 
 type KeyComparisonType int
@@ -45,7 +46,7 @@ func (c KeyComparisonType) awsComparison() aws.StringValue {
 	switch c {
 	case KeyComparisonEq:
 		return aws.String("EQ")
-		
+
 	case KeyComparisonGt:
 		return aws.String("GT")
 
@@ -62,15 +63,17 @@ type DBKeyValue struct {
 }
 
 type KeyType int
+
 const (
-	KeyTypeHash KeyType = iota
+	KeyTypeHash  KeyType = iota
 	KeyTypeRange KeyType = iota
 )
+
 func (t KeyType) awsKeyType() aws.StringValue {
 	switch t {
 	case KeyTypeHash:
 		return aws.String(dynamodb.KeyTypeHash)
-		
+
 	case KeyTypeRange:
 		return aws.String(dynamodb.KeyTypeRange)
 	}
@@ -78,12 +81,12 @@ func (t KeyType) awsKeyType() aws.StringValue {
 }
 
 type DBKeyType struct {
-	Name        string
-	Type        KeyType
+	Name string
+	Type KeyType
 }
 
 type ThroughPut struct {
-	Read int64
+	Read  int64
 	Write int64
 }
 
@@ -116,10 +119,10 @@ func (d *DynamoDb) Get(tableName string, keys []DBKeyValue) (*map[string]interfa
 
 func (d *DynamoDb) Search(tableName string, attributes []DBKeyValue) ([]map[string]interface{}, error) {
 	req := dynamodb.QueryInput{
-		TableName: aws.String(tableName),
+		TableName:      aws.String(tableName),
 		ConsistentRead: aws.Boolean(false),
 	}
-	
+
 	// TODO Need to map the keys passed in to an Indexname, if appropriate
 	indexName := ""
 	if indexName != "" {
@@ -129,7 +132,7 @@ func (d *DynamoDb) Search(tableName string, attributes []DBKeyValue) ([]map[stri
 	req.KeyConditions = make(map[string]dynamodb.Condition)
 	for _, attr := range attributes {
 		req.KeyConditions[attr.Key] = dynamodb.Condition{
-			AttributeValueList: []dynamodb.AttributeValue{goTypeToAttributeValue(attr.Value),},
+			AttributeValueList: []dynamodb.AttributeValue{goTypeToAttributeValue(attr.Value)},
 			ComparisonOperator: attr.Comparison.awsComparison(),
 		}
 	}
@@ -137,7 +140,7 @@ func (d *DynamoDb) Search(tableName string, attributes []DBKeyValue) ([]map[stri
 	if err != nil {
 		return nil, err
 	}
-	
+
 	items := make([]map[string]interface{}, 0, 1)
 	for _, item := range queResp.Items {
 		items = append(items, *awsAttributeMapToGo(&item))
@@ -164,7 +167,7 @@ func (d *DynamoDb) Update(tableName string, entry map[string]interface{}) error 
 func (d *DynamoDb) Delete(tableName string, entry map[string]interface{}) error {
 	req := dynamodb.DeleteItemInput{
 		TableName: aws.StringValue(&tableName),
-		Key: *goMaptoAwsAttributeMap(&entry),
+		Key:       *goMaptoAwsAttributeMap(&entry),
 	}
 	_, err := d.session.DeleteItem(&req)
 	if err != nil {
@@ -175,27 +178,27 @@ func (d *DynamoDb) Delete(tableName string, entry map[string]interface{}) error 
 
 func (d *DynamoDb) CreateTable(tableDefinition *dynamodb.CreateTableInput) error {
 	_, err := d.session.CreateTable(tableDefinition)
-	return err	
+	return err
 }
 
 func (d *DynamoDb) CreateTableReq(tableName string, attributes []DBAttrDefinition, keys []DBKeyType, throughput ThroughPut) *dynamodb.CreateTableInput {
 	createReq := dynamodb.CreateTableInput{
 		TableName: aws.String(tableName),
 	}
-	
+
 	createReq.AttributeDefinitions = make([]dynamodb.AttributeDefinition, 0, 1)
 	for _, a := range attributes {
 		attr := dynamodb.AttributeDefinition{AttributeName: aws.String(a.Name), AttributeType: a.Type.AwsString()}
 		createReq.AttributeDefinitions = append(createReq.AttributeDefinitions, attr)
 	}
-	
+
 	createReq.KeySchema = make([]dynamodb.KeySchemaElement, 0, 1)
 	for _, k := range keys {
 		el := dynamodb.KeySchemaElement{AttributeName: aws.String(k.Name), KeyType: k.Type.awsKeyType()}
 		createReq.KeySchema = append(createReq.KeySchema, el)
 	}
-	createReq.ProvisionedThroughput =  &dynamodb.ProvisionedThroughput{ReadCapacityUnits: aws.Long(throughput.Read), WriteCapacityUnits: aws.Long(throughput.Write)}
-	
+	createReq.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{ReadCapacityUnits: aws.Long(throughput.Read), WriteCapacityUnits: aws.Long(throughput.Write)}
+
 	return &createReq
 }
 
@@ -209,7 +212,7 @@ func (d *DynamoDb) AddGlobalSecondaryIndexStruct(createReq *dynamodb.CreateTable
 		key := dynamodb.KeySchemaElement{AttributeName: aws.String(k.Name), KeyType: k.Type.awsKeyType()}
 		gsi.KeySchema = append(gsi.KeySchema, key)
 	}
-	gsi.ProvisionedThroughput =  &dynamodb.ProvisionedThroughput{ReadCapacityUnits: aws.Long(throughput.Read), WriteCapacityUnits: aws.Long(throughput.Write)}
+	gsi.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{ReadCapacityUnits: aws.Long(throughput.Read), WriteCapacityUnits: aws.Long(throughput.Write)}
 	if createReq.GlobalSecondaryIndexes == nil {
 		createReq.GlobalSecondaryIndexes = make([]dynamodb.GlobalSecondaryIndex, 0, 1)
 	}
@@ -219,7 +222,7 @@ func (d *DynamoDb) AddGlobalSecondaryIndexStruct(createReq *dynamodb.CreateTable
 
 func (d *DynamoDb) DescribeTable(tableName string) (*dynamodb.TableDescription, error) {
 	descReq := dynamodb.DescribeTableInput{TableName: aws.String(tableName)}
-	descResp, err :=  d.session.DescribeTable(&descReq)
+	descResp, err := d.session.DescribeTable(&descReq)
 	if err != nil {
 		return nil, err
 	}
