@@ -344,8 +344,7 @@ func (client *MailClientContext) start() {
 	for {
 		select {
 		case <-client.maxPollTimer.C:
-			var perr error
-			perr = client.di.PushRegister()
+			perr := client.di.PushRegister()
 			if perr == APNSInvalidToken {
 				client.logger.Warning("Invalid Token reported by Apple for token '%s'. Deleting device", client.di.PushToken)
 				client.di.cleanup()
@@ -376,11 +375,11 @@ func (client *MailClientContext) start() {
 					if err != nil {
 						if client.di.aws.IgnorePushFailures() == false {
 							if err == APNSInvalidToken {
-								client.logger.Warning("Invalid Token reported by Apple for token '%s'.Deleting device", client.di.PushToken)
+								client.Warning("Invalid Token reported by Apple for token '%s'.Deleting device", client.di.PushToken)
 								client.di.cleanup()
 							} else {
+								client.Error("Failed to push: %s", err)
 							}
-							client.Error("Failed to push: %s", err)
 							logError(err, client.logger)
 							return
 						} else {
