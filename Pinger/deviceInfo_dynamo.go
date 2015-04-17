@@ -96,8 +96,7 @@ func (h *DeviceContactDynamoDbHandler) insert(dc *deviceContact) error {
 	}
 	dc.Updated = dc.Created
 	dc.LastContact = dc.Created
-	_, err := h.dynamo.Insert(dynamoDeviceInfoTableName, dc.toMap())
-	return err
+	return h.dynamo.Insert(dynamoDeviceInfoTableName, dc.toMap())
 }
 
 func (h *DeviceContactDynamoDbHandler) update(dc *deviceContact) (int64, error) {

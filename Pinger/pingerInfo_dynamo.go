@@ -16,11 +16,33 @@ const (
 	dynamoPingerInfoTableName = "alpha.pinger.pinger_info"
 )
 
-func newPingerInfoDynamoDbHandler(aws AWS.AWSHandler) *PingerInfoDynamoDbHandler {
-	return &PingerInfoDynamoDbHandler{
-		dynamo:    aws.GetDynamoDbSession(),
-		tableName: dynamoPingerInfoTableName,
+func newPingerInfoDynamoDbHandler(aws AWS.AWSHandler) (*PingerInfoDynamoDbHandler, error) {
+	dynamo := aws.GetDynamoDbSession()
+	table, err := dynamo.DescribeTable(dynamoPingerInfoTableName)
+	if err != nil {
+		return nil, err
 	}
+	if table == nil {
+		createReq := dynamo.CreateTableReq(dynamoPingerInfoTableName,
+			[]AWS.DBAttrDefinition{
+				{Name: "pinger", Type: AWS.String},
+				{Name: "created", Type: AWS.Number},
+				{Name: "updated", Type: AWS.Number},
+			},
+			[]AWS.DBKeyType{
+				{Name: "pinger", Type: AWS.KeyTypeHash},
+			},
+			AWS.ThroughPut{Read: 10, Write: 10},
+		)
+		err := dynamo.CreateTable(createReq)
+		if err != nil {
+			return nil, err
+		}
+	} 
+	return &PingerInfoDynamoDbHandler{
+		dynamo:    dynamo,
+		tableName: dynamoPingerInfoTableName,
+	}, nil
 }
 
 func (h *PingerInfoDynamoDbHandler) get(keys []AWS.DBKeyValue) (*PingerInfo, error) {
@@ -79,8 +101,7 @@ func (pinger *PingerInfo) toMap() map[string]interface{} {
 func (h *PingerInfoDynamoDbHandler) insert(pinger *PingerInfo) error {
 	pinger.Created = time.Now().UnixNano()
 	pinger.Updated = pinger.Created
-	_, err := h.dynamo.Insert(dynamoPingerInfoTableName, pinger.toMap())
-	return err
+	return h.dynamo.Insert(dynamoPingerInfoTableName, pinger.toMap())
 }
 
 func (h *PingerInfoDynamoDbHandler) update(pinger *PingerInfo) (int64, error) {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
-	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"net"
@@ -27,6 +26,7 @@ func (s *awsDynamoDbTester) SetupSuite() {
 	<-readyCh
 	s.dynDb = newDynamoDbSession("AKIAIEKBHZUDER5TYR7Q", "9bSGWoFxSGRLS+J4EhLbR3NMkjWUbdVu+itcYT6g", "local")
 	s.clientRecord = map[string]interface{}{
+		"id":           int64(1),
 		"client":       "foo12334",
 		"pinger":       "pinger1",
 		"device":       "NchoXDFF",
@@ -92,72 +92,92 @@ const (
 )
 
 func (s *awsDynamoDbTester) createTestTable() {
-	createReq := dynamodb.CreateTableInput{
-		TableName: aws.String(UnitTestTableName),
-		AttributeDefinitions: []dynamodb.AttributeDefinition{
-			{AttributeName: aws.String("id"), AttributeType: aws.String("S")},
-			{AttributeName: aws.String("pinger"), AttributeType: aws.String("S")},
-			{AttributeName: aws.String("client"), AttributeType: aws.String("S")},
+	createReq := s.dynDb.CreateTableReq(UnitTestTableName,
+		[]DBAttrDefinition{
+			{Name: "id", Type: Number},
+			{Name: "pinger", Type: String},
+			{Name: "client", Type: String},
 		},
-		KeySchema: []dynamodb.KeySchemaElement{
-			{AttributeName: aws.String("id"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+		[]DBKeyType{
+			{Name: "id", Type: KeyTypeHash},
 		},
-		GlobalSecondaryIndexes: []dynamodb.GlobalSecondaryIndex{
-			{
-				IndexName: aws.String(UnitTestIndexName),
-				KeySchema: []dynamodb.KeySchemaElement{
-					{AttributeName: aws.String("pinger"), KeyType: aws.String(dynamodb.KeyTypeHash)},
-					{AttributeName: aws.String("client"), KeyType: aws.String(dynamodb.KeyTypeRange)},
-				},
-				Projection:            &dynamodb.Projection{ProjectionType: aws.String(dynamodb.ProjectionTypeAll)},
-				ProvisionedThroughput: &dynamodb.ProvisionedThroughput{ReadCapacityUnits: aws.Long(10), WriteCapacityUnits: aws.Long(10)},
-			},
-		},
-		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{ReadCapacityUnits: aws.Long(10), WriteCapacityUnits: aws.Long(10)},
-	}
+		ThroughPut{Read: 10, Write: 10},
+	)
+	require.NotNil(s.T(), createReq)
 
-	_, err := s.dynDb.session.CreateTable(&createReq)
+	err := s.dynDb.AddGlobalSecondaryIndexStruct(createReq, UnitTestIndexName,
+		[]DBKeyType{
+			{Name: "pinger", Type: KeyTypeHash},
+			{Name: "client", Type: KeyTypeRange},
+		},
+		ThroughPut{Read: 10, Write: 10},
+	)
+	require.NoError(s.T(), err)
+
+	err = s.dynDb.CreateTable(createReq)
 	require.NoError(s.T(), err)
 }
 
 func (s *awsDynamoDbTester) TestTableCreate() {
+	table, err := s.dynDb.DescribeTable(UnitTestTableName)
+	require.Error(s.T(), err)
+	s.Nil(table)
+
 	s.createTestTable()
+
+	table, err = s.dynDb.DescribeTable(UnitTestTableName)
+	require.NoError(s.T(), err)
+	s.NotNil(table)
+	s.NotEmpty(table)
+	s.NotEmpty(table.AttributeDefinitions)
+	s.NotEmpty(table.GlobalSecondaryIndexes)
 
 	listReq := dynamodb.ListTablesInput{}
 	listResp, err := s.dynDb.session.ListTables(&listReq)
 	s.NoError(err)
 	s.NotEmpty(listResp.TableNames)
-
-	descReq := dynamodb.DescribeTableInput{
-		TableName: aws.String(UnitTestTableName),
-	}
-	descResp, err := s.dynDb.session.DescribeTable(&descReq)
-	s.NoError(err)
-	s.NotEmpty(descResp.Table.GlobalSecondaryIndexes)
 }
 
-func (s *awsDynamoDbTester) itemCreate() string {
-	id := uuid.NewV4().String()
-	item := *goMaptoAwsAttributeMap(&s.clientRecord)
-	item["id"] = goTypeToAttributeValue(id)
-	putReq := dynamodb.PutItemInput{
-		TableName: aws.String(UnitTestTableName),
-		Item:      item,
-	}
-	putResp, err := s.dynDb.session.PutItem(&putReq)
-	s.NoError(err)
-	s.Empty(putResp.Attributes)
-	return id
+func (s *awsDynamoDbTester) itemCreate(rec map[string]interface{}) {
+	err := s.dynDb.Insert(UnitTestTableName, rec)
+	require.NoError(s.T(), err)
 }
 
 func (s *awsDynamoDbTester) TestItemCreate() {
 	s.createTestTable()
-	s.itemCreate()
+	s.itemCreate(s.clientRecord)
+}
+
+func (s *awsDynamoDbTester) itemValidate(item *map[string]interface{}) {
+	v, ok := (*item)["id"]
+	s.True(ok)
+	s.Equal(s.clientRecord["id"], v)
+
+	v, ok = (*item)["client"]
+	s.True(ok)
+	s.Equal(s.clientRecord["client"], v)
+
+	v, ok = (*item)["pinger"]
+	s.True(ok)
+	s.Equal(s.clientRecord["pinger"], v)
+
+	v, ok = (*item)["device"]
+	s.True(ok)
+	s.Equal(s.clientRecord["device"], v)
+
+	v, ok = (*item)["push_service"]
+	s.True(ok)
+	s.Equal(s.clientRecord["push_service"], v)
+
+	v, ok = (*item)["push_token"]
+	s.True(ok)
+	s.Equal(s.clientRecord["push_token"], v)
 }
 
 func (s *awsDynamoDbTester) TestItemQuery() {
 	s.createTestTable()
-	s.itemCreate()
+	s.itemCreate(s.clientRecord)
+
 	queReq := dynamodb.QueryInput{
 		TableName: aws.String(UnitTestTableName),
 		//AttributesToGet: []string{"id", "client", "pinger", "device", "push_service", "push_token"},
@@ -176,40 +196,28 @@ func (s *awsDynamoDbTester) TestItemQuery() {
 	s.NoError(err)
 	s.NotEmpty(queResp.Items)
 	for _, item := range queResp.Items {
-		x := *(awsAttributeMapToGo(&item))
-
-		v, ok := x["client"]
-		s.True(ok)
-		s.Equal(s.clientRecord["client"], v)
-
-		v, ok = x["pinger"]
-		s.True(ok)
-		s.Equal(s.clientRecord["pinger"], v)
-
-		v, ok = x["device"]
-		s.True(ok)
-		s.Equal(s.clientRecord["device"], v)
-
-		v, ok = x["push_service"]
-		s.True(ok)
-		s.Equal(s.clientRecord["push_service"], v)
-
-		v, ok = x["push_token"]
-		s.True(ok)
-		s.Equal(s.clientRecord["push_token"], v)
+		s.itemValidate(awsAttributeMapToGo(&item))
 	}
 }
 
 func (s *awsDynamoDbTester) TestItemBatchGet() {
 	s.createTestTable()
-	id := s.itemCreate()
+	s.itemCreate(s.clientRecord)
+	
+	resp, err := s.dynDb.Get(UnitTestTableName, []DBKeyValue{
+			{Key: "id", Value: s.clientRecord["id"], Comparison: KeyComparisonEq},
+		},
+	)
+	s.NoError(err)
+	s.NotNil(resp)
+	
 	getReq := dynamodb.BatchGetItemInput{
 		RequestItems: map[string]dynamodb.KeysAndAttributes{
 			UnitTestTableName: dynamodb.KeysAndAttributes{
 				ConsistentRead: aws.Boolean(true),
 				Keys: []map[string]dynamodb.AttributeValue{
 					map[string]dynamodb.AttributeValue{
-						"id": goTypeToAttributeValue(id),
+						"id": goTypeToAttributeValue(s.clientRecord["id"]),
 					},
 				},
 			},
@@ -221,40 +229,13 @@ func (s *awsDynamoDbTester) TestItemBatchGet() {
 	s.NotEmpty(getResp.Responses)
 	s.NotEmpty(getResp.Responses[UnitTestTableName])
 	for _, item := range getResp.Responses[UnitTestTableName] {
-		x := *(awsAttributeMapToGo(&item))
-
-		v, ok := x["client"]
-		s.True(ok)
-		s.Equal(s.clientRecord["client"], v)
-
-		v, ok = x["pinger"]
-		s.True(ok)
-		s.Equal(s.clientRecord["pinger"], v)
-
-		v, ok = x["device"]
-		s.True(ok)
-		s.Equal(s.clientRecord["device"], v)
-
-		v, ok = x["push_service"]
-		s.True(ok)
-		s.Equal(s.clientRecord["push_service"], v)
-
-		v, ok = x["push_token"]
-		s.True(ok)
-		s.Equal(s.clientRecord["push_token"], v)
+		s.itemValidate(awsAttributeMapToGo(&item))
 	}
 }
 
 func (s *awsDynamoDbTester) TestItemDelete() {
 	s.createTestTable()
-	id := s.itemCreate()
-	delReq := dynamodb.DeleteItemInput{
-		TableName: aws.String(UnitTestTableName),
-		Key: map[string]dynamodb.AttributeValue{
-			"id": goTypeToAttributeValue(id),
-		},
-	}
-
-	_, err := s.dynDb.session.DeleteItem(&delReq)
+	s.itemCreate(s.clientRecord)
+	err := s.dynDb.Delete(UnitTestTableName, map[string]interface{}{"id": s.clientRecord["id"].(int64)})
 	s.NoError(err)
 }
