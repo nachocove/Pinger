@@ -221,7 +221,7 @@ func (di *DeviceInfo) cleanup() {
 	di.Debug("Cleaning up DeviceInfo")
 	n, err := di.dbm.Delete(di)
 	if n == 0 {
-		di.Error("Not deleted from DB!")
+		di.Debug("Not deleted from DB. Perhaps it was deleted previously?")
 	}
 	if err != nil {
 		di.Error("Not deleted from DB: %s", err)
