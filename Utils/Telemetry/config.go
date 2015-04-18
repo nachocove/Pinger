@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// TelemetryConfiguration the telemetry configuration section in a file
+// TelemetryConfiguration The telemetry configuration section in a file
 type TelemetryConfiguration struct {
 	FileLocationPrefix   string
 	UploadLocationPrefix string
@@ -12,6 +12,7 @@ type TelemetryConfiguration struct {
 	UploadInterval       int64
 }
 
+// NewTelemetryConfiguration creates a new TelemetryConfiguration
 func NewTelemetryConfiguration() *TelemetryConfiguration {
 	return &TelemetryConfiguration{
 		IncludeDebug:   false,
@@ -19,6 +20,7 @@ func NewTelemetryConfiguration() *TelemetryConfiguration {
 	}
 }
 
+// Validate validate the TelemetryConfiguration
 func (config *TelemetryConfiguration) Validate() error {
 	if config.UploadInterval <= 0 {
 		return fmt.Errorf("UploadInterval can not be <= 0")

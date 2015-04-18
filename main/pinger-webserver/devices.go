@@ -61,6 +61,7 @@ func (pd *registerPostData) getLogPrefix() string {
 
 // Validate validate the structure/information to make sure required information exists.
 func (pd *registerPostData) Validate() (bool, []string) {
+	// TODO Enhance this function to do more security validation.
 	ok := true
 	MissingFields := []string{}
 	if pd.ClientId == "" {
@@ -151,9 +152,11 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	//		return
 	//	}
 	encodingStr := r.Header.Get("Content-Type")
+	// TODO Check the length of the encodingStr. We roughly know how long it can reasonably be.
 	postInfo := registerPostData{}
 	switch {
 	case encodingStr == "application/json" || encodingStr == "text/json":
+		// TODO guess a reasonable max and check it here.  
 		decoder := json.NewDecoder(r.Body)
 		err := decoder.Decode(&postInfo)
 		if err != nil {

@@ -264,7 +264,9 @@ func (client *MailClientContext) initFsm() {
 			"enter_deferred": client.enterDeferred,
 			"leave_deferred": client.exitDeferred,
 			"enter_pinging":  client.enterPinging,
+			"leave_pinging":  client.exitPinging,
 			"enter_stopped":  client.enterStopped,
+			"leave_stopped":  client.exitStopped,
 		},
 	)
 	client.Debug("FSM initialized")
@@ -310,6 +312,9 @@ func (client *MailClientContext) enterStopped(e *fsm.Event) {
 	}
 	client.Info(msg)
 	client.setStatus(status, err)
+}
+
+func (client *MailClientContext) exitStopped(e *fsm.Event) {
 }
 
 func logError(err error, logger *Logging.Logger) {
@@ -433,7 +438,7 @@ func (client *MailClientContext) start() {
 
 			default:
 				// the mailClient.LongPoll has thrown an error. note it.
-				err = client.fsm.Event(FSMStopped, fmt.Sprintf("Error Thrown: %s. Stopping", err.Error), MailClientStatusError, err)
+				err = client.fsm.Event(FSMStopped, fmt.Sprintf("Error Thrown: %s. Stopping", err.Error()), MailClientStatusError, err)
 				if err != nil {
 					panic(err)
 				}

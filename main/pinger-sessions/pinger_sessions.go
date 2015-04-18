@@ -27,10 +27,11 @@ func makeContext(protoEmailString string) (string, error) {
 	return string(context), nil
 }
 
+var contextRegex *regexp.Regexp
 var protoEmailRegex *regexp.Regexp
-
 func init() {
-	protoEmailRegex = regexp.MustCompile("^(exchange):\\w+@\\s$")
+	contextRegex = regexp.MustCompile("^[0-9a-z]{8}$")
+	protoEmailRegex = regexp.MustCompile("^(exchange|imap):\\w+@.+$")
 }
 
 func main() {
@@ -81,14 +82,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	if len(clientContext) > 8 {
-		var err error
-		clientContext, err = makeContext(clientContext)
-		if err != nil {
-			panic(err)
-		}
-		if verbose || debug {
-			fmt.Printf("INFO: Converted context to %s\n", clientContext)
+	if clientContext != "" {
+		switch {
+		case contextRegex.MatchString(clientContext):
+			// nothing to do. Just use it.
+			
+		case protoEmailRegex.MatchString(clientContext):
+			var err error
+			clientContext, err = makeContext(clientContext)
+			if err != nil {
+				panic(err)
+			}
+			if verbose || debug {
+				fmt.Printf("INFO: Converted context to %s\n", clientContext)
+			}
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown format for client context. Valid formats are '%s' and '%s'\n", contextRegex, protoEmailRegex)
+			os.Exit(1)
 		}
 	}
 	if debug {

@@ -1,3 +1,4 @@
+// Telemetry implements telemetry for Pinger
 package Telemetry
 
 import (
@@ -20,22 +21,31 @@ import (
 	"time"
 )
 
-// TelemetryWriter The telemetry writer functionality. Comprises a few goroutines for writing to the DB, extracting
-// into files, pushing to telemetry (s3) etc.
+// TelemetryWriter The telemetry writer functionality. Comprises a few goroutines for writing to the DB,
+// extracting into files, pushing to telemetry (s3) etc.
+//
+// The TelemetryWriter 'listens' on one side to log messages (see .Log() method) and reformats the log
+// message into a telemetry record, and puts that reformatted message into a channel (to not delay logging
+// any more than necessary).
+//
+// A separate goroutine listens on the channel and writes the record to a local sqlite3 db
+// (/tmp/telemetry/telemetry.db), which is essentially a buffer. Yea another go-routine periodically wakes
+// up, reads all records from the sqlite3 DB, formats them into json-formatted files, gzip's the files,
+// and uploads it to s3.
 type TelemetryWriter struct {
-	fileLocationPrefix      string
-	uploadLocationPrefixUrl *url.URL
-	uploadInterval          int64
-	dbmap                   *gorp.DbMap
-	lastRead                time.Time
-	telemetryCh             chan telemetryLogMsg
-	doUploadNow             chan int
-	aws                     AWS.AWSHandler
-	logger                  *log.Logger
-	hostId                  string
-	includeDebug            bool
-	debug                   bool
-	msgCount                int64
+	fileLocationPrefix      string               // where to store tempfiles which are written to s3
+	uploadLocationPrefixUrl *url.URL             // prefix in the s3 bucket where to store the file
+	uploadInterval          int64                // how often (in minutes) to upload to s3
+	dbmap                   *gorp.DbMap          // the Gorp handle
+	lastRead                time.Time            // timestamp when we last read from the DB.
+	telemetryCh             chan telemetryLogMsg // the channel the .Log() method writes to
+	doUploadNow             chan int             // a channel to make the background 'task' write immediately (used when an error is encountered, for example).
+	aws                     AWS.AWSHandler       // the AWS methods
+	logger                  *log.Logger          // the logger
+	hostId                  string               // this pinger's host ID
+	includeDebug            bool                 // whether to also upload debugs. Used for debugging.
+	debug                   bool                 // whether to debug the telemetry writer (to debug we use printfs, so there's no logging loop)
+	msgCount                int64                // the message count. Keeps track of how many messages we have buffered. We upload every 100.
 	mutex                   sync.Mutex
 }
 
@@ -89,6 +99,7 @@ func init() {
 	clientIdRegex = regexp.MustCompile("^.*(?P<client>us-[a-z]+-[0-9]+:[a-z\\-0-9]+).*$")
 	deviceIdIdRegex = regexp.MustCompile("^.*(?P<device>Ncho[0-9A-Z]{24}).*$")
 }
+
 func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record, hostId string) telemetryLogMsg {
 	message := rec.Message()
 	var client, deviceId, sessionId, context string
