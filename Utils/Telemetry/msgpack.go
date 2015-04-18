@@ -5,6 +5,9 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
+// An attempt at using MsgPack for encoding of the telemetry messages. We opted for json instead.
+// This is here in case we need it later. Could be deleted.
+
 type telemetryPackKey int
 
 const (
