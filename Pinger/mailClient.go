@@ -212,8 +212,10 @@ func (client *MailClientContext) Status() (MailClientStatus, error) {
 }
 
 func (client *MailClientContext) cleanup() {
-	client.di.cleanup()
-	client.di = nil
+	if client.di != nil {
+		client.di.cleanup()
+		client.di = nil
+	}
 	client.Debug("Cleaning up MailClientContext struct")
 	if client.mailClient != nil {
 		client.mailClient.Cleanup()
@@ -353,6 +355,7 @@ func (client *MailClientContext) start() {
 			if perr == APNSInvalidToken {
 				client.logger.Warning("Invalid Token reported by Apple for token '%s'. Deleting device", client.di.PushToken)
 				client.di.cleanup()
+				client.di = nil
 			} else {
 				client.logger.Warning("Error %s reported by Apple for token '%s'.", perr, client.di.PushToken)
 			}
@@ -382,6 +385,7 @@ func (client *MailClientContext) start() {
 							if err == APNSInvalidToken {
 								client.Warning("Invalid Token reported by Apple for token '%s'.Deleting device", client.di.PushToken)
 								client.di.cleanup()
+								client.di = nil
 							} else {
 								client.Error("Failed to push: %s", err)
 							}
@@ -425,6 +429,7 @@ func (client *MailClientContext) start() {
 					if err1 == APNSInvalidToken {
 						client.logger.Warning("Invalid Token reported by Apple for token '%s'. Deleting device", client.di.PushToken)
 						client.di.cleanup()
+						client.di = nil
 					} else {
 						client.logger.Warning("Error %s reported by Apple for token '%s'.", err1, client.di.PushToken)
 					}

@@ -221,11 +221,15 @@ func (di *DeviceInfo) cleanup() {
 	di.Debug("Cleaning up DeviceInfo")
 	n, err := di.dbm.Delete(di)
 	if n == 0 {
-		di.Debug("Not deleted from DB. Perhaps it was deleted previously?")
+		di.Warning("Not deleted from DB!")
 	}
 	if err != nil {
 		di.Error("Not deleted from DB: %s", err)
 	}
+	// TODO investigte if there's a way to memset(0x0) these fields, instead of 
+	// relying on the garbage collector to clean them up (i.e. assigning "" to them
+	// really just moves the pointer, orphaning the previous string, which the garbage
+	// collector them frees or reuses.
 	di.ClientId = ""
 	di.ClientContext = ""
 	di.DeviceId = ""
