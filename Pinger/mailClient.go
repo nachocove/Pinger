@@ -212,8 +212,10 @@ func (client *MailClientContext) Status() (MailClientStatus, error) {
 }
 
 func (client *MailClientContext) cleanup() {
-	client.di.cleanup()
-	client.di = nil
+	if client.di != nil {
+		client.di.cleanup()
+		client.di = nil
+	}
 	client.Debug("Cleaning up MailClientContext struct")
 	if client.mailClient != nil {
 		client.mailClient.Cleanup()
@@ -264,7 +266,9 @@ func (client *MailClientContext) initFsm() {
 			"enter_deferred": client.enterDeferred,
 			"leave_deferred": client.exitDeferred,
 			"enter_pinging":  client.enterPinging,
+			"leave_pinging":  client.exitPinging,
 			"enter_stopped":  client.enterStopped,
+			"leave_stopped":  client.exitStopped,
 		},
 	)
 	client.Debug("FSM initialized")
@@ -312,6 +316,9 @@ func (client *MailClientContext) enterStopped(e *fsm.Event) {
 	client.setStatus(status, err)
 }
 
+func (client *MailClientContext) exitStopped(e *fsm.Event) {
+}
+
 func logError(err error, logger *Logging.Logger) {
 	_, fn, line, _ := runtime.Caller(1)
 	logger.Error("%s/%s:%d %s", path.Base(path.Dir(fn)), path.Base(fn), line, err)
@@ -344,7 +351,14 @@ func (client *MailClientContext) start() {
 	for {
 		select {
 		case <-client.maxPollTimer.C:
-			client.di.PushRegister()
+			perr := client.di.PushRegister()
+			if perr == APNSInvalidToken {
+				client.logger.Warning("Invalid Token reported by Apple for token '%s'. Deleting device", client.di.PushToken)
+				client.di.cleanup()
+				client.di = nil
+			} else {
+				client.logger.Warning("Error %s reported by Apple for token '%s'.", perr, client.di.PushToken)
+			}
 			err = client.fsm.Event(FSMStopped, "maxPollTimer expired. Stopping everything.", MailClientStatusStopped, nil)
 			if err != nil {
 				panic(err)
@@ -368,7 +382,13 @@ func (client *MailClientContext) start() {
 					err = client.di.PushNewMail()
 					if err != nil {
 						if client.di.aws.IgnorePushFailures() == false {
-							client.Error("Failed to push: %s", err)
+							if err == APNSInvalidToken {
+								client.Warning("Invalid Token reported by Apple for token '%s'.Deleting device", client.di.PushToken)
+								client.di.cleanup()
+								client.di = nil
+							} else {
+								client.Error("Failed to push: %s", err)
+							}
 							logError(err, client.logger)
 							return
 						} else {
@@ -406,6 +426,13 @@ func (client *MailClientContext) start() {
 				if err1 != nil {
 					// don't bother with this error. The real/main error is the http status. Just log it.
 					client.Error("Push failed but ignored: %s", err1.Error())
+					if err1 == APNSInvalidToken {
+						client.logger.Warning("Invalid Token reported by Apple for token '%s'. Deleting device", client.di.PushToken)
+						client.di.cleanup()
+						client.di = nil
+					} else {
+						client.logger.Warning("Error %s reported by Apple for token '%s'.", err1, client.di.PushToken)
+					}
 				}
 				err = client.fsm.Event(FSMStopped, "Client needs reregister. Stopping.", MailClientStatusStopped, nil)
 				if err != nil {

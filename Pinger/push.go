@@ -14,9 +14,11 @@ import (
 )
 
 var APNSMessageTooLarge error
+var APNSInvalidToken error
 
 func init() {
 	APNSMessageTooLarge = fmt.Errorf("APNS message exceeds 256 bytes")
+	APNSInvalidToken = fmt.Errorf("APNS message used an invalid token")
 }
 
 func Push(aws AWS.AWSHandler, platform, service, token, endpointArn, alert, sound string, contentAvailable int, ttl int64, pingerMap map[string]interface{}, logger *Logging.Logger) error {
@@ -38,7 +40,9 @@ func Push(aws AWS.AWSHandler, platform, service, token, endpointArn, alert, soun
 		}
 		if err != nil {
 			// TODO: if the error is APNSMessageTooLarge, then split up the message if possible and try again
-			if err != APNSMessageTooLarge {
+			if err == APNSInvalidToken {
+				return err
+			} else if err != APNSMessageTooLarge {
 				logger.Warning("Push error %s. Retrying attempt %d in %s", err, i, retryInterval)
 				time.Sleep(retryInterval)
 			}

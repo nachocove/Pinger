@@ -113,9 +113,11 @@ func (cfg *ServerConfiguration) CreateAuthToken(clientId, clientContext, deviceI
 	str := fmt.Sprintf("%d::%s::%s::%s", time.Now().UTC().Unix(), clientId, clientContext, deviceId)
 	ciphertext := make([]byte, aes.BlockSize+len(str))
 	iv := ciphertext[:aes.BlockSize]
+	// TODO Check the RNG algorithm
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		return "", err
 	}
+	// TODO Check this code for forgeability. Make sure it's encrypted and auth'd (hmac + encryption)
 	cfb := cipher.NewCFBEncrypter(block, iv)
 	cfb.XORKeyStream(ciphertext[aes.BlockSize:], []byte(str))
 	b64 := base64.StdEncoding.EncodeToString(ciphertext)
@@ -123,6 +125,7 @@ func (cfg *ServerConfiguration) CreateAuthToken(clientId, clientContext, deviceI
 }
 
 func (cfg *ServerConfiguration) ValidateAuthToken(clientId, clientContext, deviceId, token string) (time.Time, error) {
+	// TODO Check length on token so base64 decoding doesn't blow up
 	errTime := time.Time{}
 	block, err := aes.NewCipher([]byte(cfg.TokenAuthKey))
 	if err != nil {

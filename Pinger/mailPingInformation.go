@@ -48,6 +48,10 @@ func (pi *MailPingInformation) String() string {
 }
 
 func (pi *MailPingInformation) cleanup() {
+	// TODO investigte if there's a way to memset(0x0) these fields, instead of 
+	// relying on the garbage collector to clean them up (i.e. assigning "" to them
+	// really just moves the pointer, orphaning the previous string, which the garbage
+	// collector them frees or reuses.
 	pi.ClientId = ""
 	pi.ClientContext = ""
 	pi.DeviceId = ""
@@ -73,6 +77,8 @@ func (pi *MailPingInformation) cleanup() {
 
 // Validate validate the structure/information to make sure required information exists.
 func (pi *MailPingInformation) Validate() bool {
+	// TODO more checking of all fields, since this is all 'user input', including URL for sanity
+	// TODO Check the sanity of the Expected replies. Perhaps use some 'reasonable' max?
 	if pi.ClientId == "" || pi.MailServerUrl == "" {
 		return false
 	}
