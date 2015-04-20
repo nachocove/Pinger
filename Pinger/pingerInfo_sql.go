@@ -64,9 +64,8 @@ func (h *PingerInfoSqlHandler) insert(pinger *PingerInfo) error {
 	return h.dbm.Insert(pinger)
 }
 
-func (h *PingerInfoSqlHandler) delete(pinger *PingerInfo) error {
-	_, err := h.dbm.Delete(pinger)
-	return err
+func (h *PingerInfoSqlHandler) delete(pinger *PingerInfo) (int64, error) {
+	return h.dbm.Delete(pinger)
 }
 
 func (h *PingerInfoSqlHandler) get(keys []AWS.DBKeyValue) (*PingerInfo, error) {

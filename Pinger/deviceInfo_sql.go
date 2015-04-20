@@ -28,9 +28,8 @@ func (h *DeviceInfoSqlHandler) update(di *DeviceInfo) (int64, error) {
 	return n, nil
 }
 
-func (h *DeviceInfoSqlHandler) delete(di *DeviceInfo) error {
-	_, err := h.dbm.Delete(di)
-	return err
+func (h *DeviceInfoSqlHandler) delete(di *DeviceInfo) (int64, error) {
+	return h.dbm.Delete(di)
 }
 
 func (h *DeviceInfoSqlHandler) get(keys []AWS.DBKeyValue) (*DeviceInfo, error) {

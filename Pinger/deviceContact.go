@@ -8,7 +8,7 @@ import (
 type DeviceContactDbHandler interface {
 	insert(dc *deviceContact) error
 	update(dc *deviceContact) (int64, error)
-	delete(dc *deviceContact) error
+	delete(dc *deviceContact) (int64, error)
 	get(keys []AWS.DBKeyValue) (*deviceContact, error)
 }
 

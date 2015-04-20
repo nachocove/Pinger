@@ -60,9 +60,8 @@ func (h *deviceContactSqlDbHandler) update(dc *deviceContact) (int64, error) {
 	return n, nil
 }
 
-func (h *deviceContactSqlDbHandler) delete(dc *deviceContact) error {
-	_, err := h.dbm.Delete(dc)
-	return err
+func (h *deviceContactSqlDbHandler) delete(dc *deviceContact) (int64, error) {
+	return h.dbm.Delete(dc)
 }
 
 func (h *deviceContactSqlDbHandler) get(keys []AWS.DBKeyValue) (*deviceContact, error) {

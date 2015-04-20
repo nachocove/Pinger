@@ -11,7 +11,7 @@ import (
 type PingerInfoDbHandler interface {
 	insert(pinger *PingerInfo) error
 	update(pinger *PingerInfo) (int64, error)
-	delete(pinger *PingerInfo) error
+	delete(pinger *PingerInfo) (int64, error)
 	get(keys []AWS.DBKeyValue) (*PingerInfo, error)
 }
 

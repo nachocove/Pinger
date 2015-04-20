@@ -108,8 +108,8 @@ func (h *DeviceContactDynamoDbHandler) update(dc *deviceContact) (int64, error) 
 	return 1, nil
 }
 
-func (h *DeviceContactDynamoDbHandler) delete(dc *deviceContact) error {
+func (h *DeviceContactDynamoDbHandler) delete(dc *deviceContact) (int64, error) {
 	err := fmt.Errorf("Not implemented")
-	return err
+	return 0, err
 
 }

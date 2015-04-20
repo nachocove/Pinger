@@ -13,7 +13,7 @@ import (
 type DeviceInfoDbHandler interface {
 	insert(di *DeviceInfo) error
 	update(di *DeviceInfo) (int64, error)
-	delete(di *DeviceInfo) error
+	delete(di *DeviceInfo) (int64, error)
 	get(keys []AWS.DBKeyValue) (*DeviceInfo, error)
 	findByPingerId(pingerId string) ([]*DeviceInfo, error)
 }
@@ -138,7 +138,7 @@ func (di *DeviceInfo) Warning(format string, args ...interface{}) {
 	di.logger.Warning(fmt.Sprintf("%s: %s", di.getLogPrefix(), format), args...)
 }
 
-func (di *DeviceInfo) delete() error {
+func (di *DeviceInfo) delete() (int64, error) {
 	return di.db.delete(di)
 }
 
