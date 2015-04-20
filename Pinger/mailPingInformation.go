@@ -142,5 +142,12 @@ func (pi *MailPingInformation) newDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWS
 			return nil, err
 		}
 	}
+	dc, err := di.getContactInfoObj(true)
+	if err != nil {
+		return nil, err
+	}
+	if dc == nil {
+		panic("Could not create DeviceContact record")
+	}
 	return di, nil
 }
