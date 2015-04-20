@@ -35,6 +35,8 @@ type ExchangeClient struct {
 
 // NewExchangeClient set up a new exchange client
 func NewExchangeClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, logger *Logging.Logger) (*ExchangeClient, error) {
+	// TODO Check the request URL here. Check for http/https, and validate/sanity check the URL itself.
+	// TODO check that fields we actually look at are used and fields we don't use are ignored.
 	ex := &ExchangeClient{
 		debug:     debug,
 		logger:    logger.Copy(),
@@ -154,6 +156,9 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 
 	ex.Info("Making Connection to server")
 	// Make the request and wait for response; this could take a while
+	// TODO Can we and how do we validate the server certificate?
+	// TODO Can we guard against bogus SSL negotiation from a hacked server?
+	// TODO Perhaps we need to read and assess the Go SSL/TLS implementation
 	response, err := ex.httpClient.Do(ex.request)
 	ex.request = nil // unsave it. We're done with it.
 	if ex.cancelled == true {
@@ -164,6 +169,8 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		// if we cancel requests, we drop into this error case. We will wind up sending
 		// the retryResponse, but since no one is listening, we don't care (there's no
 		// memory leakage in this case
+		// TODO Can 'err.Error()' be data from the remote endpoint? Do we need to protect against it?
+		// TODO Perhaps limit the length we log here.
 		if strings.Contains(err.Error(), "use of closed network connection") == false {
 			ex.Warning("httpClient.Do failed: %s", err.Error())
 		} else {
@@ -185,7 +192,10 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		toRead = ex.maxResponseSize()
 	}
 	responseBytes = make([]byte, toRead)
-	// TODO Do I need to loop here to make sure I get the number of bytes I expect?
+	if len(responseBytes) != toRead {
+		panic("len of response is not what we expected")
+	}
+	// TODO Do I need to loop here to make sure I get the number of bytes I expect? i.e. like unix sockets returning less than you expected.
 	n, err := response.Body.Read(responseBytes)
 	if err != nil {
 		if err != io.EOF {
@@ -388,11 +398,11 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 			}
 
 		case <-stopPollCh: // parent will close this, at which point this will trigger.
-			ex.Debug("Was told to stop (allStop). Stopping")
+			ex.Debug("Was told to stop. Stopping")
 			return
 
 		case <-stopAllCh: // parent will close this, at which point this will trigger.
-			ex.Debug("Was told to stop. Stopping")
+			ex.Debug("Was told to stop (allStop). Stopping")
 			return
 		}
 	}

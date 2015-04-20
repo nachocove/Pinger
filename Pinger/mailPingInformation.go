@@ -71,6 +71,8 @@ func (pi *MailPingInformation) cleanup() {
 
 // Validate validate the structure/information to make sure required information exists.
 func (pi *MailPingInformation) Validate() bool {
+	// TODO more checking of all fields, since this is all 'user input', including URL for sanity
+	// TODO Check the sanity of the Expected replies. Perhaps use some 'reasonable' max?
 	if pi.ClientId == "" || pi.MailServerUrl == "" {
 		return false
 	}
