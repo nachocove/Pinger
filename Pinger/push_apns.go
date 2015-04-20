@@ -103,7 +103,11 @@ func APNSpushMessage(token string, alert, sound string, contentAvailable int, tt
 		logger.Debug("Response from apple: %s", resp.AppleResponse)
 	}
 	if resp.Error != nil {
-		return fmt.Errorf("APNS Push error: %s", resp.Error)
+		if resp.Error.Error() == "INVALID_TOKEN" {
+			return APNSInvalidToken
+		} else {
+			return fmt.Errorf("APNS Push error: %s", resp.Error)
+		}
 	}
 	if !resp.Success {
 		logger.Error("response is not success, but no error indicated")
