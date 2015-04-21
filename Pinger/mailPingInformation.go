@@ -3,6 +3,8 @@ package Pinger
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/nachocove/Pinger/Utils/AWS"
+	"github.com/nachocove/Pinger/Utils/Logging"
 )
 
 // TODO This should probably move into the MailClient interface/struct
@@ -101,4 +103,51 @@ func (pi *MailPingInformation) getLogPrefix() string {
 		pi.logPrefix = fmt.Sprintf("%s:%s:%s:%s", pi.DeviceId, pi.ClientId, pi.ClientContext, pi.SessionId)
 	}
 	return pi.logPrefix
+}
+
+func (pi *MailPingInformation) newDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, logger *Logging.Logger) (*DeviceInfo, error) {
+	var err error
+	di, err := getDeviceInfo(db, aws, pi.ClientId, pi.ClientContext, pi.DeviceId, pi.SessionId, logger)
+	if err != nil {
+		return nil, err
+	}
+	if di == nil {
+		di, err = newDeviceInfo(
+			pi.ClientId,
+			pi.ClientContext,
+			pi.DeviceId,
+			pi.PushToken,
+			pi.PushService,
+			pi.Platform,
+			pi.OSVersion,
+			pi.AppBuildVersion,
+			pi.AppBuildNumber,
+			pi.SessionId,
+			aws,
+			db,
+			logger)
+		if err != nil {
+			return nil, err
+		}
+		if di == nil {
+			return nil, fmt.Errorf("Could not create DeviceInfo")
+		}
+		err = db.insert(di)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		_, err := di.updateDeviceInfo(pi.PushService, pi.PushToken, pi.Platform, pi.OSVersion, pi.AppBuildVersion, pi.AppBuildNumber)
+		if err != nil {
+			return nil, err
+		}
+	}
+	dc, err := di.getContactInfoObj(true)
+	if err != nil {
+		return nil, err
+	}
+	if dc == nil {
+		panic("Could not create DeviceContact record")
+	}
+	return di, nil
 }

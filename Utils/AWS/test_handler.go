@@ -1,7 +1,6 @@
 package AWS
 
-import (
-)
+import ()
 
 type TestAwsHandler struct {
 	registeredEndpoint    string
@@ -93,6 +92,6 @@ func (ah *TestAwsHandler) IgnorePushFailures() bool {
 	return ah.ignorePushFailure
 }
 
-func (ah *TestAwsHandler) GetDynamoDbSession() DynamoDbHandler {
+func (ah *TestAwsHandler) GetDynamoDbSession() *DynamoDb {
 	return nil
 }
