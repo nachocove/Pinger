@@ -1,29 +1,21 @@
 package AWS
 
 import (
-	"fmt"
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"net"
-	"os"
-	"os/exec"
 	"testing"
-	"time"
 )
 
 type awsDynamoDbTester struct {
 	suite.Suite
 	dynDb         *DynamoDb
 	clientRecord  map[string]interface{}
-	dynamoProcess *os.Process
 }
 
 func (s *awsDynamoDbTester) SetupSuite() {
-	readyCh := make(chan int)
-	go s.doJavaDynamoLocal(readyCh)
-	<-readyCh
+	NewLocalDynamoDbProcess()
 	s.dynDb = newDynamoDbSession("AKIAIEKBHZUDER5TYR7Q", "9bSGWoFxSGRLS+J4EhLbR3NMkjWUbdVu+itcYT6g", "local")
 	s.clientRecord = map[string]interface{}{
 		"id":           int64(1),
@@ -36,7 +28,7 @@ func (s *awsDynamoDbTester) SetupSuite() {
 }
 
 func (s *awsDynamoDbTester) TearDownSuite() {
-	s.dynamoProcess.Kill()
+	KillLocalDynamoDbProcess()
 }
 
 func (s *awsDynamoDbTester) cleanUp() {
@@ -50,35 +42,6 @@ func (s *awsDynamoDbTester) SetupTest() {
 
 func (s *awsDynamoDbTester) TearDownTest() {
 	s.cleanUp()
-}
-
-func (s *awsDynamoDbTester) doJavaDynamoLocal(readyCh chan int) {
-	java, err := exec.LookPath("java")
-	if err != nil {
-		panic(err)
-	}
-	cmd := exec.Command(java, "-Djava.library.path=./DynamoDBLocal_lib", "-jar", "DynamoDBLocal.jar")
-	nachoHome := os.Getenv("NACHO_HOME")
-	if nachoHome == "" {
-		nachoHome = fmt.Sprintf("%s/src/nacho", os.Getenv("HOME"))
-	}
-	cmd.Dir = fmt.Sprintf("%s/dynamodb_local_2013-12-12", nachoHome)
-	err = cmd.Start()
-	if err != nil {
-		panic(err)
-	}
-	s.dynamoProcess = cmd.Process
-	time.Sleep(1 * time.Second)
-	for {
-		conn, err := net.Dial("tcp", "localhost:8000")
-		if err == nil && conn != nil {
-			conn.Close()
-			readyCh <- 1
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-	err = cmd.Wait()
 }
 
 func TestAWSDynamoDb(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"time"
+	"reflect"
 )
 
 type DeviceContactDynamoDbHandler struct {
@@ -13,25 +14,41 @@ type DeviceContactDynamoDbHandler struct {
 }
 
 const (
-	dynamoDeviceInfoTableName = "alpha.pinger.device_info"
+	dynamoDeviceContactTableName = "alpha.pinger.device_info"
 )
 
 func newDeviceContactDynamoDbHandler(aws AWS.AWSHandler) *DeviceContactDynamoDbHandler {
 	return &DeviceContactDynamoDbHandler{
 		dynamo:    aws.GetDynamoDbSession(),
-		tableName: dynamoDeviceInfoTableName,
+		tableName: dynamoDeviceContactTableName,
 	}
+}
+
+var deviceContactReflection reflect.Type
+func init() {
+	deviceContactReflection = reflect.TypeOf(deviceContact{})
 }
 
 func (h *DeviceContactDynamoDbHandler) get(keys []AWS.DBKeyValue) (*deviceContact, error) {
-	dcMap, err := h.dynamo.Get(dynamoDeviceInfoTableName, keys)
+	for _, k := range keys {
+		field, ok := deviceContactReflection.FieldByName(k.Key)
+		if !ok {
+			panic(fmt.Sprintf("No dynamo tag for field %s", k.Key))
+		}
+		tag := field.Tag.Get("dynamo")
+		if tag == "" {
+			panic(fmt.Sprintf("Tag for field %s can not be empty", k.Key))
+		}
+		k.Key = field.Tag.Get("dynamo")
+	}
+	dcMap, err := h.dynamo.Get(dynamoDeviceContactTableName, keys)
 	if err != nil {
 		return nil, err
 	}
-	return fromDeviceInfoMap(dcMap), nil
+	return fromDeviceContactMap(dcMap), nil
 }
 
-func fromDeviceInfoMap(dcMap *map[string]interface{}) *deviceContact {
+func fromDeviceContactMap(dcMap *map[string]interface{}) *deviceContact {
 	dc := deviceContact{}
 	for k, v := range *dcMap {
 		switch v := v.(type) {
@@ -80,6 +97,7 @@ func fromDeviceInfoMap(dcMap *map[string]interface{}) *deviceContact {
 }
 func (dc *deviceContact) toMap() map[string]interface{} {
 	dcMap := make(map[string]interface{})
+	dcMap["id"] = dc.Id
 	dcMap["client"] = dc.ClientId
 	dcMap["context"] = dc.ClientContext
 	dcMap["device"] = dc.DeviceId
@@ -87,6 +105,7 @@ func (dc *deviceContact) toMap() map[string]interface{} {
 	dcMap["updated"] = dc.Updated
 	dcMap["last_contact"] = dc.LastContact
 	dcMap["last_contact_request"] = dc.LastContactRequest
+	dcMap["pinger"] = dc.Pinger
 	return dcMap
 }
 
@@ -94,14 +113,18 @@ func (h *DeviceContactDynamoDbHandler) insert(dc *deviceContact) error {
 	if dc.Created == 0 {
 		dc.Created = time.Now().UnixNano()
 	}
+	if dc.Id == 0 {
+		dc.Id = dc.Created		
+	}
 	dc.Updated = dc.Created
 	dc.LastContact = dc.Created
-	return h.dynamo.Insert(dynamoDeviceInfoTableName, dc.toMap())
+	dc.Pinger = pingerHostId
+	return h.dynamo.Insert(dynamoDeviceContactTableName, dc.toMap())
 }
 
 func (h *DeviceContactDynamoDbHandler) update(dc *deviceContact) (int64, error) {
 	dc.Updated = time.Now().UnixNano()
-	err := h.dynamo.Update(dynamoDeviceInfoTableName, dc.toMap())
+	err := h.dynamo.Update(dynamoDeviceContactTableName, dc.toMap())
 	if err != nil {
 		return 0, err
 	}
@@ -111,5 +134,11 @@ func (h *DeviceContactDynamoDbHandler) update(dc *deviceContact) (int64, error) 
 func (h *DeviceContactDynamoDbHandler) delete(dc *deviceContact) (int64, error) {
 	err := fmt.Errorf("Not implemented")
 	return 0, err
-
 }
+
+func (h *DeviceContactDynamoDbHandler) findByPingerId(pingerId string) ([]*deviceContact, error) {
+	err := fmt.Errorf("Not implemented")
+	return nil, err
+}
+
+

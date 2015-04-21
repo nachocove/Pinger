@@ -1,6 +1,13 @@
 package AWS
 
-import ()
+import (
+	"fmt"
+	"net"
+	"os"
+	"os/exec"
+	"sync"
+	"time"
+)
 
 type TestAwsHandler struct {
 	registeredEndpoint    string
@@ -93,5 +100,76 @@ func (ah *TestAwsHandler) IgnorePushFailures() bool {
 }
 
 func (ah *TestAwsHandler) GetDynamoDbSession() *DynamoDb {
-	return nil
+	return newDynamoDbSession("", "", "local")
+}
+
+type LocalDynamoDbProcess struct {
+	mutex sync.Mutex
+	cmd   *exec.Cmd
+}
+
+func (d *LocalDynamoDbProcess) start() {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	if d.cmd == nil {
+		java, err := exec.LookPath("java")
+		if err != nil {
+			panic(err)
+		}
+		cmd := exec.Command(java, "-Djava.library.path=./DynamoDBLocal_lib", "-jar", "DynamoDBLocal.jar")
+		nachoHome := os.Getenv("NACHO_HOME")
+		if nachoHome == "" {
+			nachoHome = fmt.Sprintf("%s/src/nacho", os.Getenv("HOME"))
+		}
+		cmd.Dir = fmt.Sprintf("%s/dynamodb_local_2013-12-12", nachoHome)
+		readyCh := make(chan int)
+		go func(readyCh chan int) {
+			cmd.Start()
+
+			time.Sleep(1 * time.Second)
+			for {
+				conn, err := net.Dial("tcp", "localhost:8000")
+				if err == nil && conn != nil {
+					conn.Close()
+					readyCh <- 1
+					break
+				}
+				time.Sleep(1 * time.Second)
+			}
+			err = cmd.Wait()
+			if err != nil {
+				fmt.Printf("Command returned %s", err)
+			}
+		}(readyCh)
+
+		<-readyCh
+		d.cmd = cmd
+	}
+}
+
+func (d *LocalDynamoDbProcess) kill() {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	if d.cmd != nil {
+		d.cmd.Process.Kill()
+		d.cmd = nil
+	}
+}
+
+var localDynamoDbProcess *LocalDynamoDbProcess
+
+func init() {
+	localDynamoDbProcess = &LocalDynamoDbProcess{
+		mutex: sync.Mutex{},
+	}
+}
+
+func NewLocalDynamoDbProcess() {
+	localDynamoDbProcess.start()
+}
+
+func KillLocalDynamoDbProcess() {
+	localDynamoDbProcess.kill()
 }

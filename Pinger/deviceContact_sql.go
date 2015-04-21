@@ -5,6 +5,7 @@ import (
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"time"
+	"reflect"
 )
 
 type deviceContactSqlDbHandler struct {
@@ -42,6 +43,19 @@ func addDeviceContactTable(dbmap *gorp.DbMap) {
 	cMap.SetNotNull(true)
 }
 
+var getAllMyDeviceContactSql string
+func init() {
+	var ok bool
+	deviceInfoReflection := reflect.TypeOf(DeviceInfo{})
+	pingerField, ok := deviceInfoReflection.FieldByName("Pinger")
+	if ok == false {
+		panic("Could not get Pinger Field information")
+	}
+	getAllMyDeviceContactSql = fmt.Sprintf("select * from %s where %s=?",
+		deviceContactTableName,
+		pingerField.Tag.Get("db"))
+}
+
 func newDeviceContactSqlDbHandler(dbm *gorp.DbMap) *deviceContactSqlDbHandler {
 	return &deviceContactSqlDbHandler{
 		dbm: dbm,
@@ -72,7 +86,6 @@ func (h *deviceContactSqlDbHandler) get(keys []AWS.DBKeyValue) (*deviceContact, 
 		}
 		args = append(args, a.Value)
 	}
-	fmt.Printf("Searching with args %+v\n", args)
 	obj, err := h.dbm.Get(&deviceContact{}, args...)
 	if err != nil {
 		return nil, err
@@ -91,3 +104,17 @@ func (dc *deviceContact) PreInsert(s gorp.SqlExecutor) error {
 	dc.LastContact = dc.Created
 	return nil
 }
+
+func (h *deviceContactSqlDbHandler) findByPingerId(pingerId string) ([]*deviceContact, error) {
+	var devices []*deviceContact
+	var err error
+	_, err = h.dbm.Select(&devices, getAllMyDeviceContactSql, pingerHostId)
+	if err != nil {
+		return nil, err
+	}
+	for k := range devices {
+		devices[k].db = h
+	}
+	return devices, nil
+}
+

@@ -22,6 +22,7 @@ type deviceContactTester struct {
 
 func (s *deviceContactTester) SetupSuite() {
 	var err error
+	AWS.NewLocalDynamoDbProcess()
 	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
 	s.dbm, err = initDB(&dbconfig, true, s.logger)
@@ -32,6 +33,10 @@ func (s *deviceContactTester) SetupSuite() {
 	s.testClientId = "sometestClientId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"
+}
+
+func (s *deviceContactTester) TearDownSuite() {
+	AWS.KillLocalDynamoDbProcess()
 }
 
 func (s *deviceContactTester) SetupTest() {
@@ -90,4 +95,56 @@ func (s *deviceContactTester) TestDeviceContactUpdate() {
 	require.NotNil(s.T(), dc1)
 
 	s.Equal(dc1.LastContactRequest, dc.LastContactRequest)
+}
+
+func (s *deviceContactTester) createTable(dynamo *AWS.DynamoDb) {
+	createReq := dynamo.CreateTableReq(dynamoDeviceContactTableName,
+		[]AWS.DBAttrDefinition{
+			{Name: "id", Type: AWS.Number},
+			{Name: "pinger", Type: AWS.String},
+			{Name: "client", Type: AWS.String},
+		},
+		[]AWS.DBKeyType{
+			{Name: "id", Type: AWS.KeyTypeHash},
+		},
+		AWS.ThroughPut{Read: 10, Write: 10},
+	)
+	if createReq == nil {
+		panic("No createReq")
+	}
+	err := dynamo.AddGlobalSecondaryIndexStruct(createReq, dynamoDeviceContactTableName,
+		[]AWS.DBKeyType{
+			{Name: "pinger", Type: AWS.KeyTypeHash},
+			{Name: "client", Type: AWS.KeyTypeRange},
+		},
+		AWS.ThroughPut{Read: 10, Write: 10},
+	)
+	if err != nil {
+		panic(err)
+	}
+	err = dynamo.CreateTable(createReq)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (s *deviceContactTester) TestDeviceContatDynamo() {
+	dynamoHandler := newDeviceContactDynamoDbHandler(s.aws)
+	defer dynamoHandler.dynamo.DeleteTable(dynamoDeviceContactTableName)
+	
+	s.createTable(dynamoHandler.dynamo)
+	require.NotNil(s.T(), dynamoHandler)
+	require.NotNil(s.T(), dynamoHandler.dynamo)
+	require.NotEqual(s.T(), "", dynamoHandler.tableName)
+	
+	dc := newDeviceContact(dynamoHandler, s.testClientId, s.testClientContext, s.testDeviceId)
+	require.NotNil(s.T(), dc)
+	err := dc.insert()
+	s.NoError(err)
+	
+	err = dc.updateLastContact()
+	s.NoError(err)
+	
+	err = dc.delete()
+	s.NoError(err)
 }

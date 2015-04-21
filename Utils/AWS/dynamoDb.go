@@ -202,6 +202,12 @@ func (d *DynamoDb) CreateTableReq(tableName string, attributes []DBAttrDefinitio
 	return &createReq
 }
 
+func (d *DynamoDb) DeleteTable(tableName string) error {
+	req := dynamodb.DeleteTableInput{TableName: aws.String(tableName)}
+	_, err := d.session.DeleteTable(&req)
+	return err
+}
+
 func (d *DynamoDb) AddGlobalSecondaryIndexStruct(createReq *dynamodb.CreateTableInput, indexName string, keys []DBKeyType, throughput ThroughPut) error {
 	gsi := dynamodb.GlobalSecondaryIndex{
 		IndexName:  aws.String(indexName),
