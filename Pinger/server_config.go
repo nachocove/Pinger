@@ -19,7 +19,7 @@ const (
 	DefaultDebugging      = false
 	DefaultServerCertFile = ""
 	DefaultServerKeyFile  = ""
-	DefaultNonTLSPort     = 80
+	DefaultNonTLSPort     = 0
 )
 
 // ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
