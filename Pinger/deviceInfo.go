@@ -304,10 +304,8 @@ func (di *DeviceInfo) getContactInfoObj(insert bool) (*deviceContact, error) {
 	var db DeviceContactDbHandler
 	diSql, ok := di.db.(*DeviceInfoSqlHandler)
 	if ok {
-		di.Debug("Using sql handler")
 		db = newDeviceContactSqlDbHandler(diSql.dbm)
 	} else {
-		di.Debug("Using dynamo handler")
 		db = newDeviceContactDynamoDbHandler(di.aws)
 	}
 	dc, err := deviceContactGet(db, di.ClientId, di.ClientContext, di.DeviceId)
