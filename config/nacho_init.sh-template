@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# Configure variables here
+accessKey=ACCESS_KEY
+secretKey=SECRET_KEY
+bucket=BUCKET
+name=PREFIX
+
+# Probably nothing configurable beyond here
+
+NACHO_USER=nachocove
+NACHO_HOME=~$NACHO_USER
+DEST_HOME=$NACHO_HOME/config
+
+# Note we're using HOME here, not NACHO_HOME. That's because this runs as root (and as nachocove during test)
+AWS_HOME=$HOME/.aws
+aws_cli_creds=$AWS_HOME/credentials
+aws_cli_config=$AWS_HOME/config
+
+if [ ! -d $AWS_HOME ] ; then
+	mkdir $AWS_HOME || (echo "Could not create aws directory"; exit 1) || exit 1
+fi
+
+cat > $aws_cli_creds << EOF
+[default]
+aws_access_key_id = $accessKey
+aws_secret_access_key = $secretKey
+EOF
+
+cat > $aws_cli_config << EOF
+[default]
+region = us-west-2
+EOF
+
+aws s3 cp s3://$bucket/$name/pinger $DEST_HOME/pinger --recursive --include '*' --quiet || (echo "Could not download s3 items for pinger"; exit 1) || exit 1
+chown -R $NACHO_USER:$NACHO_USER $DEST_HOME || (echo "Could not chown DEST_HOME directory"; exit 1) || exit 1
