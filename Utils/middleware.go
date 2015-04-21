@@ -72,7 +72,7 @@ func (l *Logger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Ha
 	start := time.Now()
 	l.Debug("Started %s %s", r.Method, r.URL.Path)
 	// http://www.gnuterrypratchett.com/
-	rw.Header().Add("X-Clacks-Overhead", "Terry Pratchett")
+	rw.Header().Add("X-Clacks-Overhead", "GNU Terry Pratchett")
 
 	next(rw, r)
 
