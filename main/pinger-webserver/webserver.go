@@ -57,23 +57,25 @@ func (context *Context) run() error {
 	httpsMiddlewares.UseHandler(httpsRouter)
 
 	addr := fmt.Sprintf("%s:%d", config.Server.BindAddress, config.Server.Port)
-	context.Logger.Info("Listening on %s (redirecting from %d)\n", addr, config.Server.NonTlsPort)
-	// start the server on the non-tls port to redirect
-	go func() {
-		httpMiddlewares := negroni.New(
-			Utils.NewRecovery("Pinger-web", config.Server.Debug),
-			Utils.NewLogger(context.Logger),
-			Utils.NewRedirectMiddleware("", config.Server.Port),
-		)
-		httpRouter := mux.NewRouter()
-		httpMiddlewares.UseHandler(httpRouter)
-		addr := fmt.Sprintf("%s:%d", config.Server.BindAddress, config.Server.NonTlsPort)
-		err := http.ListenAndServe(addr, httpMiddlewares)
-		if err != nil {
-			context.Logger.Fatalf("Could not start server on port %d\n", config.Server.NonTlsPort)
-		}
-	}()
-
+	context.Logger.Info("Listening on %s\n", addr)
+	if config.Server.NonTlsPort > 0 {
+		context.Logger.Info("(redirecting from %d)\n", config.Server.NonTlsPort)
+		// start the server on the non-tls port to redirect
+		go func() {
+			httpMiddlewares := negroni.New(
+				Utils.NewRecovery("Pinger-web", config.Server.Debug),
+				Utils.NewLogger(context.Logger),
+				Utils.NewRedirectMiddleware("", config.Server.Port),
+			)
+			httpRouter := mux.NewRouter()
+			httpMiddlewares.UseHandler(httpRouter)
+			addr := fmt.Sprintf("%s:%d", config.Server.BindAddress, config.Server.NonTlsPort)
+			err := http.ListenAndServe(addr, httpMiddlewares)
+			if err != nil {
+				context.Logger.Fatalf("Could not start server on port %d\n", config.Server.NonTlsPort)
+			}
+		}()
+	}
 	Utils.AddDebugToggleSignal(context)
 	var err error
 	if config.Server.ServerCertFile != "" && config.Server.ServerKeyFile != "" {
