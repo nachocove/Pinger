@@ -16,17 +16,17 @@ type DeviceContactDbHandler interface {
 }
 
 type deviceContact struct {
-	Id                 int64  `db:"id", dynamo:"id"`
-	Created            int64  `db:"created", dynamo:"created"`
-	Updated            int64  `db:"updated", dynamo:"updated"`
-	LastContact        int64  `db:"last_contact", dynamo:"last_contact"`
-	LastContactRequest int64  `db:"last_contact_request", dynamo:"last_contact_request"`
-	ClientId           string `db:"client_id", dynamo:"client_id"` // us-east-1a-XXXXXXXX
-	ClientContext      string `db:"client_context", dynamo:"client_context"`
-	DeviceId           string `db:"device_id", dynamo:"device_id"` // NCHO348348384384.....
-	PushToken          string `db:"push_token", dynamo:"push_token"`
-	PushService        string `db:"push_service", dynamo:"push_service"` // APNS, GCM, ...
-	Pinger             string `db:"pinger"`
+	Id                 int64  `db:"id" dynamo:"id"`
+	Created            int64  `db:"created" dynamo:"created"`
+	Updated            int64  `db:"updated" dynamo:"updated"`
+	LastContact        int64  `db:"last_contact" dynamo:"last_contact"`
+	LastContactRequest int64  `db:"last_contact_request" dynamo:"last_contact_request"`
+	ClientId           string `db:"client_id" dynamo:"client_id"` // us-east-1a-XXXXXXXX
+	ClientContext      string `db:"client_context" dynamo:"client_context"`
+	DeviceId           string `db:"device_id" dynamo:"device_id"` // NCHO348348384384.....
+	PushToken          string `db:"push_token" dynamo:"push_token"`
+	PushService        string `db:"push_service" dynamo:"push_service"` // APNS, GCM, ...
+	Pinger             string `db:"pinger" dynamo:"pinger"`
 
 	db DeviceContactDbHandler `db:"-"`
 }
@@ -64,9 +64,10 @@ func deviceContactGet(db DeviceContactDbHandler, clientId, clientContext, device
 		// Note these are really only relevant to the dynamoDB sql handler. for gorp,
 		// the keys should be in order they are in the struct, so we need to make sure
 		// the order is correct here, as well as the values, but don't care about the column name.
-		AWS.DBKeyValue{Key: clientIdField.Tag.Get("db"), Value: clientId, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: clientContextField.Tag.Get("db"), Value: clientContext, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: deviceIdField.Tag.Get("db"), Value: deviceId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "ClientId", Value: clientId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "ClientContext", Value: clientContext, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "DeviceId", Value: deviceId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "Pinger", Value: pingerHostId, Comparison: AWS.KeyComparisonEq},
 	}
 	dc, err := db.get(keys)
 	if err != nil {

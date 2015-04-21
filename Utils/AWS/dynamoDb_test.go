@@ -189,6 +189,7 @@ func (s *awsDynamoDbTester) TestItemBatchGet() {
 func (s *awsDynamoDbTester) TestItemDelete() {
 	s.createTestTable()
 	s.itemCreate(s.clientRecord)
-	err := s.dynDb.Delete(UnitTestTableName, map[string]interface{}{"id": s.clientRecord["id"].(int64)})
+	n, err := s.dynDb.Delete(UnitTestTableName, []DBKeyValue{DBKeyValue{Key: "id", Value: s.clientRecord["id"].(int64), Comparison: KeyComparisonEq}})
 	s.NoError(err)
+	s.Equal(1, n)
 }

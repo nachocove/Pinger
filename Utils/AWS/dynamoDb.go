@@ -56,6 +56,20 @@ func (c KeyComparisonType) awsComparison() aws.StringValue {
 	panic("unknown KeyComparisonType")
 }
 
+func (c KeyComparisonType) awsConditionOperator() aws.StringValue {
+	switch c {
+	case KeyComparisonEq:
+		return aws.String("=")
+
+	case KeyComparisonGt:
+		return aws.String(">")
+
+	case KeyComparisonLt:
+		return aws.String("<")
+	}
+	panic("unknown KeyComparisonType")
+}
+
 type DBKeyValue struct {
 	Key        string
 	Value      interface{}
@@ -164,16 +178,20 @@ func (d *DynamoDb) Update(tableName string, entry map[string]interface{}) error 
 	return d.Insert(tableName, entry)
 }
 
-func (d *DynamoDb) Delete(tableName string, entry map[string]interface{}) error {
+func (d *DynamoDb) Delete(tableName string, attributes []DBKeyValue) (int64, error) {
 	req := dynamodb.DeleteItemInput{
 		TableName: aws.StringValue(&tableName),
-		Key:       *goMaptoAwsAttributeMap(&entry),
+		//ReturnItemCollectionMetrics: aws.String("SIZE"),
+	}
+	req.Key = make(map[string]dynamodb.AttributeValue)
+	for _, attr := range attributes {
+		req.Key[attr.Key] = goTypeToAttributeValue(attr.Value)
 	}
 	_, err := d.session.DeleteItem(&req)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	return 1, nil
 }
 
 func (d *DynamoDb) CreateTable(tableDefinition *dynamodb.CreateTableInput) error {

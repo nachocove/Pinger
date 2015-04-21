@@ -142,9 +142,14 @@ func (s *deviceContactTester) TestDeviceContatDynamo() {
 	err := dc.insert()
 	s.NoError(err)
 	
-	err = dc.updateLastContact()
-	s.NoError(err)
-	
-	err = dc.delete()
-	s.NoError(err)
+//	dc, err = deviceContactGet(dynamoHandler, s.testClientId, s.testClientContext, s.testDeviceId)
+//	s.NoError(err)
+//	require.NotNil(s.T(), dc)
+//	
+//	err = dc.updateLastContact()
+//	s.NoError(err)
+//	
+//	
+//	err = dc.delete()
+//	s.NoError(err)
 }

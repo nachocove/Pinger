@@ -30,6 +30,9 @@ func init() {
 }
 
 func (h *DeviceContactDynamoDbHandler) get(keys []AWS.DBKeyValue) (*deviceContact, error) {
+    // TODO Need to look at the table description and match up passed in keys to the indexes, and decide
+    // whether we can get on the primary (no index needed) or one of the indexes. This may not be trivial
+	reqKeys := make([]AWS.DBKeyValue, 0, 1)
 	for _, k := range keys {
 		field, ok := deviceContactReflection.FieldByName(k.Key)
 		if !ok {
@@ -37,15 +40,59 @@ func (h *DeviceContactDynamoDbHandler) get(keys []AWS.DBKeyValue) (*deviceContac
 		}
 		tag := field.Tag.Get("dynamo")
 		if tag == "" {
-			panic(fmt.Sprintf("Tag for field %s can not be empty", k.Key))
+			panic(fmt.Sprintf("Tag for field %s can not be empty (%+v)", k.Key, field.Tag))
 		}
-		k.Key = field.Tag.Get("dynamo")
+		reqKeys = append(reqKeys, AWS.DBKeyValue{Key: tag, Value: k.Value, Comparison: k.Comparison})
 	}
-	dcMap, err := h.dynamo.Get(dynamoDeviceContactTableName, keys)
+	if len(reqKeys) == 0 {
+		panic("No keys found to get")
+	}
+	dcMap, err := h.dynamo.Get(dynamoDeviceContactTableName, reqKeys)
 	if err != nil {
 		return nil, err
 	}
 	return fromDeviceContactMap(dcMap), nil
+}
+
+func (h *DeviceContactDynamoDbHandler) insert(dc *deviceContact) error {
+	if dc.Created == 0 {
+		dc.Created = time.Now().UnixNano()
+	}
+	if dc.Id == 0 {
+		dc.Id = dc.Created		
+	}
+	dc.Updated = dc.Created
+	dc.LastContact = dc.Created
+	dc.Pinger = pingerHostId
+	return h.dynamo.Insert(dynamoDeviceContactTableName, dc.toMap())
+}
+
+func (h *DeviceContactDynamoDbHandler) update(dc *deviceContact) (int64, error) {
+	dc.Updated = time.Now().UnixNano()
+	err := h.dynamo.Update(dynamoDeviceContactTableName, dc.toMap())
+	if err != nil {
+		return 0, err
+	}
+	return 1, nil
+}
+
+func (h *DeviceContactDynamoDbHandler) delete(dc *deviceContact) (int64, error) {
+    // TODO Need to look at the table description and match up passed in keys to the indexes, and decide
+    // whether we can delete on the primary (no index needed) or one of the indexes. This may not be trivial
+	if dc.Id == 0 {
+		panic("Can not delete item without primary key")
+	}
+	return h.dynamo.Delete(dynamoDeviceContactTableName,
+		[]AWS.DBKeyValue{
+			AWS.DBKeyValue{Key: "id",  Value: dc.Id, Comparison: AWS.KeyComparisonEq},
+			AWS.DBKeyValue{Key: "client_id",  Value: dc.ClientId, Comparison: AWS.KeyComparisonEq},
+			AWS.DBKeyValue{Key: "pinger",  Value: dc.Pinger, Comparison: AWS.KeyComparisonEq},
+			})
+}
+
+func (h *DeviceContactDynamoDbHandler) findByPingerId(pingerId string) ([]*deviceContact, error) {
+	err := fmt.Errorf("Not implemented")
+	return nil, err
 }
 
 func fromDeviceContactMap(dcMap *map[string]interface{}) *deviceContact {
@@ -108,37 +155,4 @@ func (dc *deviceContact) toMap() map[string]interface{} {
 	dcMap["pinger"] = dc.Pinger
 	return dcMap
 }
-
-func (h *DeviceContactDynamoDbHandler) insert(dc *deviceContact) error {
-	if dc.Created == 0 {
-		dc.Created = time.Now().UnixNano()
-	}
-	if dc.Id == 0 {
-		dc.Id = dc.Created		
-	}
-	dc.Updated = dc.Created
-	dc.LastContact = dc.Created
-	dc.Pinger = pingerHostId
-	return h.dynamo.Insert(dynamoDeviceContactTableName, dc.toMap())
-}
-
-func (h *DeviceContactDynamoDbHandler) update(dc *deviceContact) (int64, error) {
-	dc.Updated = time.Now().UnixNano()
-	err := h.dynamo.Update(dynamoDeviceContactTableName, dc.toMap())
-	if err != nil {
-		return 0, err
-	}
-	return 1, nil
-}
-
-func (h *DeviceContactDynamoDbHandler) delete(dc *deviceContact) (int64, error) {
-	err := fmt.Errorf("Not implemented")
-	return 0, err
-}
-
-func (h *DeviceContactDynamoDbHandler) findByPingerId(pingerId string) ([]*deviceContact, error) {
-	err := fmt.Errorf("Not implemented")
-	return nil, err
-}
-
 
