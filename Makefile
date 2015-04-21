@@ -42,3 +42,6 @@ curl-defer:
 
 curl-stop:
 	curl -b /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/$(PINGER_EXAMPLE)-stop.json $(PINGER_HOST)/$(PINGER_VERSION)/stop
+
+curl-alive:
+	curl -v -k $(PINGER_HOST)/$(PINGER_VERSION)/alive?token=7701056ede5b4717babf239d215efaf0
