@@ -25,7 +25,7 @@ const (
 type ServerConfiguration struct {
 	Port             int
 	BindAddress      string
-	TemplateDir      string  // deprecated. If removed, all existing configs need to be fixed.
+	TemplateDir      string // deprecated. If removed, all existing configs need to be fixed.
 	ServerCertFile   string
 	ServerKeyFile    string
 	NonTlsPort       int      `gcfg:"non-tls-port"`

@@ -156,7 +156,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	postInfo := registerPostData{}
 	switch {
 	case encodingStr == "application/json" || encodingStr == "text/json":
-		// TODO guess a reasonable max and check it here.  
+		// TODO guess a reasonable max and check it here.
 		decoder := json.NewDecoder(r.Body)
 		err := decoder.Decode(&postInfo)
 		if err != nil {
