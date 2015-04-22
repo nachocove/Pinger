@@ -62,7 +62,7 @@ func main() {
 		usage()
 		os.Exit(0)
 	}
-	
+
 	if configFile == "" {
 		configFile = os.Getenv("PINGER_CONFIG")
 	}
