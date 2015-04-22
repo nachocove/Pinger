@@ -51,7 +51,6 @@ func (context *Context) run() error {
 	httpsMiddlewares := negroni.New(
 		Utils.NewRecovery("Pinger-web", config.Server.Debug),
 		Utils.NewLogger(context.Logger),
-		Utils.NewStatic("/public", "/static", ""),
 		NewContextMiddleWare(context))
 
 	httpsMiddlewares.UseHandler(httpsRouter)
@@ -130,10 +129,6 @@ func main() {
 	if debug != Pinger.DefaultDebugging {
 		config.Server.Debug = debug
 	}
-	if config.Server.TemplateDir == "" {
-		fmt.Fprintf(os.Stderr, "No template directory specified!")
-		os.Exit(1)
-	}
 	var screenLogging = false
 	var screenLevel = Logging.ERROR
 	if debug {
@@ -147,6 +142,9 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error InitLogging: %v\n", err)
 		os.Exit(1)
+	}
+	if config.Server.TemplateDir != "" {
+		logger.Warning("templateDir is deprecated. Please remove from config.")
 	}
 	context := NewContext(
 		config,
