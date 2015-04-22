@@ -125,6 +125,14 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 		if err != nil {
 			panic(err)
 		}
+		fs, err := os.Stat(config.Rpc.Path)
+		if err != nil {
+			panic(err)
+		}
+		err = os.Chmod(config.Rpc.Path, fs.Mode()&os.ModeType|0700)
+		if err != nil {
+			panic(err)
+		}
 		rpcServer.Accept(listener)
 	}
 	return nil
