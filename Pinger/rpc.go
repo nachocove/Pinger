@@ -7,9 +7,10 @@ import (
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"io/ioutil"
 	"log"
-	"os"
 	"net"
+	"net/http"
 	"net/rpc"
+	"os"
 )
 
 const (
@@ -105,15 +106,14 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 	}
 
 	logger.Debug("Starting RPC server on %s (pinger id %s)", config.Rpc.String(), pingerHostId)
-	var listener net.Listener
 	switch {
 	case config.Rpc.Protocol == RPCProtocolHTTP:
 		rpcServer.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
-		listener, err = net.Listen("tcp", config.Rpc.ConnectString())
+		err = http.ListenAndServe(config.Rpc.ConnectString(), nil)
 		if err != nil {
 			panic(err)
 		}
-		
+
 	case config.Rpc.Protocol == RPCProtocolUnix:
 		if exists(config.Rpc.Path) {
 			err = os.Remove(config.Rpc.Path)
@@ -121,12 +121,12 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 				panic(err)
 			}
 		}
-		listener, err = net.Listen("unix", config.Rpc.Path)
+		listener, err := net.Listen("unix", config.Rpc.Path)
 		if err != nil {
 			panic(err)
 		}
+		rpcServer.Accept(listener)
 	}
-	rpcServer.Accept(listener)
 	return nil
 }
 
