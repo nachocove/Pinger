@@ -33,8 +33,8 @@ region = us-west-2
 EOF
 
 cat > /etc/sudoers.d/$NACHO_USER << EOF
-$NACHO_USER ALL=(root) NOPASSWD: ALL
-Defaults:$NACHO_USER !requiretty
+root ALL=($NACHO_USER) NOPASSWD: ALL
+Defaults:root !requiretty
 EOF
 
 cat > /etc/postfix/sasl_passwd << EOF
@@ -47,5 +47,5 @@ service postfix restart || (echo "Could not restart postfix"; exit 1) || exit 1
 aws s3 cp s3://$bucket/$name/pinger $NACHO_CONFIG --recursive --include '*' --quiet || (echo "Could not download s3 items for pinger"; exit 1) || exit 1
 chown -R $NACHO_USER:$NACHO_USER $NACHO_CONFIG || (echo "Could not chown $NACHO_CONFIG directory"; exit 1) || exit 1
 
-sudo -u $NACHO_USER -i -H sh -c "cd $NACHO_HOME; /usr/bin/supervisord -c $NACHO_CONFIG/supervisord.conf" || (echo "Could not start supervisord"; exit 1) || exit 1
+sudo -n -u $NACHO_USER -i -H sh -c "cd $NACHO_HOME; /usr/bin/supervisord -c $NACHO_CONFIG/supervisord.conf" || (echo "Could not start supervisord"; exit 1) || exit 1
 exit 0
