@@ -15,18 +15,17 @@ import (
 const (
 	DefaultPort           = 443
 	DefaultBindAddress    = "0.0.0.0"
-	DefaultTemplateDir    = "templates"
 	DefaultDebugging      = false
 	DefaultServerCertFile = ""
 	DefaultServerKeyFile  = ""
-	DefaultNonTLSPort     = 80
+	DefaultNonTLSPort     = 0
 )
 
 // ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
 type ServerConfiguration struct {
 	Port             int
 	BindAddress      string
-	TemplateDir      string
+	TemplateDir      string  // deprecated. If removed, all existing configs need to be fixed.
 	ServerCertFile   string
 	ServerKeyFile    string
 	NonTlsPort       int      `gcfg:"non-tls-port"`
@@ -44,7 +43,6 @@ func NewServerConfiguration() *ServerConfiguration {
 	return &ServerConfiguration{
 		Port:           DefaultPort,
 		BindAddress:    DefaultBindAddress,
-		TemplateDir:    DefaultTemplateDir,
 		ServerCertFile: DefaultServerCertFile,
 		ServerKeyFile:  DefaultServerKeyFile,
 		NonTlsPort:     DefaultNonTLSPort,
