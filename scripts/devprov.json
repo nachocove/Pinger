@@ -1,0 +1,37 @@
+{
+    "aws_config": {
+        "region_name": "us-west-2"
+    },
+    "s3_config": {
+          "s3_bucket": "nchoconfal",
+          "s3_filenames": {
+            "cert": "/devpinger/pinger/devCerts.crt",
+            "key": "/devpinger/pinger/devCerts.key",
+            "config": "/devpinger/pinger/pinger.cfg"
+          }
+    },
+    "vpc_config": {
+        "name": "Apr22TestPVC1",
+        "vpc_cidr_block": "10.0.0.0/20",
+        "subnet_cidr_block": "10.0.0.0/24",
+        "instance_tenancy": "default"
+    },
+    "sg_config": {
+        "name": "AzimTestPVC-SG",
+        "description": "The SG for Pinger VPC",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "from_port": 22,
+            "to_port": 22,
+            "cidr_ip": "0.0.0.0/0"
+          },
+                    {
+            "protocol": "tcp",
+            "from_port": 80,
+            "to_port": 80,
+            "cidr_ip": "0.0.0.0/0"
+          }
+        ]
+    }
+}
