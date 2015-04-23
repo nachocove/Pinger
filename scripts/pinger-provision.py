@@ -1,6 +1,7 @@
 __author__ = 'azimo'
 import sys
 import time
+import traceback
 import boto
 import boto.vpc
 import argparse
@@ -8,6 +9,9 @@ import json
 from pprint import pprint
 from boto.s3.key import Key
 import boto.ec2
+import boto.ec2.elb
+from boto.ec2.elb import HealthCheck
+from boto.exception import S3ResponseError, EC2ResponseError, BotoServerError
 
 def get_region(region_name):
     for region in boto.ec2.regions():
@@ -22,6 +26,7 @@ def wait_for_vpc (c, id):
         vpc_list = c.get_all_vpcs(vpc_ids =[id])
 
 def create_vpc(conn, name, cidr_block, instance_tenancy):
+    print "creating vpc"
     vpc_list = conn.get_all_vpcs(filters=[("cidrBlock", cidr_block)])
     if not len(vpc_list):
         vpc = conn.create_vpc(cidr_block, instance_tenancy = instance_tenancy)
@@ -34,6 +39,7 @@ def create_vpc(conn, name, cidr_block, instance_tenancy):
     return vpc
 
 def create_ig(conn, vpc, name):
+    print "creating internet gateway"
     ig_list = conn.get_all_internet_gateways(filters=[("attachment.vpc-id", vpc.id)])
     if not len(ig_list):
         ig = conn.create_internet_gateway()
@@ -54,6 +60,7 @@ def wait_for_subnet (c, id):
         subnet_list = c.get_all_subnets(subnet_ids =[id])
 
 def create_subnet(conn, vpc, name, cidr_block):
+    print "creating subnet"
     subnet_list = conn.get_all_subnets(filters=[("cidrBlock", cidr_block), ("vpcId", vpc.id)])
     if not len(subnet_list):
         subnet = conn.create_subnet(vpc.id, cidr_block)
@@ -67,18 +74,19 @@ def create_subnet(conn, vpc, name, cidr_block):
 
 
 def create_sg(conn, vpc, name, description):
+    print "creating security group"
     sg_list = conn.get_all_security_groups(filters=[("vpc-id", vpc.id)])
     if not len(sg_list):
         sg = conn.create_security_group(name, description, vpc.id)
-        sg.add_tag("Name", name)
         print "Created Security Group (%s) for VPC(%s)" % (sg.id, vpc.id)
     else:
         sg = sg_list[0]
         print "Security Group (%s) found for VPC(%s)" % (sg.id, vpc.id)
-        sg.add_tag("Name", name)
+    sg.add_tag("Name", name)
     return sg
 
 def update_route_table(conn, vpc, ig, name):
+    print "updating route table"
     rt_list = conn.get_all_route_tables(filters=[("vpc-id", vpc.id)])
     if not len(rt_list):
         print "Cannot find default route table for VPC(%s)" % vpc.id
@@ -100,6 +108,7 @@ def sg_rule_exists(sg, rule):
 
 
 def add_rules_to_sg(conn, sg, rules):
+    print "adding rules to security group"
     for rule in rules:
         if (sg_rule_exists(sg, rule)):
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) exists." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
@@ -108,6 +117,7 @@ def add_rules_to_sg(conn, sg, rules):
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) added." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
 
 def create_instance(conn, vpc, sg, subnet, name, config):
+    print "creating instance"
     ins_list = conn.get_all_reservations(filters=[("vpc-id", vpc.id)])
     if not len(ins_list):
         reservation = conn.run_instances(config["ami_id"], key_name=config["key_pair"],
@@ -129,12 +139,44 @@ def create_instance(conn, vpc, sg, subnet, name, config):
     eip = conn.allocate_address(domain='vpc')
     conn.associate_address(instance_id=ins.id, allocation_id=eip.allocation_id)
     print "Instance(%s) status is :(%s)" % (ins.id, ins.state)
+    return ins
+
+def create_elb(region, vpc, subnet, sg, ins, name, config):
+    print "creating elastic load balancer"
+    conn = boto.ec2.elb.connect_to_region(region, profile_name="provisioner")
+    try:
+        elb_list = conn.get_all_load_balancers(load_balancer_names=[name])
+    except BotoServerError, e: # ELB by the given name does not exist
+        elb_list = []
+    if not len(elb_list):
+        ports = config["ports"]
+        elb = conn.create_load_balancer(name, None, listeners = ports, subnets=[subnet.id], security_groups=[sg.id])
+        hc = HealthCheck(
+            interval = config["health_check"]["interval"],
+            healthy_threshold = config["health_check"]["healthy_threshold"],
+            unhealthy_threshold = config["health_check"]["unhealthy_threshold"],
+            target = config["health_check"]["target"]
+        )
+        elb.configure_health_check(hc)
+        print "Created Elastic Load Balancer (%s) for VPC(%s)" % (elb.name, vpc.id)
+    else:
+        elb = elb_list[0]
+        print "Elastic Load Balancer (%s) found for VPC(%s)" % (elb.name, elb.vpc_id)
+        if (elb.vpc_id != vpc.id):
+            raise Exception("Error: Wrong VPC association: ELB(%s) is associated with VPC(%s) rather than VPC(%s)" % (elb.name, elb.vpc_id, vpc.id))
+    elb.register_instances(ins.id)
+    return elb
+
+def cleanup():
+    print "Cleaning up..."
+    # TODO: stop instance if running
+    # TODO: delete vpc
 
 def process_config(config):
     config["aws_config"]["region"] = get_region(config["aws_config"]["region_name"])
 
 def load_config_from_s3(s3_config):
-    conn = boto.connect_s3()
+    conn = boto.connect_s3(profile_name="provisioner")
     bucket = boto.s3.bucket.Bucket(conn, s3_config["s3_bucket"])
     s3_files = dict ()
     for key in s3_config["s3_filenames"]:
@@ -160,24 +202,32 @@ def main():
     s3_config = config["s3_config"]
     vpc_config = config["vpc_config"]
     sg_config = config["sg_config"]
-    ins_config = config["ins_config"];
+    ins_config = config["ins_config"]
+    elb_config = config["elb_config"]
 
     load_config_from_s3(s3_config)
-    pprint(config)
 
     # create connection
     from boto.vpc import VPCConnection
-    conn = VPCConnection(region=aws_config["region"])
+    conn = VPCConnection(region=aws_config["region"], profile_name="provisioner")
 
     # create vpc
-    vpc = create_vpc(conn, vpc_config["name"], vpc_config["vpc_cidr_block"], vpc_config["instance_tenancy"])
-    subnet = create_subnet(conn, vpc, vpc_config["name"]+"-SN", vpc_config["subnet_cidr_block"])
-    ig = create_ig(conn, vpc, vpc_config["name"]+"-IG")
-    rt = update_route_table(conn, vpc, ig, vpc_config["name"]+"-RT")
-    sg = create_sg(conn, vpc, sg_config["name"], sg_config["description"] + " for " + vpc_config["name"])
-    add_rules_to_sg(conn, sg, sg_config["rules"])
-    ins = create_instance(conn, vpc, sg, subnet, vpc_config["name"] + "-I", ins_config)
-    #ec2.connection.associate_address('i-71b2f60b', None, 'eipalloc-35cf685d')
+    try:
+        vpc = create_vpc(conn, vpc_config["name"], vpc_config["vpc_cidr_block"], vpc_config["instance_tenancy"])
+        subnet = create_subnet(conn, vpc, vpc_config["name"]+"-SN", vpc_config["subnet_cidr_block"])
+        ig = create_ig(conn, vpc, vpc_config["name"]+"-IG")
+        rt = update_route_table(conn, vpc, ig, vpc_config["name"]+"-RT")
+        sg = create_sg(conn, vpc, sg_config["name"], sg_config["description"] + " for " + vpc_config["name"])
+        add_rules_to_sg(conn, sg, sg_config["rules"])
+        ins = create_instance(conn, vpc, sg, subnet, vpc_config["name"] + "-I", ins_config)
+        elb = create_elb(aws_config["region_name"], vpc, subnet, sg, ins, vpc_config["name"] + "-ELB", elb_config)
+
+    except (S3ResponseError, EC2ResponseError) as e:
+        print type(e)
+        print dir(e)
+        print "Error :%s(%s):%s" % (e.error_code, e.status, e.message)
+        print traceback.format_exc()
+        cleanup()
 
 
 if __name__ == '__main__':

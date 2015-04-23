@@ -1,6 +1,7 @@
 {
     "aws_config": {
-        "region_name": "us-west-2"
+        "region_name": "us-west-2",
+        "zones": ["us-west-2a"]
     },
     "s3_config": {
           "s3_bucket": "nchoconfal",
@@ -34,10 +35,21 @@
           }
         ]
     },
-      "ins_config": {
+    "ins_config": {
         "ami_id": "ami-55a7ea65",
         "elastic_ip": "54.69.155.8",
         "type": "c1.medium",
         "key_pair": "Dev Pinger VPC KeyPair"
+    },
+    "elb_config": {
+      "ports": [
+        [443, 443, "tcp"]
+      ],
+      "health_check": {
+          "interval" :20,
+          "healthy_threshold": 3,
+          "unhealthy_threshold": 5,
+          "target": "HTTPS:443/1/alive?token=7701056ede5b4717babf239d215efaf0"
+      }
     }
 }
