@@ -16,10 +16,10 @@ type PingerInfoDbHandler interface {
 }
 
 type PingerInfo struct {
-	Id      int64  `db:"id"`
-	Pinger  string `db:"pinger"`
-	Created int64  `db:"created"`
-	Updated int64  `db:"updated"`
+	Id      int64  `db:"id" dynamo:"id"`
+	Pinger  string `db:"pinger" dynamo:"pinger"`
+	Created int64  `db:"created" dynamo:"created"`
+	Updated int64  `db:"updated" dynamo:"updated"`
 
 	db     PingerInfoDbHandler `db:"-"`
 	logger *Logging.Logger     `db:"-"`
