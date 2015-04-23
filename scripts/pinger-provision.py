@@ -107,6 +107,28 @@ def add_rules_to_sg(conn, sg, rules):
             sg.authorize(ip_protocol=rule["protocol"], from_port=rule["from_port"], to_port=rule["to_port"], cidr_ip=rule["cidr_ip"])
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) added." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
 
+def create_instance(conn, vpc, sg, subnet, name, config):
+    ins_list = conn.get_all_reservations(filters=[("vpc-id", vpc.id)])
+    if not len(ins_list):
+        reservation = conn.run_instances(config["ami_id"], key_name=config["key_pair"],
+            security_group_ids=[sg.id],
+            instance_type=config["type"],
+            subnet_id=subnet.id)
+        ins = reservation.instances[0]
+        print "Created Instance(%s). Status:(%s)" % (ins.id, ins.state)
+    else:
+        ins = ins_list[0].instances[0]
+        print "Instance(%s) already exists. Status:(%s)" % (ins.id, ins.state)
+
+    # Wait for the instance to be running
+    while ins.state == 'pending':
+        print "Waiting for instance(%s) to get out of pending. Status:(%s)" % (ins.id, ins.state)
+        time.sleep(1)
+        ins.update()
+    ins.add_tag("Name", name)
+    eip = conn.allocate_address(domain='vpc')
+    conn.associate_address(instance_id=ins.id, allocation_id=eip.allocation_id)
+    print "Instance(%s) status is :(%s)" % (ins.id, ins.state)
 
 def process_config(config):
     config["aws_config"]["region"] = get_region(config["aws_config"]["region_name"])
@@ -138,7 +160,7 @@ def main():
     s3_config = config["s3_config"]
     vpc_config = config["vpc_config"]
     sg_config = config["sg_config"]
-
+    ins_config = config["ins_config"];
 
     load_config_from_s3(s3_config)
     pprint(config)
@@ -153,7 +175,8 @@ def main():
     ig = create_ig(conn, vpc, vpc_config["name"]+"-IG")
     rt = update_route_table(conn, vpc, ig, vpc_config["name"]+"-RT")
     sg = create_sg(conn, vpc, sg_config["name"], sg_config["description"] + " for " + vpc_config["name"])
-    sg = add_rules_to_sg(conn, sg, sg_config["rules"])
+    add_rules_to_sg(conn, sg, sg_config["rules"])
+    ins = create_instance(conn, vpc, sg, subnet, vpc_config["name"] + "-I", ins_config)
     #ec2.connection.associate_address('i-71b2f60b', None, 'eipalloc-35cf685d')
 
 
