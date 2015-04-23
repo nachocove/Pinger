@@ -57,7 +57,7 @@ func aliveCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "BAD IP", http.StatusForbidden)
 		return
 	}
-	reply, err := Pinger.AliveCheck(context.Config.Rpc.ConnectString())
+	reply, err := Pinger.AliveCheck(&context.Config.Rpc)
 	if err != nil {
 		context.Logger.Warning("Could not check for aliveness: %v", err)
 		responseError(w, RPCServerError, "")
