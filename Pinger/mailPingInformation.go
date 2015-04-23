@@ -48,7 +48,7 @@ func (pi *MailPingInformation) String() string {
 }
 
 func (pi *MailPingInformation) cleanup() {
-	// TODO investigte if there's a way to memset(0x0) these fields, instead of 
+	// TODO investigte if there's a way to memset(0x0) these fields, instead of
 	// relying on the garbage collector to clean them up (i.e. assigning "" to them
 	// really just moves the pointer, orphaning the previous string, which the garbage
 	// collector them frees or reuses.

@@ -156,7 +156,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	postInfo := registerPostData{}
 	switch {
 	case encodingStr == "application/json" || encodingStr == "text/json":
-		// TODO guess a reasonable max and check it here.  
+		// TODO guess a reasonable max and check it here.
 		decoder := json.NewDecoder(r.Body)
 		err := decoder.Decode(&postInfo)
 		if err != nil {
@@ -185,7 +185,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 
 	//	session.Values[SessionVarClientId] = postInfo.ClientId
 	sessionId, err := makeSessionId(token)
-	reply, err := Pinger.StartPoll(context.Config.Rpc.ConnectString(), postInfo.AsMailInfo(sessionId))
+	reply, err := Pinger.StartPoll(&context.Config.Rpc, postInfo.AsMailInfo(sessionId))
 	if err != nil {
 		context.Logger.Warning("%s: Could not re/start polling for device: %s", postInfo.getLogPrefix(), err)
 		responseError(w, RPCServerError, "")
@@ -291,7 +291,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 		//		return
 		//	}
-		reply, err = Pinger.DeferPoll(context.Config.Rpc.ConnectString(), deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout)
+		reply, err = Pinger.DeferPoll(&context.Config.Rpc, deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout)
 		if err != nil {
 			context.Logger.Error("%s: Error deferring poll %s", deferData.getLogPrefix(), err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -386,7 +386,7 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 		//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 		//		return
 		//	}
-		reply, err = Pinger.StopPoll(context.Config.Rpc.ConnectString(), stopData.ClientId, stopData.ClientContext, stopData.DeviceId)
+		reply, err = Pinger.StopPoll(&context.Config.Rpc, stopData.ClientId, stopData.ClientContext, stopData.DeviceId)
 		if err != nil {
 			context.Logger.Error("%s: Error stopping poll %s", stopData.getLogPrefix(), err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
