@@ -12,7 +12,16 @@ NACHO_USER=nachocove
 NACHO_HOME=/home/$NACHO_USER
 NACHO_CONFIG=$NACHO_HOME/config
 
+if [ -z "$HOME" ] ; then
+	HOME=`echo ~`
+	if [ -z "$HOME"] ; then
+		echo "Could not determine HOME. Assuming /root"
+		HOME="/root"
+	fi
+fi
+
 # Note we're using HOME here, not NACHO_HOME. That's because this runs as root (and as nachocove during test)
+# and we need to make sure to write the pinger configs to the nachocove HOME, not the (possibly) root home.
 AWS_HOME=$HOME/.aws
 aws_cli_creds=$AWS_HOME/credentials
 aws_cli_config=$AWS_HOME/config
@@ -22,13 +31,13 @@ if [ ! -d $AWS_HOME ] ; then
 fi
 
 cat > $aws_cli_creds << EOF
-[default]
+[nacho]
 aws_access_key_id = $accessKey
 aws_secret_access_key = $secretKey
 EOF
 
 cat > $aws_cli_config << EOF
-[default]
+[nacho]
 region = us-west-2
 EOF
 
@@ -44,7 +53,7 @@ EOF
 postmap /etc/postfix/sasl_passwd || (echo "Could not write sasl_passwd file"; exit 1) || exit 1
 service postfix restart || (echo "Could not restart postfix"; exit 1) || exit 1
 
-aws s3 cp s3://$bucket/$name/pinger $NACHO_CONFIG --recursive --include '*' --quiet || (echo "Could not download s3 items for pinger"; exit 1) || exit 1
+aws --profile nacho s3 cp s3://$bucket/$name/pinger $NACHO_CONFIG --recursive --include '*' || (echo "Could not download s3 items for pinger"; exit 1) || exit 1
 chown -R $NACHO_USER:$NACHO_USER $NACHO_CONFIG || (echo "Could not chown $NACHO_CONFIG directory"; exit 1) || exit 1
 
 sudo -n -u $NACHO_USER -i -H sh -c "cd $NACHO_HOME; /usr/bin/supervisord -c $NACHO_CONFIG/supervisord.conf" || (echo "Could not start supervisord"; exit 1) || exit 1
