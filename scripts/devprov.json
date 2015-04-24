@@ -12,48 +12,54 @@
           }
     },
     "vpc_config": {
-        "name": "Apr24DevVPC",
+        "name": "3-Apr24DevVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
+        "availability_zone": "us-west-2a",
         "instance_tenancy": "default"
-    },
-    "sg_config": {
-        "description": "The SG for Pinger VPC",
-        "rules": [
-            {
-              "protocol": "tcp",
-              "from_port": 443,
-              "to_port": 443,
-              "cidr_ip": "0.0.0.0/0"
-            }
-        ]
-    },
-    "ins_config": {
-        "ami_id": "ami-954571a5",
-        "elastic_ip": "54.69.155.8",
-        "type": "t1.micro",
-        "key_pair": "Dev Pinger VPC KeyPair"
     },
     "elb_config": {
         "ports": [
-            [443, 443, "https", "arn:aws:iam::263277746520:server-certificate/DevPinger"]
+            [443, 8443, "https", "arn:aws:iam::263277746520:server-certificate/DevPinger"]
         ],
         "health_check": {
             "interval" :20,
             "healthy_threshold": 3,
             "unhealthy_threshold": 5,
-            "target": "HTTPS:443/1/alive?token=7701056ede5b4717babf239d215efaf0"
+            "target": "HTTPS:8443/1/alive?token=7701056ede5b4717babf239d215efaf0"
+        },
+        "sg_config": {
+            "name" : "ELB",
+            "description": "The SG for Pinger ELB",
+            "rules": [
+                {
+                  "protocol": "tcp",
+                  "from_port": 443,
+                  "to_port": 443,
+                  "cidr_ip": "0.0.0.0/0"
+                }
+            ]
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-954571a5",
+        "ami_id": "ami-e981b5d9",
         "key_pair": "Dev Pinger VPC KeyPair",
         "instance_type": "t1.micro",
         "instance_monitoring": false,
         "min_size": 1,
         "max_size": 1,
-        "user_data_file": "nacho_init_devpinger.sh"
-
-
+        "user_data_file": "nacho_init_devpinger.sh",
+        "sg_config": {
+            "name" : "ASIns",
+            "description": "The SG for Pinger AS - Instance",
+            "rules": [
+                {
+                  "protocol": "tcp",
+                  "from_port": 8443,
+                  "to_port": 8443,
+                  "cidr_ip": "0.0.0.0/0"
+                }
+            ]
+        }
     }
 }
