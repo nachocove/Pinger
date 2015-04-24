@@ -6,6 +6,7 @@ import (
 	"github.com/nachocove/Pinger/Utils/HostId"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"time"
+	"reflect"
 )
 
 type PingerInfoDbHandler interface {
@@ -16,7 +17,6 @@ type PingerInfoDbHandler interface {
 }
 
 type PingerInfo struct {
-	Id      int64  `db:"id" dynamo:"id"`
 	Pinger  string `db:"pinger" dynamo:"pinger"`
 	Created int64  `db:"created" dynamo:"created"`
 	Updated int64  `db:"updated" dynamo:"updated"`
@@ -26,8 +26,23 @@ type PingerInfo struct {
 }
 
 var pingerHostId string
+var piCreatedField, piUpdatedField, piPingerField reflect.StructField
 
 func init() {
+	var ok bool
+	pingerInfoReflection := reflect.TypeOf(PingerInfo{})
+	piCreatedField, ok = pingerInfoReflection.FieldByName("Created")
+	if ok == false {
+		panic("Could not get Created Field information")
+	}
+	piUpdatedField, ok = pingerInfoReflection.FieldByName("Updated")
+	if ok == false {
+		panic("Could not get Updated Field information")
+	}
+	piPingerField, ok = pingerInfoReflection.FieldByName("Pinger")
+	if ok == false {
+		panic("Could not get Pinger Field information")
+	}
 	pingerHostId = HostId.HostId()
 }
 
@@ -44,7 +59,6 @@ func (pinger *PingerInfo) Updater(minutes int) {
 }
 
 func (pinger *PingerInfo) UpdateEntry() error {
-	pinger.Updated = time.Now().UnixNano()
 	n, err := pinger.update()
 	if err != nil {
 		return err
@@ -60,6 +74,7 @@ func (pinger *PingerInfo) update() (int64, error) {
 	if pinger.db == nil {
 		panic("Can not update pinger info without having fetched it")
 	}
+	pinger.Updated = time.Now().UnixNano()
 	n, err := pinger.db.update(pinger)
 	if err != nil {
 		panic(fmt.Sprintf("update error: %s", err.Error()))
@@ -67,9 +82,22 @@ func (pinger *PingerInfo) update() (int64, error) {
 	return n, nil
 }
 
+func (pinger *PingerInfo) insert() error {
+	if pinger.db == nil {
+		panic("Can not update pinger info without db")
+	}
+	pinger.Created = time.Now().UnixNano()
+	pinger.Updated = pinger.Created
+	err := pinger.db.insert(pinger)
+	if err != nil {
+		panic(fmt.Sprintf("update error: %s", err.Error()))
+	}
+	return nil
+}
+
 func newPingerInfo(db PingerInfoDbHandler, logger *Logging.Logger) (*PingerInfo, error) {
 	keys := []AWS.DBKeyValue{
-		AWS.DBKeyValue{Key: "pinger", Value: pingerHostId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "Pinger", Value: pingerHostId, Comparison: AWS.KeyComparisonEq},
 	}
 	pinger, err := db.get(keys)
 	if err != nil {
@@ -83,8 +111,8 @@ func newPingerInfo(db PingerInfoDbHandler, logger *Logging.Logger) (*PingerInfo,
 		}
 	} else {
 		pinger = &PingerInfo{Pinger: pingerHostId}
-		db.insert(pinger)
 		pinger.db = db
+		pinger.insert()
 		pinger.logger = logger
 	}
 	return pinger, nil

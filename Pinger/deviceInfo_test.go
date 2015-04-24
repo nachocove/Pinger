@@ -33,7 +33,7 @@ func (s *deviceInfoTester) SetupSuite() {
 	var err error
 	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
-	s.dbm, err = initDB(&dbconfig, true, s.logger)
+	s.dbm, err = dbconfig.initDB(true, s.logger)
 	if err != nil {
 		panic("Could not create DB")
 	}
@@ -141,7 +141,6 @@ func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
-
 	di.insert(nil)
 
 	di.cleanup()

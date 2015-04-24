@@ -18,6 +18,8 @@ type deviceContactTester struct {
 	testClientId      string
 	testClientContext string
 	testDeviceId      string
+	testPushService string
+	testPushToken string
 }
 
 func (s *deviceContactTester) SetupSuite() {
@@ -25,14 +27,17 @@ func (s *deviceContactTester) SetupSuite() {
 	AWS.NewLocalDynamoDbProcess()
 	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
-	s.dbm, err = initDB(&dbconfig, true, s.logger)
+	s.dbm, err = dbconfig.initDB(true, s.logger)
 	if err != nil {
 		panic("Could not create DB")
 	}
-	s.db = newDeviceContactSqlDbHandler(s.dbm)
+	s.db, err = newDeviceContactSqlDbHandler(s.dbm)
+	require.NoError(s.T(), err)
 	s.testClientId = "sometestClientId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"
+	s.testPushService = "APNS"
+	s.testPushToken = "APNSRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
 }
 
 func (s *deviceContactTester) TearDownSuite() {
@@ -53,7 +58,7 @@ func TestDeviceContact(t *testing.T) {
 }
 
 func (s *deviceContactTester) TestDeviceContactCreate() {
-	dc := newDeviceContact(s.db, s.testClientId, s.testClientContext, s.testDeviceId)
+	dc := newDeviceContact(s.db, s.testClientId, s.testClientContext, s.testDeviceId, s.testPushService, s.testPushToken)
 	require.NotNil(s.T(), dc)
 	err := dc.insert()
 	s.NoError(err)
@@ -68,7 +73,7 @@ func (s *deviceContactTester) TestDeviceContactCreate() {
 }
 
 func (s *deviceContactTester) TestDeviceContactUpdate() {
-	dc := newDeviceContact(s.db, s.testClientId, s.testClientContext, s.testDeviceId)
+	dc := newDeviceContact(s.db, s.testClientId, s.testClientContext, s.testDeviceId, s.testPushService, s.testPushToken)
 	require.NotNil(s.T(), dc)
 	err := dc.insert()
 	s.NoError(err)
@@ -129,7 +134,8 @@ func (s *deviceContactTester) createTable(dynamo *AWS.DynamoDb) {
 }
 
 func (s *deviceContactTester) TestDeviceContatDynamo() {
-	dynamoHandler := newDeviceContactDynamoDbHandler(s.aws)
+	dynamoHandler, err := newDeviceContactDynamoDbHandler(s.aws)
+	require.NoError(s.T(), err)
 	defer dynamoHandler.dynamo.DeleteTable(dynamoDeviceContactTableName)
 	
 	s.createTable(dynamoHandler.dynamo)
@@ -137,9 +143,9 @@ func (s *deviceContactTester) TestDeviceContatDynamo() {
 	require.NotNil(s.T(), dynamoHandler.dynamo)
 	require.NotEqual(s.T(), "", dynamoHandler.tableName)
 	
-	dc := newDeviceContact(dynamoHandler, s.testClientId, s.testClientContext, s.testDeviceId)
+	dc := newDeviceContact(dynamoHandler, s.testClientId, s.testClientContext, s.testDeviceId, s.testPushService, s.testPushToken)
 	require.NotNil(s.T(), dc)
-	err := dc.insert()
+	err = dc.insert()
 	s.NoError(err)
 	
 //	dc, err = deviceContactGet(dynamoHandler, s.testClientId, s.testClientContext, s.testDeviceId)

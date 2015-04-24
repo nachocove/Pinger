@@ -62,6 +62,9 @@ func (di *DeviceInfo) validate() error {
 			return fmt.Errorf("PushService %s is not known", di.PushService)
 		}
 	}
+	if di.PushToken == "" {
+		return errors.New("PushToken can not be empty")
+	}
 	if di.Platform == "" {
 		return errors.New("Platform can not be empty")
 	} else {
@@ -301,12 +304,17 @@ func (di *DeviceInfo) getContactInfoObj(insert bool) (*deviceContact, error) {
 	if di.db == nil {
 		panic("Must have fetched di first")
 	}
+	//db, err := newDeviceContactDynamoDbHandler(di.aws)
 	var db DeviceContactDbHandler
+	var err error
 	diSql, ok := di.db.(*DeviceInfoSqlHandler)
 	if ok {
-		db = newDeviceContactSqlDbHandler(diSql.dbm)
+		db, err = newDeviceContactSqlDbHandler(diSql.dbm)
 	} else {
-		db = newDeviceContactDynamoDbHandler(di.aws)
+		db, err = newDeviceContactDynamoDbHandler(di.aws)
+	}
+	if err != nil {
+		return nil, err
 	}
 	dc, err := deviceContactGet(db, di.ClientId, di.ClientContext, di.DeviceId)
 	if err != nil {
@@ -314,7 +322,7 @@ func (di *DeviceInfo) getContactInfoObj(insert bool) (*deviceContact, error) {
 	}
 	if dc == nil {
 		if insert {
-			dc = newDeviceContact(db, di.ClientId, di.ClientContext, di.DeviceId)
+			dc = newDeviceContact(db, di.ClientId, di.ClientContext, di.DeviceId, di.PushService, di.PushToken)
 			err = dc.insert()
 			if err != nil {
 				panic(err)

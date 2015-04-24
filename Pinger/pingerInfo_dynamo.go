@@ -3,7 +3,7 @@ package Pinger
 import (
 	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
-	"time"
+	"reflect"
 )
 
 type PingerInfoDynamoDbHandler struct {
@@ -14,6 +14,7 @@ type PingerInfoDynamoDbHandler struct {
 
 const (
 	dynamoPingerInfoTableName = "alpha.pinger.pinger_info"
+	dynamoPingerInfoUpdatedIndexName = "index-updated"
 )
 
 func newPingerInfoDynamoDbHandler(aws AWS.AWSHandler) (*PingerInfoDynamoDbHandler, error) {
@@ -25,14 +26,21 @@ func newPingerInfoDynamoDbHandler(aws AWS.AWSHandler) (*PingerInfoDynamoDbHandle
 	if table == nil {
 		createReq := dynamo.CreateTableReq(dynamoPingerInfoTableName,
 			[]AWS.DBAttrDefinition{
-				{Name: "pinger", Type: AWS.String},
-				{Name: "created", Type: AWS.Number},
-				{Name: "updated", Type: AWS.Number},
+				{Name: piPingerField.Tag.Get("dynamo"), Type: AWS.String},
+				{Name: piCreatedField.Tag.Get("dynamo"), Type: AWS.Number},
+				{Name: piUpdatedField.Tag.Get("dynamo"), Type: AWS.Number},
 			},
 			[]AWS.DBKeyType{
-				{Name: "pinger", Type: AWS.KeyTypeHash},
+				{Name: piPingerField.Tag.Get("dynamo"), Type: AWS.KeyTypeHash},
 			},
 			AWS.ThroughPut{Read: 10, Write: 10},
+		)
+		
+		err = dynamo.AddGlobalSecondaryIndexStruct(createReq, dynamoPingerInfoUpdatedIndexName,
+			[]AWS.DBKeyType{
+				{Name: piUpdatedField.Tag.Get("dynamo"), Type: AWS.KeyTypeRange},
+			},
+			AWS.ThroughPut{Read: 10, Write: 10},			
 		)
 		err := dynamo.CreateTable(createReq)
 		if err != nil {
@@ -59,30 +67,24 @@ func fromPingerInfoMap(dcMap *map[string]interface{}) *PingerInfo {
 		switch v := v.(type) {
 		case string:
 			switch k {
-			case "pinger":
+			case piPingerField.Tag.Get("dynamo"):
 				pinger.Pinger = v
 			}
 		case int64:
 			switch k {
-			case "created":
+			case piCreatedField.Tag.Get("dynamo"):
 				pinger.Created = v
 
-			case "updated":
+			case piUpdatedField.Tag.Get("dynamo"):
 				pinger.Updated = v
-
-			case "id":
-				pinger.Id = v
 			}
 		case int:
 			switch k {
-			case "created":
+			case piCreatedField.Tag.Get("dynamo"):
 				pinger.Created = int64(v)
 
-			case "updated":
+			case piUpdatedField.Tag.Get("dynamo"):
 				pinger.Updated = int64(v)
-
-			case "id":
-				pinger.Id = int64(v)
 			}
 		}
 	}
@@ -91,21 +93,22 @@ func fromPingerInfoMap(dcMap *map[string]interface{}) *PingerInfo {
 
 func (pinger *PingerInfo) toMap() map[string]interface{} {
 	pingerMap := make(map[string]interface{})
-	pingerMap["id"] = pinger.Id
-	pingerMap["pinger"] = pinger.Pinger
-	pingerMap["created"] = pinger.Created
-	pingerMap["updated"] = pinger.UpdateEntry
+	v := reflect.Indirect(reflect.ValueOf(pinger))
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		k := t.Field(i).Tag.Get("dynamo")
+		if k != "" && k != "-" {
+			pingerMap[k] = v.Field(i).Interface()
+		}
+	}
 	return pingerMap
 }
 
 func (h *PingerInfoDynamoDbHandler) insert(pinger *PingerInfo) error {
-	pinger.Created = time.Now().UnixNano()
-	pinger.Updated = pinger.Created
 	return h.dynamo.Insert(dynamoPingerInfoTableName, pinger.toMap())
 }
 
 func (h *PingerInfoDynamoDbHandler) update(pinger *PingerInfo) (int64, error) {
-	pinger.Updated = time.Now().UnixNano()
 	err := h.dynamo.Update(dynamoPingerInfoTableName, pinger.toMap())
 	if err != nil {
 		return 0, err
@@ -113,8 +116,8 @@ func (h *PingerInfoDynamoDbHandler) update(pinger *PingerInfo) (int64, error) {
 	return 1, nil
 }
 
-func (h *PingerInfoDynamoDbHandler) delete(pinger *PingerInfo) error {
+func (h *PingerInfoDynamoDbHandler) delete(pinger *PingerInfo) (int64, error) {
 	err := fmt.Errorf("Not implemented")
-	return err
+	return 0, err
 
 }

@@ -51,7 +51,7 @@ func (dbl DBLogger) Printf(format string, v ...interface{}) {
 	dbl.logger.Debug(format, v...)
 }
 
-func initDB(dbconfig *DBConfiguration, init bool, logger *Logging.Logger) (*gorp.DbMap, error) {
+func (dbconfig *DBConfiguration) initDB(init bool, logger *Logging.Logger) (*gorp.DbMap, error) {
 	var dbmap *gorp.DbMap
 	err := dbconfig.Validate()
 	if err != nil {
@@ -60,10 +60,10 @@ func initDB(dbconfig *DBConfiguration, init bool, logger *Logging.Logger) (*gorp
 
 	switch {
 	case dbconfig.Type == "mysql":
-		dbmap, err = initDbMySql(dbconfig)
+		dbmap, err = dbconfig.initDbMySql()
 
 	case dbconfig.Type == "sqlite" || dbconfig.Type == "sqlite3":
-		dbmap, err = initDbSqlite(dbconfig)
+		dbmap, err = dbconfig.initDbSqlite()
 
 	default:
 		return nil, fmt.Errorf("Unknown db type %s", dbconfig.Type)
@@ -100,7 +100,7 @@ func initDB(dbconfig *DBConfiguration, init bool, logger *Logging.Logger) (*gorp
 	return dbmap, nil
 }
 
-func initDbSqlite(dbconfig *DBConfiguration) (*gorp.DbMap, error) {
+func (dbconfig *DBConfiguration) initDbSqlite() (*gorp.DbMap, error) {
 	db, err := sql.Open("sqlite3", dbconfig.Filename)
 	if err != nil {
 		// DO NOT LOG THE PASSWORD!
@@ -113,7 +113,7 @@ func initDbSqlite(dbconfig *DBConfiguration) (*gorp.DbMap, error) {
 	return &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}, nil
 }
 
-func initDbMySql(dbConfig *DBConfiguration) (*gorp.DbMap, error) {
+func (dbConfig *DBConfiguration) initDbMySql() (*gorp.DbMap, error) {
 	//const mysqlDBInitString string = "%s:%s@tcp(%s:%d)/%s/collation=utf8_general_ci&autocommit=true"
 	const mysqlDBInitString string = "%s:%s@tcp(%s:%d)/%s"
 	// connect to db using standard Go database/sql API

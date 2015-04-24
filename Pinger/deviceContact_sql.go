@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
-	"time"
 	"reflect"
 )
 
@@ -56,10 +55,10 @@ func init() {
 		pingerField.Tag.Get("db"))
 }
 
-func newDeviceContactSqlDbHandler(dbm *gorp.DbMap) *deviceContactSqlDbHandler {
+func newDeviceContactSqlDbHandler(dbm *gorp.DbMap) (*deviceContactSqlDbHandler, error) {
 	return &deviceContactSqlDbHandler{
 		dbm: dbm,
-	}
+	}, nil
 }
 
 func (h *deviceContactSqlDbHandler) insert(dc *deviceContact) error {
@@ -96,13 +95,6 @@ func (h *deviceContactSqlDbHandler) get(keys []AWS.DBKeyValue) (*deviceContact, 
 		dc.db = h
 	}
 	return dc, nil
-}
-
-func (dc *deviceContact) PreInsert(s gorp.SqlExecutor) error {
-	dc.Created = time.Now().UnixNano()
-	dc.Updated = dc.Created
-	dc.LastContact = dc.Created
-	return nil
 }
 
 func (h *deviceContactSqlDbHandler) findByPingerId(pingerId string) ([]*deviceContact, error) {

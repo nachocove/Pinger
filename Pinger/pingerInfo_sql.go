@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
-	"reflect"
-	"time"
 )
 
 func addPingerInfoTable(dbmap *gorp.DbMap) {
@@ -34,22 +32,14 @@ type PingerInfoSqlHandler struct {
 	dbm *gorp.DbMap
 }
 
-func newPingerInfoSqlHandler(dbm *gorp.DbMap) *PingerInfoSqlHandler {
-	return &PingerInfoSqlHandler{dbm: dbm}
+func newPingerInfoSqlHandler(dbm *gorp.DbMap) (*PingerInfoSqlHandler, error) {
+	return &PingerInfoSqlHandler{dbm: dbm}, nil
 }
 
 var getPingerSql string
 
 func init() {
-	var pingerInfoReflection reflect.Type
-	var pingerField reflect.StructField
-	var ok bool
-	pingerInfoReflection = reflect.TypeOf(PingerInfo{})
-	pingerField, ok = pingerInfoReflection.FieldByName("Pinger")
-	if ok == false {
-		panic("Could not get Pinger Field information")
-	}
-	getPingerSql = fmt.Sprintf("select * from %s where %s=?", PingerTableName, pingerField.Tag.Get("db"))
+	getPingerSql = fmt.Sprintf("select * from %s where %s=?", PingerTableName, piPingerField.Tag.Get("db"))
 }
 
 func (h *PingerInfoSqlHandler) update(pinger *PingerInfo) (int64, error) {
@@ -87,10 +77,4 @@ func (h *PingerInfoSqlHandler) get(keys []AWS.DBKeyValue) (*PingerInfo, error) {
 	}
 	return pinger, nil
 
-}
-
-func (pinger *PingerInfo) PreInsert(s gorp.SqlExecutor) error {
-	pinger.Created = time.Now().UnixNano()
-	pinger.Updated = pinger.Created
-	return nil
 }

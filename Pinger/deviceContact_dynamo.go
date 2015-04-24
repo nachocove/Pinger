@@ -3,8 +3,8 @@ package Pinger
 import (
 	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
-	"time"
 	"reflect"
+	"time"
 )
 
 type DeviceContactDynamoDbHandler struct {
@@ -14,24 +14,57 @@ type DeviceContactDynamoDbHandler struct {
 }
 
 const (
-	dynamoDeviceContactTableName = "alpha.pinger.device_info"
+	dynamoDeviceContactTableName             = "alpha.pinger.device_info"
+	dynamoDeviceContactPingerClientIndexName = "index.pinger-device"
 )
 
-func newDeviceContactDynamoDbHandler(aws AWS.AWSHandler) *DeviceContactDynamoDbHandler {
+func newDeviceContactDynamoDbHandler(aws AWS.AWSHandler) (*DeviceContactDynamoDbHandler, error) {
 	return &DeviceContactDynamoDbHandler{
 		dynamo:    aws.GetDynamoDbSession(),
 		tableName: dynamoDeviceContactTableName,
+	}, nil
+}
+
+func (h *DeviceContactDynamoDbHandler) createDeviceContactTable() error {
+	createReq := h.dynamo.CreateTableReq(dynamoDeviceContactTableName,
+		[]AWS.DBAttrDefinition{
+			{Name: dcIdField.Tag.Get("dynamo"), Type: AWS.Number},
+			{Name: dcPingerField.Tag.Get("dynamo"), Type: AWS.String},
+			{Name: dcClientIdField.Tag.Get("dynamo"), Type: AWS.String},
+		},
+		[]AWS.DBKeyType{
+			{Name: dcIdField.Tag.Get("dynamo"), Type: AWS.KeyTypeHash},
+		},
+		AWS.ThroughPut{Read: 10, Write: 10},
+	)
+
+	err := h.dynamo.AddGlobalSecondaryIndexStruct(createReq, dynamoDeviceContactPingerClientIndexName,
+		[]AWS.DBKeyType{
+			{Name: dcPingerField.Tag.Get("dynamo"), Type: AWS.KeyTypeHash},
+			{Name: dcClientIdField.Tag.Get("dynamo"), Type: AWS.KeyTypeRange},
+		},
+		AWS.ThroughPut{Read: 10, Write: 10},
+	)
+	if err != nil {
+		return err
 	}
+
+	err = h.dynamo.CreateTable(createReq)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 var deviceContactReflection reflect.Type
+
 func init() {
 	deviceContactReflection = reflect.TypeOf(deviceContact{})
 }
 
 func (h *DeviceContactDynamoDbHandler) get(keys []AWS.DBKeyValue) (*deviceContact, error) {
-    // TODO Need to look at the table description and match up passed in keys to the indexes, and decide
-    // whether we can get on the primary (no index needed) or one of the indexes. This may not be trivial
+	// TODO Need to look at the table description and match up passed in keys to the indexes, and decide
+	// whether we can get on the primary (no index needed) or one of the indexes. This may not be trivial
 	reqKeys := make([]AWS.DBKeyValue, 0, 1)
 	for _, k := range keys {
 		field, ok := deviceContactReflection.FieldByName(k.Key)
@@ -55,15 +88,9 @@ func (h *DeviceContactDynamoDbHandler) get(keys []AWS.DBKeyValue) (*deviceContac
 }
 
 func (h *DeviceContactDynamoDbHandler) insert(dc *deviceContact) error {
-	if dc.Created == 0 {
-		dc.Created = time.Now().UnixNano()
-	}
 	if dc.Id == 0 {
-		dc.Id = dc.Created		
+		dc.Id = time.Now().UTC().UnixNano()
 	}
-	dc.Updated = dc.Created
-	dc.LastContact = dc.Created
-	dc.Pinger = pingerHostId
 	return h.dynamo.Insert(dynamoDeviceContactTableName, dc.toMap())
 }
 
@@ -77,17 +104,17 @@ func (h *DeviceContactDynamoDbHandler) update(dc *deviceContact) (int64, error) 
 }
 
 func (h *DeviceContactDynamoDbHandler) delete(dc *deviceContact) (int64, error) {
-    // TODO Need to look at the table description and match up passed in keys to the indexes, and decide
-    // whether we can delete on the primary (no index needed) or one of the indexes. This may not be trivial
+	// TODO Need to look at the table description and match up passed in keys to the indexes, and decide
+	// whether we can delete on the primary (no index needed) or one of the indexes. This may not be trivial
 	if dc.Id == 0 {
 		panic("Can not delete item without primary key")
 	}
 	return h.dynamo.Delete(dynamoDeviceContactTableName,
 		[]AWS.DBKeyValue{
-			AWS.DBKeyValue{Key: "id",  Value: dc.Id, Comparison: AWS.KeyComparisonEq},
-			AWS.DBKeyValue{Key: "client_id",  Value: dc.ClientId, Comparison: AWS.KeyComparisonEq},
-			AWS.DBKeyValue{Key: "pinger",  Value: dc.Pinger, Comparison: AWS.KeyComparisonEq},
-			})
+			AWS.DBKeyValue{Key: dcIdField.Tag.Get("dynamo"), Value: dc.Id, Comparison: AWS.KeyComparisonEq},
+			AWS.DBKeyValue{Key: dcClientIdField.Tag.Get("dynamo"), Value: dc.ClientId, Comparison: AWS.KeyComparisonEq},
+			AWS.DBKeyValue{Key: dcPingerField.Tag.Get("dynamo"), Value: dc.Pinger, Comparison: AWS.KeyComparisonEq},
+		})
 }
 
 func (h *DeviceContactDynamoDbHandler) findByPingerId(pingerId string) ([]*deviceContact, error) {
@@ -101,41 +128,41 @@ func fromDeviceContactMap(dcMap *map[string]interface{}) *deviceContact {
 		switch v := v.(type) {
 		case string:
 			switch k {
-			case "client":
+			case dcClientIdField.Tag.Get("dynamo"):
 				dc.ClientId = v
 
-			case "device":
+			case dcDeviceIdField.Tag.Get("dynamo"):
 				dc.DeviceId = v
 
-			case "context":
+			case dcClientContextField.Tag.Get("dynamo"):
 				dc.ClientContext = v
 			}
 		case int64:
 			switch k {
-			case "created":
+			case dcCreatedField.Tag.Get("dynamo"):
 				dc.Created = v
 
-			case "updated":
+			case dcUpdatedField.Tag.Get("dynamo"):
 				dc.Updated = v
 
-			case "last_contact":
+			case dcLastContactField.Tag.Get("dynamo"):
 				dc.LastContact = v
 
-			case "id":
+			case dcIdField.Tag.Get("dynamo"):
 				dc.Id = v
 			}
 		case int:
 			switch k {
-			case "created":
+			case dcCreatedField.Tag.Get("dynamo"):
 				dc.Created = int64(v)
 
-			case "updated":
+			case dcUpdatedField.Tag.Get("dynamo"):
 				dc.Updated = int64(v)
 
-			case "last_contact":
+			case dcLastContactField.Tag.Get("dynamo"):
 				dc.LastContact = int64(v)
 
-			case "id":
+			case dcIdField.Tag.Get("dynamo"):
 				dc.Id = int64(v)
 			}
 		}
@@ -144,15 +171,23 @@ func fromDeviceContactMap(dcMap *map[string]interface{}) *deviceContact {
 }
 func (dc *deviceContact) toMap() map[string]interface{} {
 	dcMap := make(map[string]interface{})
-	dcMap["id"] = dc.Id
-	dcMap["client"] = dc.ClientId
-	dcMap["context"] = dc.ClientContext
-	dcMap["device"] = dc.DeviceId
-	dcMap["created"] = dc.Created
-	dcMap["updated"] = dc.Updated
-	dcMap["last_contact"] = dc.LastContact
-	dcMap["last_contact_request"] = dc.LastContactRequest
-	dcMap["pinger"] = dc.Pinger
+	vReflect := reflect.Indirect(reflect.ValueOf(dc))
+	t := vReflect.Type()
+	for i := 0; i < vReflect.NumField(); i++ {
+		k := t.Field(i).Tag.Get("dynamo")
+		if k != "" && k != "-" {
+			switch v := vReflect.Field(i).Interface().(type) {
+			case string:
+				if v != "" {
+					dcMap[k] = v
+				} else {
+					panic(fmt.Sprintf("Field is empty", k))
+				}
+				
+			default:
+				dcMap[k] = v
+			}
+		}
+	}
 	return dcMap
 }
-

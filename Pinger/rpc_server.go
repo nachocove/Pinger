@@ -18,7 +18,7 @@ type BackendPolling struct {
 }
 
 func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger) (*BackendPolling, error) {
-	dbm, err := initDB(&config.Db, true, logger)
+	dbm, err := config.Db.initDB(true, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -70,3 +70,27 @@ func (t *BackendPolling) FindActiveSessions(args *FindSessionsArgs, reply *FindS
 func (t *BackendPolling) AliveCheck(args *AliveCheckArgs, reply *AliveCheckResponse) (err error) {
 	return RPCAliveCheck(t, &t.pollMap, t.dbm, args, reply, t.logger)
 }
+
+func (t *BackendPolling) newDbHandler(i interface{}, db DBHandlerType) (interface{}, error) {
+	switch i.(type) {
+	case PingerInfo:
+		switch db {
+		case DBHandlerSql:
+			return newPingerInfoSqlHandler(t.dbm)
+			
+		case DBHandlerDynamo:
+			return newPingerInfoDynamoDbHandler(t.aws)
+		}
+		
+	case deviceContact:
+		switch db {
+		case DBHandlerSql:
+			return newDeviceContactSqlDbHandler(t.dbm)
+			
+		case DBHandlerDynamo:
+			return newDeviceContactDynamoDbHandler(t.aws)
+		}
+	}
+	panic("Unknown interface type")
+} 
+

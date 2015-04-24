@@ -28,33 +28,57 @@ type deviceContact struct {
 	PushService        string `db:"push_service" dynamo:"push_service"` // APNS, GCM, ...
 	Pinger             string `db:"pinger" dynamo:"pinger"`
 
-	db DeviceContactDbHandler `db:"-"`
+	db DeviceContactDbHandler `db:"-" dynamo:"-"`
 }
 
-var clientIdField, clientContextField, deviceIdField, pushServiceField, pushTokenField reflect.StructField
+var dcIdField, dcCreatedField, dcUpdatedField, dcLastContactField, dcLastContactRequestField, dcPingerField, dcClientIdField, dcClientContextField, dcDeviceIdField, dcPushServiceField, dcPushTokenField reflect.StructField
 
 func init() {
 	var ok bool
 	deviceContactReflection := reflect.TypeOf(deviceContact{})
-	clientIdField, ok = deviceContactReflection.FieldByName("ClientId")
+	dcIdField, ok = deviceContactReflection.FieldByName("Id")
+	if ok == false {
+		panic("Could not get Id Field information")
+	}
+	dcPingerField, ok = deviceContactReflection.FieldByName("Pinger")
 	if ok == false {
 		panic("Could not get Pinger Field information")
 	}
-	clientContextField, ok = deviceContactReflection.FieldByName("ClientContext")
+	dcCreatedField, ok = deviceContactReflection.FieldByName("Created")
 	if ok == false {
-		panic("Could not get Pinger Field information")
+		panic("Could not get Created Field information")
 	}
-	deviceIdField, ok = deviceContactReflection.FieldByName("DeviceId")
+	dcUpdatedField, ok = deviceContactReflection.FieldByName("Updated")
 	if ok == false {
-		panic("Could not get Pinger Field information")
+		panic("Could not get Updated Field information")
 	}
-	pushServiceField, ok = deviceContactReflection.FieldByName("PushService")
+	dcLastContactField, ok = deviceContactReflection.FieldByName("LastContact")
 	if ok == false {
-		panic("Could not get Pinger Field information")
+		panic("Could not get LastContact Field information")
 	}
-	pushTokenField, ok = deviceContactReflection.FieldByName("PushToken")
+	dcLastContactRequestField, ok = deviceContactReflection.FieldByName("LastContactRequest")
 	if ok == false {
-		panic("Could not get Pinger Field information")
+		panic("Could not get LastContactRequest Field information")
+	}
+	dcClientIdField, ok = deviceContactReflection.FieldByName("ClientId")
+	if ok == false {
+		panic("Could not get ClientId Field information")
+	}
+	dcClientContextField, ok = deviceContactReflection.FieldByName("ClientContext")
+	if ok == false {
+		panic("Could not get ClientContext Field information")
+	}
+	dcDeviceIdField, ok = deviceContactReflection.FieldByName("DeviceId")
+	if ok == false {
+		panic("Could not get DeviceId Field information")
+	}
+	dcPushServiceField, ok = deviceContactReflection.FieldByName("PushService")
+	if ok == false {
+		panic("Could not get PushService Field information")
+	}
+	dcPushTokenField, ok = deviceContactReflection.FieldByName("PushToken")
+	if ok == false {
+		panic("Could not get PushToken Field information")
 	}
 }
 
@@ -76,18 +100,79 @@ func deviceContactGet(db DeviceContactDbHandler, clientId, clientContext, device
 	return dc, nil
 }
 
-func newDeviceContact(db DeviceContactDbHandler, clientId, clientContext, deviceId string) *deviceContact {
+func (dc *deviceContact) validate() error {
+	vReflect := reflect.Indirect(reflect.ValueOf(dc))
+	t := vReflect.Type()
+	emptyFields := make([]string, 0, 0)
+	for i := 0; i < vReflect.NumField(); i++ {
+		k := t.Field(i).Name
+		switch k {
+		case "LastContactRequest":
+			continue
+			
+		case "db":
+			continue
+			
+		case "Id":
+			continue
+		}
+		
+		switch v := vReflect.Field(i).Interface().(type) {
+		case string:
+			if v == "" {
+				emptyFields = append(emptyFields, k)
+			}
+			
+		case int:
+			if v == 0 {
+				emptyFields = append(emptyFields, k)
+			}
+
+		case int64:
+			if v == 0 {
+				emptyFields = append(emptyFields, k)
+			}
+		}
+	}
+	if len(emptyFields) > 0 {
+		return fmt.Errorf(fmt.Sprintf("Empty fields: %v", emptyFields))
+	}
+	return nil
+}
+func newDeviceContact(db DeviceContactDbHandler, clientId, clientContext, deviceId, pushService, pushToken string) *deviceContact {
 	dc := deviceContact{
 		ClientId:      clientId,
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
+		PushService:   pushService,
+		PushToken:     pushToken,
 	}
 	dc.db = db
 	return &dc
 }
 
 func (dc *deviceContact) insert() error {
+	dc.Created = time.Now().UTC().Unix()
+	dc.Updated = dc.Created
+	dc.LastContact = dc.Created
+	dc.Pinger = pingerHostId
+	
+	err := dc.validate()
+	if err != nil {
+		return err
+	}
 	return dc.db.insert(dc)
+}
+
+func (dc *deviceContact) update() (int64, error) {
+	dc.Updated = time.Now().UTC().Unix()
+	dc.Pinger = pingerHostId
+	
+	err := dc.validate()
+	if err != nil {
+		return 0, err
+	}
+	return dc.db.update(dc)
 }
 
 func (dc *deviceContact) delete() error {
@@ -104,7 +189,7 @@ func (dc *deviceContact) delete() error {
 
 func (dc *deviceContact) updateLastContact() error {
 	dc.LastContact = time.Now().UnixNano()
-	_, err := dc.db.update(dc)
+	_, err := dc.update()
 	if err != nil {
 		return err
 	}
@@ -113,7 +198,7 @@ func (dc *deviceContact) updateLastContact() error {
 
 func (dc *deviceContact) updateLastContactRequest() error {
 	dc.LastContactRequest = time.Now().UnixNano()
-	_, err := dc.db.update(dc)
+	_, err := dc.update()
 	if err != nil {
 		return err
 	}
