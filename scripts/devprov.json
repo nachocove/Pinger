@@ -18,7 +18,6 @@
         "instance_tenancy": "default"
     },
     "sg_config": {
-        "name": "AzimTestPVC-SG",
         "description": "The SG for Pinger VPC",
         "rules": [
             {
@@ -29,8 +28,8 @@
             },
             {
               "protocol": "tcp",
-              "from_port": 80,
-              "to_port": 80,
+              "from_port": 443,
+              "to_port": 443,
               "cidr_ip": "0.0.0.0/0"
             }
         ]

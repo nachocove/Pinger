@@ -263,7 +263,7 @@ def main():
         subnet = create_subnet(conn, vpc, vpc_config["name"]+"-SN", vpc_config["subnet_cidr_block"])
         ig = create_ig(conn, vpc, vpc_config["name"]+"-IG")
         rt = update_route_table(conn, vpc, ig, vpc_config["name"]+"-RT")
-        sg = create_sg(conn, vpc, sg_config["name"], sg_config["description"] + " for " + vpc_config["name"])
+        sg = create_sg(conn, vpc, vpc_config["name"]+"-SG", sg_config["description"] + " for " + vpc_config["name"])
         add_rules_to_sg(conn, sg, sg_config["rules"])
         #ins = create_instance(conn, vpc, sg, subnet, vpc_config["name"] + "-I", ins_config)
         elb = create_elb(aws_config["region_name"], vpc, subnet, sg, vpc_config["name"] + "-ELB", elb_config)
