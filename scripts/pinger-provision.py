@@ -35,10 +35,10 @@ def create_vpc(conn, name, cidr_block, instance_tenancy):
         vpc = conn.create_vpc(cidr_block, instance_tenancy = instance_tenancy)
         print "Created VPC (%s) for cidr_block: %s" % (vpc.id, vpc.cidr_block)
         wait_for_vpc(conn, vpc.id)
-        vpc.add_tag("Name", name)
     else:
         vpc = vpc_list[0]
         print "VPC (%s) already exists at cidr_block: %s!" % (vpc.id, vpc.cidr_block)
+    vpc.add_tag("Name", name)
     return vpc
 
 def create_ig(conn, vpc, name):
@@ -251,7 +251,7 @@ def main():
     as_config = config["autoscale_config"]
     elb_config = config["elb_config"]
 
-    load_config_from_s3(s3_config)
+    #load_config_from_s3(s3_config)
 
     # create connection
     from boto.vpc import VPCConnection
