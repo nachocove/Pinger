@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/coopernurse/gorp"
 	"github.com/looplab/fsm"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/AWS"
@@ -120,7 +119,7 @@ const (
 	DefaultMaxPollTimeout int64 = 2 * 24 * 60 * 60 * 1000 // 2 days in milliseconds
 )
 
-func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
+func NewMailClientContext(db DeviceInfoDbHandler, aws AWS.AWSHandler, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
 		logger:          logger.Copy(),
 		stopAllCh:       make(chan int),
@@ -144,7 +143,7 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 
 	client.logger.SetCallDepth(1)
 
-	di, err := pi.newDeviceInfo(newDeviceInfoSqlHandler(dbm), aws, logger)
+	di, err := pi.newDeviceInfo(db, aws, logger)
 	if err != nil {
 		return nil, err
 	}

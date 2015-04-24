@@ -37,7 +37,9 @@ func (s *deviceInfoTester) SetupSuite() {
 	if err != nil {
 		panic("Could not create DB")
 	}
-	s.db = newDeviceInfoSqlHandler(s.dbm)
+	s.db, err = newDeviceInfoSqlHandler(s.dbm)
+	require.NoError(s.T(), err)
+	
 	s.testClientId = "sometestClientId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"

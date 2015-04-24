@@ -35,7 +35,11 @@ func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger
 }
 
 func (t *BackendPolling) newMailClientContext(pi *MailPingInformation, doStats bool) (MailClientContextType, error) {
-	return NewMailClientContext(t.dbm, t.aws, pi, t.debug, false, t.logger)
+	db, err := t.newDbHandler(DeviceInfo{}, DBHandlerSql)
+	if err != nil {
+		return nil, err
+	}
+	return NewMailClientContext(db.(DeviceInfoDbHandler), t.aws, pi, t.debug, false, t.logger)
 }
 
 func (t *BackendPolling) ToggleDebug() {
@@ -72,25 +76,37 @@ func (t *BackendPolling) AliveCheck(args *AliveCheckArgs, reply *AliveCheckRespo
 }
 
 func (t *BackendPolling) newDbHandler(i interface{}, db DBHandlerType) (interface{}, error) {
+	return newDbHandler(i, db, t.dbm, t.aws)
+} 
+
+func newDbHandler(i interface{}, db DBHandlerType, dbm *gorp.DbMap, aws AWS.AWSHandler) (interface{}, error) {
 	switch i.(type) {
 	case PingerInfo:
 		switch db {
 		case DBHandlerSql:
-			return newPingerInfoSqlHandler(t.dbm)
+			return newPingerInfoSqlHandler(dbm)
 			
 		case DBHandlerDynamo:
-			return newPingerInfoDynamoDbHandler(t.aws)
+			return newPingerInfoDynamoDbHandler(aws)
 		}
 		
 	case deviceContact:
 		switch db {
 		case DBHandlerSql:
-			return newDeviceContactSqlDbHandler(t.dbm)
+			return newDeviceContactSqlDbHandler(dbm)
 			
 		case DBHandlerDynamo:
-			return newDeviceContactDynamoDbHandler(t.aws)
+			return newDeviceContactDynamoDbHandler(aws)
+		}
+		
+	case DeviceInfo:
+		switch db {
+		case DBHandlerSql:
+			return newDeviceInfoSqlHandler(dbm)
+			
+		case DBHandlerDynamo:
+			return newDeviceContactDynamoDbHandler(aws)
 		}
 	}
 	panic("Unknown interface type")
 } 
-

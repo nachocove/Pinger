@@ -13,6 +13,7 @@ type mailClientTester struct {
 	suite.Suite
 	logger            *Logging.Logger
 	dbmap             *gorp.DbMap
+	dbHandler         DeviceInfoDbHandler
 	testClientId      string
 	testClientContext string
 	testDeviceId      string
@@ -30,8 +31,15 @@ func (s *mailClientTester) SetupSuite() {
 	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
 	s.dbmap, err = dbconfig.initDB(true, s.logger)
 	if err != nil {
-		panic("Could not create DB")
+		panic(err)
 	}
+	s.aws = AWS.NewTestAwsHandler()
+
+	dbh, err :=  newDbHandler(DeviceInfo{}, DBHandlerSql, s.dbmap, s.aws)
+	if err != nil {
+		panic(err)
+	}
+	s.dbHandler = dbh.(DeviceInfoDbHandler)
 	s.testClientId = "sometestClientId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"
@@ -39,7 +47,6 @@ func (s *mailClientTester) SetupSuite() {
 	s.testPushToken = "AEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEF"
 	s.testPushService = "APNS"
 	s.testProtocol = "ActiveSync"
-	s.aws = AWS.NewTestAwsHandler()
 	s.sessionId = "12345678"
 	setGlobal(&BackendConfiguration{})
 }
@@ -89,7 +96,7 @@ func (s *mailClientTester) TestMailClient() {
 	pi.SessionId = s.sessionId
 	debug := true
 	doStats := false
-	client, err := NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
+	client, err := NewMailClientContext(s.dbHandler, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
 	s.Equal("ClientID can not be empty", err.Error())
@@ -105,7 +112,7 @@ func (s *mailClientTester) TestMailClient() {
 		PushToken:     s.testPushToken,
 		SessionId:     s.sessionId,
 	}
-	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
+	client, err = NewMailClientContext(s.dbHandler, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
 	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testClientId, s.testClientContext, s.sessionId, ""), err.Error())
@@ -120,7 +127,7 @@ func (s *mailClientTester) TestMailClient() {
 		Protocol:      "Foo",
 		SessionId:     s.sessionId,
 	}
-	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
+	client, err = NewMailClientContext(s.dbHandler, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
 
@@ -135,7 +142,7 @@ func (s *mailClientTester) TestMailClient() {
 		Protocol:      s.testProtocol,
 		SessionId:     s.sessionId,
 	}
-	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
+	client, err = NewMailClientContext(s.dbHandler, s.aws, pi, debug, doStats, s.logger)
 	s.NotNil(client)
 	s.NoError(err)
 	s.NotNil(client.mailClient)

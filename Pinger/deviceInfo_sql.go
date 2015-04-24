@@ -13,9 +13,10 @@ type DeviceInfoSqlHandler struct {
 	dbm *gorp.DbMap
 }
 
-func newDeviceInfoSqlHandler(dbm *gorp.DbMap) *DeviceInfoSqlHandler {
-	return &DeviceInfoSqlHandler{dbm: dbm}
+func newDeviceInfoSqlHandler(dbm *gorp.DbMap) (*DeviceInfoSqlHandler, error) {
+	return &DeviceInfoSqlHandler{dbm: dbm}, nil
 }
+
 func (h *DeviceInfoSqlHandler) insert(di *DeviceInfo) error {
 	return h.dbm.Insert(di)
 }
