@@ -21,35 +21,46 @@
         "name": "AzimTestPVC-SG",
         "description": "The SG for Pinger VPC",
         "rules": [
-          {
-            "protocol": "tcp",
-            "from_port": 22,
-            "to_port": 22,
-            "cidr_ip": "0.0.0.0/0"
-          },
-                    {
-            "protocol": "tcp",
-            "from_port": 80,
-            "to_port": 80,
-            "cidr_ip": "0.0.0.0/0"
-          }
+            {
+              "protocol": "tcp",
+              "from_port": 22,
+              "to_port": 22,
+              "cidr_ip": "0.0.0.0/0"
+            },
+            {
+              "protocol": "tcp",
+              "from_port": 80,
+              "to_port": 80,
+              "cidr_ip": "0.0.0.0/0"
+            }
         ]
     },
     "ins_config": {
-        "ami_id": "ami-55a7ea65",
+        "ami_id": "ami-954571a5",
         "elastic_ip": "54.69.155.8",
-        "type": "c1.medium",
+        "type": "t1.micro",
         "key_pair": "Dev Pinger VPC KeyPair"
     },
     "elb_config": {
-      "ports": [
-        [443, 443, "tcp"]
-      ],
-      "health_check": {
-          "interval" :20,
-          "healthy_threshold": 3,
-          "unhealthy_threshold": 5,
-          "target": "HTTPS:443/1/alive?token=7701056ede5b4717babf239d215efaf0"
-      }
+        "ports": [
+            [443, 443, "https", "arn:aws:iam::263277746520:server-certificate/DevPinger"]
+        ],
+        "health_check": {
+            "interval" :20,
+            "healthy_threshold": 3,
+            "unhealthy_threshold": 5,
+            "target": "HTTPS:443/1/alive?token=7701056ede5b4717babf239d215efaf0"
+        }
+    },
+    "autoscale_config": {
+        "ami_id": "ami-954571a5",
+        "key_pair": "Dev Pinger VPC KeyPair",
+        "instance_type": "t1.micro",
+        "instance_monitoring": false,
+        "min_size": 1,
+        "max_size": 1,
+        "user_data_file": "nacho_init_devpinger.sh"
+
+
     }
 }

@@ -11,7 +11,10 @@ from boto.s3.key import Key
 import boto.ec2
 import boto.ec2.elb
 from boto.ec2.elb import HealthCheck
+import boto.ec2.autoscale
 from boto.exception import S3ResponseError, EC2ResponseError, BotoServerError
+from boto.ec2.autoscale import LaunchConfiguration
+from boto.ec2.autoscale import AutoScalingGroup
 
 def get_region(region_name):
     for region in boto.ec2.regions():
@@ -136,14 +139,56 @@ def create_instance(conn, vpc, sg, subnet, name, config):
         time.sleep(1)
         ins.update()
     ins.add_tag("Name", name)
-    eip = conn.allocate_address(domain='vpc')
-    conn.associate_address(instance_id=ins.id, allocation_id=eip.allocation_id)
-    print "Instance(%s) status is :(%s)" % (ins.id, ins.state)
+    if not ins.ip_address:
+        print "Allocating Elastic IP Address for Instance(%s)" % ins.id
+        eip = conn.allocate_address(domain='vpc')
+        conn.associate_address(instance_id=ins.id, allocation_id=eip.allocation_id)
+    print "Instance(%s) IP(%s) Status(%s)" % (ins.id, ins.ip_address, ins.state)
     return ins
 
-def create_elb(region, vpc, subnet, sg, ins, name, config):
+def create_autoscaler(region_name, vpc, elb, subnet, sg, name, aws_config, as_config):
+    print "creating auto scaler"
+    conn = boto.ec2.autoscale.connect_to_region(region_name, profile_name="provisioner")
+    asg_list =  conn.get_all_groups(names=[name])
+    if not len(asg_list):
+        with open (as_config["user_data_file"], "r") as udfile:
+            user_data = udfile.read()
+        lc_name = name + "-LC"
+        lc_list = conn.get_all_launch_configurations(names=[lc_name])
+        if not len(lc_list):
+            print "Creating Launch Configuration (%s)" % lc_name
+            lc = LaunchConfiguration(name=lc_name, image_id=as_config["ami_id"],
+                key_name=as_config["key_pair"],
+                security_groups=[sg.id],
+                user_data = user_data,
+                instance_type = as_config["instance_type"],
+                instance_monitoring = as_config["instance_monitoring"],
+                associate_public_ip_address = True
+                )
+            conn.create_launch_configuration(lc)
+        else:
+            lc=lc_list[0]
+            print "Launch Configuration (%s) already exists" % lc_name
+        tag = boto.ec2.autoscale.tag.Tag(key="Name", value=name +"Instance",
+             propagate_at_launch=True, resource_id=name)
+        asg = AutoScalingGroup(group_name=name, load_balancers=[elb.name],
+            availability_zones=aws_config["zones"],
+            launch_config=lc, min_size=as_config["min_size"], max_size=as_config["max_size"],
+            vpc_zone_identifier = [subnet.id],
+            tags=[tag],
+            connection=conn)
+        conn.create_auto_scaling_group(asg)
+        print "Created Auto Scaler Group (%s) for VPC(%s)" % (asg.name, vpc.id)
+    else:
+        asg = asg_list[0]
+        print "Auto Scaler Group (%s) found for VPC(%s)" % (asg.name, elb.vpc_id)
+    for act in conn.get_all_activities(asg):
+        print "Activiity %s" % act
+    return asg
+
+def create_elb(region_name, vpc, subnet, sg, name, config):
     print "creating elastic load balancer"
-    conn = boto.ec2.elb.connect_to_region(region, profile_name="provisioner")
+    conn = boto.ec2.elb.connect_to_region(region_name, profile_name="provisioner")
     try:
         elb_list = conn.get_all_load_balancers(load_balancer_names=[name])
     except BotoServerError, e: # ELB by the given name does not exist
@@ -164,7 +209,7 @@ def create_elb(region, vpc, subnet, sg, ins, name, config):
         print "Elastic Load Balancer (%s) found for VPC(%s)" % (elb.name, elb.vpc_id)
         if (elb.vpc_id != vpc.id):
             raise Exception("Error: Wrong VPC association: ELB(%s) is associated with VPC(%s) rather than VPC(%s)" % (elb.name, elb.vpc_id, vpc.id))
-    elb.register_instances(ins.id)
+    #elb.register_instances(ins.id)
     return elb
 
 def cleanup():
@@ -203,6 +248,7 @@ def main():
     vpc_config = config["vpc_config"]
     sg_config = config["sg_config"]
     ins_config = config["ins_config"]
+    as_config = config["autoscale_config"]
     elb_config = config["elb_config"]
 
     load_config_from_s3(s3_config)
@@ -219,12 +265,10 @@ def main():
         rt = update_route_table(conn, vpc, ig, vpc_config["name"]+"-RT")
         sg = create_sg(conn, vpc, sg_config["name"], sg_config["description"] + " for " + vpc_config["name"])
         add_rules_to_sg(conn, sg, sg_config["rules"])
-        ins = create_instance(conn, vpc, sg, subnet, vpc_config["name"] + "-I", ins_config)
-        elb = create_elb(aws_config["region_name"], vpc, subnet, sg, ins, vpc_config["name"] + "-ELB", elb_config)
-
-    except (S3ResponseError, EC2ResponseError) as e:
-        print type(e)
-        print dir(e)
+        #ins = create_instance(conn, vpc, sg, subnet, vpc_config["name"] + "-I", ins_config)
+        elb = create_elb(aws_config["region_name"], vpc, subnet, sg, vpc_config["name"] + "-ELB", elb_config)
+        ascaler = create_autoscaler(aws_config["region_name"], vpc, elb, subnet, sg, vpc_config["name"] + "-AS", aws_config, as_config)
+    except (BotoServerError, S3ResponseError, EC2ResponseError) as e:
         print "Error :%s(%s):%s" % (e.error_code, e.status, e.message)
         print traceback.format_exc()
         cleanup()
