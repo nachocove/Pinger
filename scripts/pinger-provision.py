@@ -208,6 +208,13 @@ def sg_rule_exists(sg, rule, is_ingress):
 # add rules to sg
 def add_rules_to_sg(conn, sg, rules, is_ingress):
     print "Adding rules to security group - IsIngress(%s)" % is_ingress
+    print "azim ", sg.rules
+    print "azim 2", sg.rules_egress
+    if not is_ingress:
+        # TODO: delete default rule, the following doesnt work
+        for rule in sg.rules_egress:
+            print rule
+            sg.revoke(ip_protocol=rule.ip_protocol, from_port=rule.from_port, to_port=rule.to_port, cidr_ip=rule.cidr_ip)
     for rule in rules:
         if sg_rule_exists(sg, rule, is_ingress):
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) exists." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
@@ -289,11 +296,9 @@ def delete_elb(region_name, name):
         print "Deleting Elastic Load Balancer %s..." % name
         conn.delete_load_balancer(name)
 
-# TODO 1 - configure the ELB to check the certificate on the instance - SetLoadBalancerPoliciesForBackendServer
-# http://docs.aws.amazon.com/ElasticLoadBalancing/latest/APIReference/API_SetLoadBalancerPoliciesForBackendServer.html
-# TODO 2 - figure out a workaround for the HTTP bug in boto's listener config
+# TODO - figure out a workaround for the HTTP bug in boto's listener config
 # create load balancer
-def create_elb(region_name, vpc, subnet, sg, name, config):
+def create_elb(region_name, vpc, subnet, sg, name, config, cert):
     print "Creating elastic load balancer"
     conn = boto.ec2.elb.connect_to_region(region_name, profile_name="provisioner")
     try:
@@ -310,6 +315,12 @@ def create_elb(region_name, vpc, subnet, sg, name, config):
             target = config["health_check"]["target"]
         )
         elb.configure_health_check(hc)
+        pkp_name = "PublicKeyPolicy-%s-BackendCert" % elb.name
+        conn.create_lb_policy(elb.name, pkp_name , "PublicKeyPolicyType", {"PublicKey": cert})
+        besap_name = "BackendAuthPolicy-%s-BackendCert" % elb.name
+        conn.create_lb_policy(elb.name, besap_name, "BackendServerAuthenticationPolicyType",
+                                       {"PublicKeyPolicyName": pkp_name})
+        conn.set_lb_policies_of_backend_server(elb.name, config["backend_port"], [besap_name])
         print "Created Elastic Load Balancer (%s) for VPC(%s)" % (elb.name, vpc.id)
     else:
         elb = elb_list[0]
@@ -364,7 +375,7 @@ def provision_pinger(config):
     vpc_config = config["vpc_config"]
     as_config = config["autoscale_config"]
     elb_config = config["elb_config"]
-    #load_config_from_s3(s3_config)
+    load_config_from_s3(s3_config)
 
     print "Provisioning Pinger %s" % vpc_config["name"]
     # create connection
@@ -379,7 +390,7 @@ def provision_pinger(config):
         elb_sg = create_sg(conn, vpc, vpc_config["name"]+elb_sg_config["name"]+"-SG", elb_sg_config["description"] + " for " + vpc_config["name"])
         add_rules_to_sg(conn, elb_sg, elb_sg_config["ingress-rules"], True)
         add_rules_to_sg(conn, elb_sg, elb_sg_config["egress-rules"], False)
-        elb = create_elb(aws_config["region_name"], vpc, subnet, elb_sg, vpc_config["name"] + "-ELB", elb_config)
+        elb = create_elb(aws_config["region_name"], vpc, subnet, elb_sg, vpc_config["name"] + "-ELB", elb_config, s3_config["s3_files"]["cert"])
         ins_sg_config = config["autoscale_config"]["sg_config"]
         ins_sg = create_sg(conn, vpc, vpc_config["name"]+ins_sg_config["name"]+"-SG", ins_sg_config["description"] + " for " + vpc_config["name"])
         add_rules_to_sg(conn, ins_sg, ins_sg_config["ingress-rules"], True)

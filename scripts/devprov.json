@@ -12,7 +12,7 @@
           }
     },
     "vpc_config": {
-        "name": "1-Apr25DevVPC",
+        "name": "TestApr25DevVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
@@ -28,6 +28,7 @@
             "unhealthy_threshold": 5,
             "target": "HTTPS:8443/1/alive?token=7701056ede5b4717babf239d215efaf0"
         },
+      "backend_port": 8443,
         "sg_config": {
             "name" : "ELB",
             "description": "The SG for Pinger ELB",
@@ -40,7 +41,6 @@
               }
             ],
             "egress-rules": [
-
             ]
         }
     },
