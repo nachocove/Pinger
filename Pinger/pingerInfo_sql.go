@@ -6,6 +6,14 @@ import (
 	"github.com/nachocove/Pinger/Utils/AWS"
 )
 
+type PingerInfoDbHandleSql struct {
+	db *DBHandleSql
+}
+
+func newPingerInfoDbHandleSql(db DBHandler) PingerInfoDbHandler {
+	return &PingerInfoDbHandleSql{db.(*DBHandleSql)}
+}
+
 func addPingerInfoTable(dbmap *gorp.DbMap) {
 	tMap := dbmap.AddTableWithName(PingerInfo{}, PingerTableName)
 	if tMap.SetKeys(false, "Pinger") == nil {
@@ -27,54 +35,33 @@ const (
 	PingerTableName string = "pinger_info"
 )
 
-type PingerInfoSqlHandler struct {
-	PingerInfoDbHandler
-	dbm *gorp.DbMap
-}
-
-func newPingerInfoSqlHandler(dbm *gorp.DbMap) (*PingerInfoSqlHandler, error) {
-	return &PingerInfoSqlHandler{dbm: dbm}, nil
-}
-
 var getPingerSql string
 
 func init() {
 	getPingerSql = fmt.Sprintf("select * from %s where %s=?", PingerTableName, piPingerField.Tag.Get("db"))
 }
 
-func (h *PingerInfoSqlHandler) update(pinger *PingerInfo) (int64, error) {
-	n, err := h.dbm.Update(pinger)
-	if err != nil {
-		panic(fmt.Sprintf("update error: %s", err.Error()))
-	}
-	return n, nil
+func (h *PingerInfoDbHandleSql) update(pinger *PingerInfo) (int64, error) {
+	return h.db.update(pinger, "")
 }
 
-func (h *PingerInfoSqlHandler) insert(pinger *PingerInfo) error {
-	return h.dbm.Insert(pinger)
+func (h *PingerInfoDbHandleSql) insert(pinger *PingerInfo) error {
+	return h.db.insert(pinger, "")
 }
 
-func (h *PingerInfoSqlHandler) delete(pinger *PingerInfo) (int64, error) {
-	return h.dbm.Delete(pinger)
+func (h *PingerInfoDbHandleSql) delete(pinger *PingerInfo) (int64, error) {
+	return h.db.delete(pinger, "", nil)
 }
 
-func (h *PingerInfoSqlHandler) get(keys []AWS.DBKeyValue) (*PingerInfo, error) {
-	args := make([]interface{}, 0, len(keys))
-	for _, a := range keys {
-		if a.Comparison != AWS.KeyComparisonEq {
-			panic("Can only use KeyComparisonEq for get")
-		}
-		args = append(args, a.Value)
-	}
-	obj, err := h.dbm.Get(&PingerInfo{}, args...)
+func (h *PingerInfoDbHandleSql) get(keys []AWS.DBKeyValue) (*PingerInfo, error) {
+	obj, err := h.db.get(&PingerInfo{}, "", keys)
 	if err != nil {
 		return nil, err
 	}
 	var pinger *PingerInfo
 	if obj != nil {
 		pinger = obj.(*PingerInfo)
-		pinger.db = h
+		pinger.dbHandler = h
 	}
 	return pinger, nil
-
 }

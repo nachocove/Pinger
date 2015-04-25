@@ -10,8 +10,8 @@ import (
 
 type awsDynamoDbTester struct {
 	suite.Suite
-	dynDb         *DynamoDb
-	clientRecord  map[string]interface{}
+	dynDb        *DynamoDb
+	clientRecord map[string]interface{}
 }
 
 func (s *awsDynamoDbTester) SetupSuite() {
@@ -141,7 +141,7 @@ func (s *awsDynamoDbTester) TestItemQuery() {
 	s.createTestTable()
 	s.itemCreate(s.clientRecord)
 
-	resp, err := s.dynDb.Search(UnitTestTableName, []DBKeyValue{
+	resp, err := s.dynDb.Search(UnitTestTableName, "", []DBKeyValue{
 		{Key: "id", Value: s.clientRecord["id"], Comparison: KeyComparisonEq},
 	},
 	)

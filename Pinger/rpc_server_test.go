@@ -101,10 +101,6 @@ func (t *TestingBackend) FindActiveSessions(args *FindSessionsArgs, reply *FindS
 	return RPCFindActiveSessions(t, &t.pollMap, t.dbm, args, reply, t.logger)
 }
 
-func (t *TestingBackend) newDbHandler(i interface{}, db DBHandlerType) (interface{}, error) {
-	return nil, fmt.Errorf("Not implemented")
-}
-
 //func (t *TestingBackend) LockMap() {
 //	return
 //}

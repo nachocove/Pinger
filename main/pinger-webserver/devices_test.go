@@ -136,6 +136,102 @@ func (s *devicesTester) TestRegisterRPCFail() {
 	s.Contains(response.Body.String(), "RPC_SERVER_ERROR")
 }
 
+func (s *devicesTester) TestPostInfoValidate() {
+	pd := &registerPostData{}
+	err := pd.Validate()
+	s.Error(err)
+	s.Contains(err.Error(), "Missing required fields")
+	s.Contains(err.Error(), "Protocol")
+	s.Contains(err.Error(), "ClientId")
+	s.Contains(err.Error(), "ClientContext")
+	s.Contains(err.Error(), "DeviceId")
+	s.Contains(err.Error(), "MailServerUrl")
+	s.Contains(err.Error(), "Protocol")
+	s.Contains(err.Error(), "WaitBeforeUse")
+	
+	pd.ClientId = "foo"
+	err = pd.Validate()
+	s.Error(err)
+	s.Contains(err.Error(), "Missing required fields")
+	s.Contains(err.Error(), "Protocol")
+	s.NotContains(err.Error(), "ClientId")
+	s.Contains(err.Error(), "ClientContext")
+	s.Contains(err.Error(), "DeviceId")
+	s.Contains(err.Error(), "MailServerUrl")
+	s.Contains(err.Error(), "Protocol")
+	s.Contains(err.Error(), "WaitBeforeUse")
+
+	pd.ClientContext = "bar"
+	err = pd.Validate()
+	s.Error(err)
+	s.Contains(err.Error(), "Missing required fields")
+	s.Contains(err.Error(), "Protocol")
+	s.NotContains(err.Error(), "ClientId")
+	s.NotContains(err.Error(), "ClientContext")
+	s.Contains(err.Error(), "DeviceId")
+	s.Contains(err.Error(), "MailServerUrl")
+	s.Contains(err.Error(), "Protocol")
+	s.Contains(err.Error(), "WaitBeforeUse")
+	
+	pd.WaitBeforeUse = 10
+	err = pd.Validate()
+	s.Error(err)
+	s.Contains(err.Error(), "Missing required fields")
+	s.Contains(err.Error(), "Protocol")
+	s.NotContains(err.Error(), "ClientId")
+	s.NotContains(err.Error(), "ClientContext")
+	s.Contains(err.Error(), "DeviceId")
+	s.Contains(err.Error(), "MailServerUrl")
+	s.Contains(err.Error(), "Protocol")
+	s.NotContains(err.Error(), "WaitBeforeUse")
+	
+	pd.Protocol = "foo"
+	err = pd.Validate()
+	s.Error(err)
+	s.Contains(err.Error(), "Missing required fields")
+	s.NotContains(err.Error(), "ClientId")
+	s.NotContains(err.Error(), "ClientContext")
+	s.Contains(err.Error(), "DeviceId")
+	s.Contains(err.Error(), "MailServerUrl")
+	s.Contains(err.Error(), "Protocol")
+	s.NotContains(err.Error(), "WaitBeforeUse")
+	s.Contains(err.Error(), "Protocol foo is not known")
+	
+	pd.Protocol = "ActiveSync"
+	err = pd.Validate()
+	s.Error(err)
+	s.Contains(err.Error(), "Missing required fields")
+	s.NotContains(err.Error(), "Protocol")
+	s.NotContains(err.Error(), "ClientId")
+	s.NotContains(err.Error(), "ClientContext")
+	s.Contains(err.Error(), "DeviceId")
+	s.Contains(err.Error(), "MailServerUrl")
+	s.NotContains(err.Error(), "WaitBeforeUse")
+	s.NotContains(err.Error(), "is not known")
+	s.Contains(err.Error(), "RequestData")
+	s.Contains(err.Error(), "NoChangeReply")
+	
+	pd.RequestData = []byte("323232323")
+	err = pd.Validate()
+	s.NotContains(err.Error(), "RequestData")
+	s.Contains(err.Error(), "NoChangeReply")
+	
+	pd.NoChangeReply = []byte("323232323")
+	err = pd.Validate()
+	s.NotContains(err.Error(), "RequestData")
+	s.NotContains(err.Error(), "NoChangeReply")
+	
+	pd.Platform = "foo"
+	err = pd.Validate()
+	s.Error(err)
+	s.Contains(err.Error(), "Platform foo is not known")
+	
+	pd.Platform = "ios"
+	err = pd.Validate()
+	s.Error(err)
+	s.NotContains(err.Error(), "Platform")
+}
+
 //func (s *devicesTester) TestRegisterContentSuccess() {
 //  config.Rpc.Port = rpcTestPort
 //	req, err := http.NewRequest("POST", fakeRegisterUrl, strings.NewReader(registerJson))

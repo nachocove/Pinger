@@ -1,7 +1,6 @@
 package Pinger
 
 import (
-	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
@@ -13,7 +12,7 @@ import (
 type deviceInfoTester struct {
 	suite.Suite
 	dbm               *gorp.DbMap
-	db                DeviceInfoDbHandler
+	db                DBHandler
 	logger            *Logging.Logger
 	testClientId      string
 	testClientContext string
@@ -37,9 +36,10 @@ func (s *deviceInfoTester) SetupSuite() {
 	if err != nil {
 		panic("Could not create DB")
 	}
-	s.db, err = newDeviceInfoSqlHandler(s.dbm)
+
+	s.db = newDbHandler(DBHandlerSql, s.dbm, nil)
 	require.NoError(s.T(), err)
-	
+
 	s.testClientId = "sometestClientId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"
@@ -106,15 +106,6 @@ func (s *deviceInfoTester) TestDeviceInfoValidate() {
 	s.EqualError(err, "DeviceId can not be empty")
 	di.DeviceId = s.testDeviceId
 
-	di.Platform = ""
-	err = di.validate()
-	s.EqualError(err, "Platform can not be empty")
-
-	di.Platform = "foo"
-	err = di.validate()
-	s.EqualError(err, "Platform foo is not known")
-	di.Platform = s.testPlatform
-
 	di.PushService = ""
 	err = di.validate()
 	s.EqualError(err, "PushService can not be empty")
@@ -160,7 +151,9 @@ func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 
 func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	var err error
-	deviceList, err := getAllMyDeviceInfo(s.db, s.aws, s.logger)
+	dbHandle := newDeviceInfoDbHandler(s.db)
+	deviceList, err := dbHandle.getAllMyDeviceInfo(pingerHostId)
+	require.NoError(s.T(), err)
 	s.Equal(len(deviceList), 0)
 
 	di, err := newDeviceInfo(
@@ -211,15 +204,9 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.Empty(di.Pinger)
 	s.Equal(0, di.Created)
 	s.Equal(0, di.Updated)
-	s.Empty(di.AWSEndpointArn)
 
-	// get but don't create. Since it doesn't exist, there will be an error
-	lastContact, lastContactRequest, err := di.getContactInfo(false)
-	s.Error(err)
-	s.Equal(0, lastContact)
-	s.Equal(0, lastContactRequest)
-
-	deviceList, err = getAllMyDeviceInfo(s.db, s.aws, s.logger)
+	deviceList, err = dbHandle.getAllMyDeviceInfo(pingerHostId)
+	require.NoError(s.T(), err)
 	s.Equal(0, len(deviceList))
 
 	diInDb, err := getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
@@ -231,13 +218,6 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.NotEmpty(di.Pinger)
 	s.True(di.Created > 0)
 	s.True(di.Updated > 0)
-	s.Empty(di.AWSEndpointArn)
-
-	// getDeviceInfo creates the data. Fetch it here and verify
-	lastContact, lastContactRequest, err = di.getContactInfo(false)
-	s.NoError(err)
-	s.True(lastContact > 0)
-	s.Equal(0, lastContactRequest)
 
 	s.Equal(pingerHostId, di.Pinger)
 
@@ -246,10 +226,10 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.NotNil(diInDb)
 	s.Equal(di.Id, diInDb.Id)
 
-	deviceList, err = getAllMyDeviceInfo(s.db, s.aws, s.logger)
-	s.NoError(err)
+	deviceList, err = dbHandle.getAllMyDeviceInfo(pingerHostId)
+	require.NoError(s.T(), err)
 	s.Equal(1, len(deviceList))
-	s.NotNil(di.db)
+	s.NotNil(di.dbHandler)
 }
 
 func (s *deviceInfoTester) TestDeviceInfoUpdate() {
@@ -282,106 +262,22 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 	s.NotNil(di2)
 	s.Equal(di.Id, di2.Id)
 
-	di.AWSEndpointArn = "some endpoint"
-	_, err = di.update()
-	s.NoError(err)
-	s.NotEqual("", di.AWSEndpointArn)
-
-	di.AWSEndpointArn = "some other endpoint"
-	_, err = di.update()
-	s.NoError(err)
-	s.NotEqual("", di.AWSEndpointArn)
-
-	di2.AWSEndpointArn = "yet another endpoint"
-	s.Panics(func() { di2.update() })
-
-	changed, err := di.updateDeviceInfo(di.PushService, di.PushToken, di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
+	changed, err := di.updateDeviceInfo(di.PushService, di.PushToken)
 	s.NoError(err)
 	s.False(changed)
 
 	newToken := "some updated token"
-	changed, err = di.updateDeviceInfo(di.PushService, newToken, di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
+	changed, err = di.updateDeviceInfo(di.PushService, newToken)
 	s.NoError(err)
 	s.True(changed)
 	s.Equal(newToken, di.PushToken)
-	s.Equal("", di.AWSEndpointArn)
 
 	newService := "GCM"
-	changed, err = di.updateDeviceInfo(newService, di.PushToken, di.Platform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
+	changed, err = di.updateDeviceInfo(newService, di.PushToken)
 	s.NoError(err)
 	s.True(changed)
 	s.Equal(newService, di.PushService)
 	s.NotEqual("", di.PushToken) // this should have gotten set to the passed in value (which is the same as before)
-	s.Equal("", di.AWSEndpointArn)
-
-	newPlatform := "android"
-	changed, err = di.updateDeviceInfo(di.PushService, di.PushToken, newPlatform, di.OSVersion, di.AppBuildVersion, di.AppBuildNumber)
-	s.NoError(err)
-	s.True(changed)
-	s.Equal(newPlatform, di.Platform)
-	s.NotEqual("", di.PushToken)   // this should have gotten set to the passed in value (which is the same as before)
-	s.NotEqual("", di.PushService) // this should have gotten set to the passed in value (which is the same as before)
-	s.Equal("", di.AWSEndpointArn)
-
-	newOsVersion := "11111"
-	changed, err = di.updateDeviceInfo(di.PushService, di.PushToken, di.Platform, newOsVersion, di.AppBuildVersion, di.AppBuildNumber)
-	s.NoError(err)
-	s.True(changed)
-	s.Equal(newOsVersion, di.OSVersion)
-
-	newAppBuildVersion := "22222"
-	changed, err = di.updateDeviceInfo(di.PushService, di.PushToken, di.Platform, di.OSVersion, newAppBuildVersion, di.AppBuildNumber)
-	s.NoError(err)
-	s.True(changed)
-	s.Equal(newAppBuildVersion, di.AppBuildVersion)
-
-	newAppBuildNumber := "33333"
-	changed, err = di.updateDeviceInfo(di.PushService, di.PushToken, di.Platform, di.OSVersion, di.AppBuildVersion, newAppBuildNumber)
-	s.NoError(err)
-	s.True(changed)
-	s.Equal(newAppBuildNumber, di.AppBuildNumber)
-}
-
-func (s *deviceInfoTester) TestDeviceInfoUpdateContact() {
-	di, err := newDeviceInfo(
-		s.testClientId,
-		s.testClientContext,
-		s.testDeviceId,
-		s.testPushToken,
-		s.testPushService,
-		s.testPlatform,
-		s.testOSVersion,
-		s.testAppVersion,
-		s.testAppNumber,
-		s.sessionId,
-		s.aws,
-		s.db,
-		s.logger)
-	s.NoError(err)
-	require.NotNil(s.T(), di)
-
-	err = di.insert(nil)
-	s.NoError(err)
-
-	lastContact, _, err := di.getContactInfo(false)
-	s.NoError(err)
-	err = di.updateLastContact()
-	s.NoError(err)
-
-	lastContact2, _, err := di.getContactInfo(false)
-	s.NoError(err)
-
-	s.True(lastContact2 > lastContact)
-
-	_, lastContactRequest, err := di.getContactInfo(false)
-	s.NoError(err)
-	err = di.updateLastContactRequest()
-	s.NoError(err)
-
-	_, lastContactRequest2, err := di.getContactInfo(false)
-	s.NoError(err)
-
-	s.True(lastContactRequest2 > lastContactRequest)
 }
 
 func (s *deviceInfoTester) TestDeviceInfoDelete() {
@@ -419,40 +315,6 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 	s.Nil(di)
 }
 
-func (s *deviceInfoTester) TestRegisterAWS() {
-	di, err := newDeviceInfo(
-		s.testClientId,
-		s.testClientContext,
-		s.testDeviceId,
-		s.testPushToken,
-		s.testPushService,
-		s.testPlatform,
-		s.testOSVersion,
-		s.testAppVersion,
-		s.testAppNumber,
-		s.sessionId,
-		s.aws,
-		s.db,
-		s.logger)
-	s.NoError(err)
-	require.NotNil(s.T(), di)
-
-	err = di.insert(nil)
-	s.NoError(err)
-
-	fmt.Println(di.AWSEndpointArn)
-	s.Equal("", di.AWSEndpointArn)
-
-	//s.aws.SetRegisteredEndpoint("foo12345")
-	testArn := "arn:aws:sns:foo12345"
-	s.aws.SetReturnRegisteredEndpoint("", fmt.Errorf("Endpoint %s already exists.", testArn))
-	s.aws.SetReturnGetAttributes(make(map[string]string), nil)
-	s.aws.SetReturnSetAttributes(nil)
-	err = di.registerAws()
-	s.NoError(err)
-	s.Equal(testArn, di.AWSEndpointArn)
-}
-
 func (s *deviceInfoTester) TestSendToAll() {
 	di, err := newDeviceInfo(
 		s.testClientId,
@@ -470,7 +332,6 @@ func (s *deviceInfoTester) TestSendToAll() {
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
-	di.AWSEndpointArn = "12345"
 	di.insert(nil)
 
 	di, err = newDeviceInfo(
@@ -489,14 +350,12 @@ func (s *deviceInfoTester) TestSendToAll() {
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
-	di.AWSEndpointArn = "12345"
 	di.insert(nil)
 
-	deviceList, err := getAllMyDeviceInfo(s.db, s.aws, s.logger)
+	dbHandle := newDeviceInfoDbHandler(s.db)
+	deviceList, err := dbHandle.getAllMyDeviceInfo(pingerHostId)
+	require.NoError(s.T(), err)
 	s.Equal(2, len(deviceList))
-
-	n := alertAllDevices(s.dbm, s.aws, s.logger)
-	s.Equal(1, n)
 }
 
 func (s *deviceInfoTester) TestPingerStealing() {
@@ -516,7 +375,6 @@ func (s *deviceInfoTester) TestPingerStealing() {
 		s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), di)
-	di.AWSEndpointArn = "12345"
 	di.insert(nil)
 	s.Equal(pingerHostId, di.Pinger)
 

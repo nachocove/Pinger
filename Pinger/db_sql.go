@@ -4,11 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	// blank import to get the mysql mappings for gorp
-	_ "github.com/Go-SQL-Driver/MySQL"
-	// blank import to get the mysql mappings for gorp
+	_ "github.com/Go-SQL-Driver/MySQL" // blank import to get the mysql mappings for gorp
 	"github.com/coopernurse/gorp"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // blank import to get the mysql mappings for gorp
+	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
 )
 
@@ -85,7 +84,6 @@ func (dbconfig *DBConfiguration) initDB(init bool, logger *Logging.Logger) (*gor
 	// map tables
 	///////////////
 	addDeviceInfoTable(dbmap)
-	addDeviceContactTable(dbmap)
 	addPingerInfoTable(dbmap)
 
 	if init {
@@ -93,7 +91,7 @@ func (dbconfig *DBConfiguration) initDB(init bool, logger *Logging.Logger) (*gor
 		// use a migration tool, or create the tables via scripts
 		err := dbmap.CreateTablesIfNotExists()
 		if err != nil {
-			return nil, fmt.Errorf("Create tables failed: %s", err)
+			panic(err)
 		}
 	}
 
@@ -135,4 +133,48 @@ func (dbConfig *DBConfiguration) initDbMySql() (*gorp.DbMap, error) {
 		return nil, fmt.Errorf("Could not ping database: %v", err)
 	}
 	return &gorp.DbMap{Db: db, Dialect: gorp.MySQLDialect{Engine: "InnoDB", Encoding: "UTF8"}}, nil
+}
+
+type DBHandleSql struct {
+	DBHandler
+	dbm *gorp.DbMap
+}
+
+func newDBHandleSql(dbm *gorp.DbMap) DBHandler {
+	return &DBHandleSql{dbm: dbm}
+}
+
+func (h *DBHandleSql) insert(i interface{}, tableName string) error {
+	return h.dbm.Insert(i)
+}
+
+func (h *DBHandleSql) update(i interface{}, tableName string) (int64, error) {
+	n, err := h.dbm.Update(i)
+	if err != nil {
+		return n, err
+	}
+	return n, nil
+}
+
+func (h *DBHandleSql) delete(i interface{}, tableName string, keys []AWS.DBKeyValue) (int64, error) {
+	return h.dbm.Delete(i)
+}
+
+func (h *DBHandleSql) get(i interface{}, tableName string, keys []AWS.DBKeyValue) (interface{}, error) {
+	args := make([]interface{}, 0, len(keys))
+	for _, a := range keys {
+		if a.Comparison != AWS.KeyComparisonEq {
+			panic("Can only use KeyComparisonEq for get")
+		}
+		args = append(args, a.Value)
+	}
+	return h.dbm.Get(i, args...)
+}
+
+func (h *DBHandleSql) search(i interface{}, tableName, indexName string, keys []AWS.DBKeyValue) ([]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (h *DBHandleSql) selectItems(i interface{}, sql string, args ...interface{}) ([]interface{}, error) {
+	return h.dbm.Select(i, sql, args...)
 }

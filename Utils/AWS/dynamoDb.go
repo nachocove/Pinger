@@ -131,20 +131,18 @@ func (d *DynamoDb) Get(tableName string, keys []DBKeyValue) (*map[string]interfa
 	return awsAttributeMapToGo(&getResp.Item), nil
 }
 
-func (d *DynamoDb) Search(tableName string, attributes []DBKeyValue) ([]map[string]interface{}, error) {
+func (d *DynamoDb) Search(tableName, indexName string, keys []DBKeyValue) ([]map[string]interface{}, error) {
 	req := dynamodb.QueryInput{
 		TableName:      aws.String(tableName),
 		ConsistentRead: aws.Boolean(false),
 	}
 
-	// TODO Need to map the keys passed in to an Indexname, if appropriate
-	indexName := ""
 	if indexName != "" {
 		req.IndexName = aws.String(indexName)
 	}
 
 	req.KeyConditions = make(map[string]dynamodb.Condition)
-	for _, attr := range attributes {
+	for _, attr := range keys {
 		req.KeyConditions[attr.Key] = dynamodb.Condition{
 			AttributeValueList: []dynamodb.AttributeValue{goTypeToAttributeValue(attr.Value)},
 			ComparisonOperator: attr.Comparison.awsComparison(),

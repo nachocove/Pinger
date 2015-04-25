@@ -152,3 +152,61 @@ func (s *pushTester) TestDevicePushMessageCreateV2() {
 		s.NotEmpty(secMap)
 	}
 }
+
+//func (s *pushTester) TestRegisterAWS() {
+//	di, err := newDeviceInfo(
+//		s.testClientId,
+//		s.testClientContext,
+//		s.testDeviceId,
+//		s.testPushToken,
+//		s.testPushService,
+//		s.testPlatform,
+//		s.testOSVersion,
+//		s.testAppVersion,
+//		s.testAppNumber,
+//		s.sessionId,
+//		s.aws,
+//		s.db,
+//		s.logger)
+//	s.NoError(err)
+//	require.NotNil(s.T(), di)
+//
+//	err = di.insert(nil)
+//	s.NoError(err)
+//
+//	//s.aws.SetRegisteredEndpoint("foo12345")
+//	testArn := "arn:aws:sns:foo12345"
+//	s.aws.SetReturnRegisteredEndpoint("", fmt.Errorf("Endpoint %s already exists.", testArn))
+//	s.aws.SetReturnGetAttributes(make(map[string]string), nil)
+//	s.aws.SetReturnSetAttributes(nil)
+//	err = di.registerAws()
+//	s.NoError(err)
+//}
+//
+//func (s *pushTester) TestPush() {
+//	di, err = newDeviceInfo(
+//		s.testClientId,
+//		s.testClientContext,
+//		s.testDeviceId,
+//		s.testPushToken,
+//		s.testPushService,
+//		s.testPlatform,
+//		s.testOSVersion,
+//		s.testAppVersion,
+//		s.testAppNumber,
+//		"2",
+//		s.aws,
+//		s.db,
+//		s.logger)
+//	s.NoError(err)
+//	require.NotNil(s.T(), di)
+//	di.insert(nil)
+//
+//	dbHandle := newDeviceInfoDbHandler(s.db)
+//	deviceList, err := dbHandle.getAllMyDeviceInfo(pingerHostId)
+//	require.NoError(s.T(), err)
+//	s.Equal(2, len(deviceList))
+//
+//	n := alertAllDevices(s.db, s.logger)
+//	s.Equal(1, n)
+//}

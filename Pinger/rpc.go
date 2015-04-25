@@ -72,20 +72,14 @@ func (r PollingReplyType) String() string {
 	}
 }
 
-type DBHandlerType int
-const (
-	DBHandlerSql DBHandlerType = iota
-	DBHandlerDynamo DBHandlerType = iota
-)
-
 type BackendPoller interface {
-	newDbHandler(i interface{}, db DBHandlerType) (interface{}, error) 
 	newMailClientContext(pi *MailPingInformation, doStats bool) (MailClientContextType, error)
 	Start(args *StartPollArgs, reply *StartPollingResponse) (err error)
 	Stop(args *StopPollArgs, reply *PollingResponse) (err error)
 	Defer(args *DeferPollArgs, reply *PollingResponse) (err error)
 	LockMap()
 	UnlockMap()
+	newDBHandler() DBHandler
 }
 
 type pollMapType map[string]MailClientContextType
@@ -102,14 +96,11 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 	rpcServer := rpc.NewServer()
 	rpcServer.Register(pollingAPI)
 	go FeedbackListener(logger)
-	go alertAllDevices(pollingAPI.dbm, pollingAPI.aws, pollingAPI.logger)
+	go alertAllDevices(pollingAPI.newDBHandler(), pollingAPI.logger)
 
 	if config.Backend.PingerUpdater > 0 {
-		dbHandler, err := pollingAPI.newDbHandler(PingerInfo{}, DBHandlerSql)
-		if err != nil {
-			return err
-		}
-		pinger, err := newPingerInfo(dbHandler.(PingerInfoDbHandler), logger)
+		db := pollingAPI.newDBHandler()
+		pinger, err := newPingerInfo(db, logger)
 		if err != nil {
 			return err
 		}
@@ -449,11 +440,7 @@ func RPCAliveCheck(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args 
 	if globals.config.PingerUpdater > 0 {
 		logger.Warning("Running both auto-updater and a remote Alive Check")
 	}
-	dbHandler, err := t.newDbHandler(PingerInfo{}, DBHandlerSql)
-	if err != nil {
-		return err
-	}
-	_, err = newPingerInfo(dbHandler.(PingerInfoDbHandler), logger) // this updates the timestamp
+	_, err = newPingerInfo(t.newDBHandler(), logger) // this updates the timestamp
 	if err != nil {
 		return err
 	}
