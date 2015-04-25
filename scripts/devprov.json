@@ -12,7 +12,7 @@
           }
     },
     "vpc_config": {
-        "name": "4-Apr24DevVPC",
+        "name": "1-Apr25DevVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
@@ -31,13 +31,16 @@
         "sg_config": {
             "name" : "ELB",
             "description": "The SG for Pinger ELB",
-            "rules": [
-                {
-                  "protocol": "tcp",
-                  "from_port": 443,
-                  "to_port": 443,
-                  "cidr_ip": "0.0.0.0/0"
-                }
+            "ingress-rules": [
+              {
+                "protocol": "tcp",
+                "from_port": 443,
+                "to_port": 443,
+                "cidr_ip": "0.0.0.0/0"
+              }
+            ],
+            "egress-rules": [
+
             ]
         }
     },
@@ -52,13 +55,27 @@
         "sg_config": {
             "name" : "ASIns",
             "description": "The SG for Pinger AS - Instance",
-            "rules": [
+            "ingress-rules": [
                 {
                   "protocol": "tcp",
                   "from_port": 8443,
                   "to_port": 8443,
                   "cidr_ip": "0.0.0.0/0"
                 }
+            ],
+            "egress-rules": [
+              {
+                "protocol": "tcp",
+                "from_port": 443,
+                "to_port": 443,
+                "cidr_ip": "0.0.0.0/0"
+              },
+              {
+                "protocol": "tcp",
+                "from_port": 80,
+                "to_port": 80,
+                "cidr_ip": "0.0.0.0/0"
+              }
             ]
         }
     }

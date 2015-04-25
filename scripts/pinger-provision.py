@@ -182,7 +182,6 @@ def delete_sgs_for_vpc(conn, vpc, name):
             conn.delete_security_group(group_id=sg.id)
 
 # create Security Group
-# TODO : figure out how to create outbound rules
 def create_sg(conn, vpc, name, description):
     print "Creating security group %s" % name
     sg = get_sg_by_name(conn, vpc, name)
@@ -195,21 +194,28 @@ def create_sg(conn, vpc, name, description):
     return sg
 
 # check if security group rule exists
-def sg_rule_exists(sg, rule):
-    for r in sg.rules:
+def sg_rule_exists(sg, rule, is_ingress):
+    if (is_ingress):
+        rules = sg.rules
+    else:
+        rules = sg.rules_egress
+    for r in rules:
         if r.ip_protocol == rule["protocol"] and  int(r.from_port) == rule["from_port"] and\
                 int(r.to_port) == rule["to_port"] and r.grants[0].cidr_ip == rule["cidr_ip"]:
             return True
     return False
 
 # add rules to sg
-def add_rules_to_sg(conn, sg, rules):
-    print "Adding rules to security group"
+def add_rules_to_sg(conn, sg, rules, is_ingress):
+    print "Adding rules to security group - IsIngress(%s)" % is_ingress
     for rule in rules:
-        if (sg_rule_exists(sg, rule)):
+        if sg_rule_exists(sg, rule, is_ingress):
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) exists." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
         else:
-            sg.authorize(ip_protocol=rule["protocol"], from_port=rule["from_port"], to_port=rule["to_port"], cidr_ip=rule["cidr_ip"])
+            if is_ingress:
+                sg.authorize(ip_protocol=rule["protocol"], from_port=rule["from_port"], to_port=rule["to_port"], cidr_ip=rule["cidr_ip"])
+            else:
+                conn.authorize_security_group_egress(sg.id, ip_protocol=rule["protocol"], from_port=rule["from_port"], to_port=rule["to_port"], cidr_ip=rule["cidr_ip"])
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) added." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
 
 # delete auto scale and launch configuration
@@ -371,11 +377,13 @@ def provision_pinger(config):
         rt = update_route_table(conn, vpc, ig, vpc_config["name"]+"-RT")
         elb_sg_config = config["elb_config"]["sg_config"]
         elb_sg = create_sg(conn, vpc, vpc_config["name"]+elb_sg_config["name"]+"-SG", elb_sg_config["description"] + " for " + vpc_config["name"])
-        add_rules_to_sg(conn, elb_sg, elb_sg_config["rules"])
+        add_rules_to_sg(conn, elb_sg, elb_sg_config["ingress-rules"], True)
+        add_rules_to_sg(conn, elb_sg, elb_sg_config["egress-rules"], False)
         elb = create_elb(aws_config["region_name"], vpc, subnet, elb_sg, vpc_config["name"] + "-ELB", elb_config)
         ins_sg_config = config["autoscale_config"]["sg_config"]
         ins_sg = create_sg(conn, vpc, vpc_config["name"]+ins_sg_config["name"]+"-SG", ins_sg_config["description"] + " for " + vpc_config["name"])
-        add_rules_to_sg(conn, ins_sg, ins_sg_config["rules"])
+        add_rules_to_sg(conn, ins_sg, ins_sg_config["ingress-rules"], True)
+        add_rules_to_sg(conn, ins_sg, ins_sg_config["egress-rules"], False)
         ascaler = create_autoscaler(aws_config["region_name"], vpc, elb, subnet, ins_sg, vpc_config["name"] + "-AS", aws_config, as_config)
     except (BotoServerError, S3ResponseError, EC2ResponseError) as e:
         print "Error :%s(%s):%s" % (e.error_code, e.status, e.message)
