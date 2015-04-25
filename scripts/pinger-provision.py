@@ -57,8 +57,8 @@ def delete_vpc(region, name):
     if not vpc:
         print "VPC %s does not exist. Nothing to delete" % name
     else:
-        delete_subnets_for_vpc(conn, vpc, name)
         delete_sgs_for_vpc(conn, vpc, name)
+        delete_subnets_for_vpc(conn, vpc, name)
         delete_route_tables_for_vpc(conn, vpc, name)
         delete_igs_for_vpc(conn, vpc, name)
         print "Deleting VPC %s..." % name
@@ -177,11 +177,9 @@ def update_route_table(conn, vpc, ig, name):
 def delete_sgs_for_vpc(conn, vpc, name):
     print "Deleting security groups for VPC %s" % name
     sg_list = conn.get_all_security_groups(filters=[("vpc-id", vpc.id)])
-    try:
-        for sg in sg_list:
+    for sg in sg_list:
+        if 'Name' in sg.tags and sg.tags['Name'] != "default":
             conn.delete_security_group(group_id=sg.id)
-    except:
-        print "a"
 
 # create Security Group
 # TODO : figure out how to create outbound rules
