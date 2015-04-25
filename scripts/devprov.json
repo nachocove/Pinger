@@ -12,7 +12,7 @@
           }
     },
     "vpc_config": {
-        "name": "3-Apr24DevVPC",
+        "name": "4-Apr24DevVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",

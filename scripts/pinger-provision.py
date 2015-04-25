@@ -15,7 +15,7 @@ import boto.ec2.autoscale
 from boto.exception import S3ResponseError, EC2ResponseError, BotoServerError
 from boto.ec2.autoscale import LaunchConfiguration
 from boto.ec2.autoscale import AutoScalingGroup
-
+from boto.vpc import VPCConnection
 
 # get region from region_name
 def get_region(region_name):
@@ -32,12 +32,12 @@ def wait_for_vpc (c, vpc_id):
             vpc_list = c.get_all_vpcs(vpc_ids=[vpc_id])
             break
         except EC2ResponseError:
-            print "waiting for VPC(%s) to be created" % vpc_id
+            print "Waiting for VPC(%s) to be created" % vpc_id
             time.sleep(1)
     if not len(vpc_list):
         raise Exception("Error:Cannot find the VPC(%s) just created" % vpc_id)
     while vpc_list[0].state == 'pending':
-        print "waiting for VPC(%s) to be get out of pending state" % vpc_id
+        print "Waiting for VPC(%s) to be get out of pending state" % vpc_id
         time.sleep(1)
         vpc_list = c.get_all_vpcs(vpc_ids =[vpc_id])
 
@@ -50,9 +50,19 @@ def get_vpc_by_name(conn, name):
                 return vpc
     return None
 
+# delete VPC
+def delete_vpc(region, name):
+    conn = VPCConnection(region=region, profile_name="provisioner")
+    vpc = get_vpc_by_name(conn, name)
+    if not vpc:
+        print "VPC %s does not exist. Nothing to delete" % name
+    else:
+        print "Deleting VPC %s..." % name
+        conn.delete_vpc(vpc.id)
+
 # create VPC
 def create_vpc(conn, name, cidr_block, instance_tenancy):
-    print "creating vpc %s" % name
+    print "Creating vpc %s" % name
     vpc = get_vpc_by_name(conn, name)
     if not vpc:
         vpc = conn.create_vpc(cidr_block, instance_tenancy=instance_tenancy)
@@ -65,7 +75,7 @@ def create_vpc(conn, name, cidr_block, instance_tenancy):
 
 # create internet gateway
 def create_ig(conn, vpc, name):
-    print "creating internet gateway %s" % name
+    print "Creating internet gateway %s" % name
     ig_list = conn.get_all_internet_gateways(filters=[("attachment.vpc-id", vpc.id)])
     if not len(ig_list):
         ig = conn.create_internet_gateway()
@@ -88,7 +98,7 @@ def wait_for_subnet(c, sn_id):
 
 # create subnet
 def create_subnet(conn, vpc, name, cidr_block, availability_zone):
-    print "creating subnet %s" % name
+    print "Creating subnet %s" % name
     subnet_list = conn.get_all_subnets(filters=[("cidrBlock", cidr_block), ("vpcId", vpc.id),
                                                 ("availabilityZone", [availability_zone])])
     if not len(subnet_list):
@@ -111,7 +121,7 @@ def get_sg_by_name(conn, vpc, name):
 
 # update routing table for VPC
 def update_route_table(conn, vpc, ig, name):
-    print "updating route table %s" % name
+    print "Updating route table %s" % name
     rt_list = conn.get_all_route_tables(filters=[("vpc-id", vpc.id)])
     if not len(rt_list):
         print "Cannot find default route table for VPC(%s)" % vpc.id
@@ -127,7 +137,7 @@ def update_route_table(conn, vpc, ig, name):
 # create Security Group
 # TODO : figure out how to create outbound rules
 def create_sg(conn, vpc, name, description):
-    print "creating security group %s" % name
+    print "Creating security group %s" % name
     sg = get_sg_by_name(conn, vpc, name)
     if not sg:
         sg = conn.create_security_group(name, description, vpc.id)
@@ -147,7 +157,7 @@ def sg_rule_exists(sg, rule):
 
 # add rules to sg
 def add_rules_to_sg(conn, sg, rules):
-    print "adding rules to security group"
+    print "Adding rules to security group"
     for rule in rules:
         if (sg_rule_exists(sg, rule)):
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) exists." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
@@ -155,11 +165,28 @@ def add_rules_to_sg(conn, sg, rules):
             sg.authorize(ip_protocol=rule["protocol"], from_port=rule["from_port"], to_port=rule["to_port"], cidr_ip=rule["cidr_ip"])
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) added." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
 
+# delete auto scale and launch configuration
+def delete_autoscaler(region_name, name):
+    conn = boto.ec2.autoscale.connect_to_region(region_name, profile_name="provisioner")
+    asg_list = conn.get_all_groups(names=[name])
+    if not len(asg_list):
+        print "Auto Scaler %s does not exist. Nothing to delete" % name
+    else:
+        print "Deleting auto scaler %s..." % name
+        conn.delete_auto_scaling_group(name, force_delete=True)
+    lc_name = name + "-LC"
+    lc_list = conn.get_all_launch_configurations(names=[lc_name])
+    if not len(lc_list):
+        print "Launch Configuration %s does not exist. Nothing to delete" % lc_name
+    else:
+        print "Deleting launch configuration %s..." % lc_name
+        conn. delete_launch_configuration(lc_name)
+
 # create auto scaler
 def create_autoscaler(region_name, vpc, elb, subnet, sg, name, aws_config, as_config):
-    print "creating auto scaler %s" % name
+    print "Creating auto scaler %s" % name
     conn = boto.ec2.autoscale.connect_to_region(region_name, profile_name="provisioner")
-    asg_list =  conn.get_all_groups(names=[name])
+    asg_list = conn.get_all_groups(names=[name])
     if not len(asg_list):
         with open (as_config["user_data_file"], "r") as udfile:
             user_data = udfile.read()
@@ -196,12 +223,25 @@ def create_autoscaler(region_name, vpc, elb, subnet, sg, name, aws_config, as_co
         print "Activiity %s" % act
     return asg
 
+# delete load balancer
+def delete_elb(region_name, name):
+    conn = boto.ec2.elb.connect_to_region(region_name, profile_name="provisioner")
+    try:
+        elb_list = conn.get_all_load_balancers(load_balancer_names=[name])
+    except BotoServerError, e: # ELB by the given name does not exist
+        elb_list = []
+    if not len(elb_list):
+        print "Elastic Load Balancer %s does not exist. Nothing to delete" % name
+    else:
+        print "Deleting Elastic Load Balancer %s..." % name
+        conn.delete_load_balancer(name)
+
 # TODO 1 - configure the ELB to check the certificate on the instance - SetLoadBalancerPoliciesForBackendServer
 # http://docs.aws.amazon.com/ElasticLoadBalancing/latest/APIReference/API_SetLoadBalancerPoliciesForBackendServer.html
 # TODO 2 - figure out a workaround for the HTTP bug in boto's listener config
-# create ELB
+# create load balancer
 def create_elb(region_name, vpc, subnet, sg, name, config):
-    print "creating elastic load balancer"
+    print "Creating elastic load balancer"
     conn = boto.ec2.elb.connect_to_region(region_name, profile_name="provisioner")
     try:
         elb_list = conn.get_all_load_balancers(load_balancer_names=[name])
@@ -227,10 +267,9 @@ def create_elb(region_name, vpc, subnet, sg, name, config):
     return elb
 
 # cleanup
-def cleanup():
+def cleanup(config):
     print "Cleaning up..."
-    # TODO: stop instance if running
-    # TODO: delete vpc
+    deprovision_pinger(config)
 
 # process config
 def process_config(config):
@@ -253,26 +292,30 @@ def json_config(file_name):
     #pprint json_data
     return json_data
 
-def main():
-    parser = argparse.ArgumentParser(description='Provision the Pinger at AWS')
-    parser.add_argument('--config', required=True, type=json_config, metavar = "config_file",
-                   help='the config(json) file for the deployment', )
-    args = parser.parse_args()
-    config =  args.config
-
-    process_config(config)
+# delete VPC et al
+def deprovision_pinger(config):
     aws_config = config["aws_config"]
     s3_config = config["s3_config"]
     vpc_config = config["vpc_config"]
     as_config = config["autoscale_config"]
     elb_config = config["elb_config"]
+    print "De-Provisioning Pinger %s" % vpc_config["name"]
+    delete_autoscaler(aws_config["region_name"], vpc_config["name"] + "-AS")
+    delete_elb(aws_config["region_name"], vpc_config["name"] + "-ELB")
+    delete_vpc(aws_config["region"], vpc_config["name"])
 
+# create VPC et al
+def provision_pinger(config):
+    aws_config = config["aws_config"]
+    s3_config = config["s3_config"]
+    vpc_config = config["vpc_config"]
+    as_config = config["autoscale_config"]
+    elb_config = config["elb_config"]
     #load_config_from_s3(s3_config)
 
+    print "Provisioning Pinger %s" % vpc_config["name"]
     # create connection
-    from boto.vpc import VPCConnection
     conn = VPCConnection(region=aws_config["region"], profile_name="provisioner")
-
     # create vpc
     try:
         vpc = create_vpc(conn, vpc_config["name"], vpc_config["vpc_cidr_block"], vpc_config["instance_tenancy"])
@@ -290,8 +333,21 @@ def main():
     except (BotoServerError, S3ResponseError, EC2ResponseError) as e:
         print "Error :%s(%s):%s" % (e.error_code, e.status, e.message)
         print traceback.format_exc()
-        cleanup()
+        cleanup(config)
 
+# main
+def main():
+    parser = argparse.ArgumentParser(description='Provision the Pinger at AWS')
+    parser.add_argument('-d', '--delete', help='use this flag to deprovision the pinger', action='store_true')
+    parser.add_argument('--config', required=True, type=json_config, metavar = "config_file",
+                   help='the config(json) file for the deployment', )
+    args = parser.parse_args()
+    config = args.config
+    process_config(config)
+    if args.delete:
+        deprovision_pinger(config)
+    else:
+        provision_pinger(config)
 
 if __name__ == '__main__':
     main()
