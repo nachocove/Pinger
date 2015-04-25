@@ -57,6 +57,10 @@ def delete_vpc(region, name):
     if not vpc:
         print "VPC %s does not exist. Nothing to delete" % name
     else:
+        delete_subnets_for_vpc(conn, vpc, name)
+        delete_sgs_for_vpc(conn, vpc, name)
+        delete_route_tables_for_vpc(conn, vpc, name)
+        delete_igs_for_vpc(conn, vpc, name)
         print "Deleting VPC %s..." % name
         conn.delete_vpc(vpc.id)
 
@@ -72,6 +76,17 @@ def create_vpc(conn, name, cidr_block, instance_tenancy):
     else:
         print "VPC %s (%s) already exists at cidr_block: %s!" % (name, vpc.id, vpc.cidr_block)
     return vpc
+
+# delete internet gateways
+def delete_igs_for_vpc(conn, vpc, name):
+    ig_list = conn.get_all_internet_gateways(filters=[("attachment.vpc-id", vpc.id)])
+    if not len(ig_list):
+        print "No internet gateway exist for VPC %s. Nothing to delete" % name
+    else:
+        for ig in ig_list:
+            print "Deleting internet gateway %s..." % ig.id
+            conn.detach_internet_gateway(ig.id, vpc.id)
+            conn.delete_internet_gateway(ig.id)
 
 # create internet gateway
 def create_ig(conn, vpc, name):
@@ -96,6 +111,16 @@ def wait_for_subnet(c, sn_id):
         time.sleep(1)
         subnet_list = c.get_all_subnets(subnet_ids =[sn_id])
 
+# delete subnet
+def delete_subnets_for_vpc(conn, vpc, name):
+    subnet_list = conn.get_all_subnets(filters=[("vpcId", vpc.id)])
+    if not len(subnet_list):
+        print "No subnet exist for VPC %s. Nothing to delete" % name
+    else:
+        for sn in subnet_list:
+            print "Deleting Subnet %s..." % sn.id
+            conn.delete_subnet(sn.id)
+
 # create subnet
 def create_subnet(conn, vpc, name, cidr_block, availability_zone):
     print "Creating subnet %s" % name
@@ -119,6 +144,20 @@ def get_sg_by_name(conn, vpc, name):
             return sg
     return None
 
+# delete route table
+def delete_route_tables_for_vpc(conn, vpc, name):
+    rt_list = conn.get_all_route_tables(filters=[("vpc-id", vpc.id)])
+    if not len(rt_list):
+        print "No route tables exist for VPC %s. Nothing to delete" % name
+    else:
+        for rt in rt_list:
+            print "Deleting Route table %s..." % rt.id
+            try:
+                conn.delete_route(rt.id, "0.0.0.0/0")
+            except boto.exception.EC2ResponseError, e:
+                print "Error deleting route: %s" % e.error_message
+            #conn.delete_route_table(rt.id)
+
 # update routing table for VPC
 def update_route_table(conn, vpc, ig, name):
     print "Updating route table %s" % name
@@ -133,6 +172,16 @@ def update_route_table(conn, vpc, ig, name):
         status = conn.create_route(rt.id, "0.0.0.0/0", ig.id)
         print "Added Route (%s) to Route Table %s (%s). Status %s" % ("0.0.0.0/0", name, rt.id, status)
     return rt
+
+# delete security group
+def delete_sgs_for_vpc(conn, vpc, name):
+    print "Deleting security groups for VPC %s" % name
+    sg_list = conn.get_all_security_groups(filters=[("vpc-id", vpc.id)])
+    try:
+        for sg in sg_list:
+            conn.delete_security_group(group_id=sg.id)
+    except:
+        print "a"
 
 # create Security Group
 # TODO : figure out how to create outbound rules
