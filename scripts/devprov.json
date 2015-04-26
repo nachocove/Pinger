@@ -20,7 +20,7 @@
     },
     "elb_config": {
         "ports": [
-            [443, 8443, "https", "arn:aws:iam::263277746520:server-certificate/DevPinger"]
+            [443, 8443, "https", "https", "arn:aws:iam::263277746520:server-certificate/DevPinger"]
         ],
         "health_check": {
             "interval" :20,

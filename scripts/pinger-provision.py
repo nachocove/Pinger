@@ -304,7 +304,6 @@ def delete_elb(region_name, name):
         print "Deleting Elastic Load Balancer %s..." % name
         conn.delete_load_balancer(name)
 
-# TODO - figure out a workaround for the HTTP bug in boto's listener config
 # create load balancer
 def create_elb(region_name, vpc, subnet, sg, name, config, cert):
     print "Creating elastic load balancer"
@@ -315,7 +314,7 @@ def create_elb(region_name, vpc, subnet, sg, name, config, cert):
         elb_list = []
     if not len(elb_list):
         ports = config["ports"]
-        elb = conn.create_load_balancer(name, None, listeners=ports, subnets=[subnet.id], security_groups=[sg.id])
+        elb = conn.create_load_balancer(name, None, complex_listeners=ports, subnets=[subnet.id], security_groups=[sg.id])
         hc = HealthCheck(
             interval = config["health_check"]["interval"],
             healthy_threshold = config["health_check"]["healthy_threshold"],
