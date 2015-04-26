@@ -205,16 +205,24 @@ def sg_rule_exists(sg, rule, is_ingress):
             return True
     return False
 
+# delete all egress rules
+def delete_egress_rules_from_sg(conn, sg):
+        sg_list = conn.get_all_security_groups(group_ids=[sg.id])
+        if not len(sg_list):
+            print "Security Group (%s) not found" % sg.id
+        else:
+            sg = sg_list[0]
+            for rule in sg.rules_egress:
+                print "Deleting egress rule ", rule
+                conn.revoke_security_group_egress(sg.id, ip_protocol=rule.ip_protocol, from_port=rule.from_port,
+                                              to_port=rule.to_port, cidr_ip=rule.grants[0])
+
 # add rules to sg
 def add_rules_to_sg(conn, sg, rules, is_ingress):
     print "Adding rules to security group - IsIngress(%s)" % is_ingress
-    print "azim ", sg.rules
-    print "azim 2", sg.rules_egress
     if not is_ingress:
-        # TODO: delete default rule, the following doesnt work
-        for rule in sg.rules_egress:
-            print rule
-            sg.revoke(ip_protocol=rule.ip_protocol, from_port=rule.from_port, to_port=rule.to_port, cidr_ip=rule.cidr_ip)
+        if len(rules):
+            delete_egress_rules_from_sg(conn, sg)
     for rule in rules:
         if sg_rule_exists(sg, rule, is_ingress):
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) exists." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
@@ -326,7 +334,8 @@ def create_elb(region_name, vpc, subnet, sg, name, config, cert):
         elb = elb_list[0]
         print "Elastic Load Balancer (%s) found for VPC(%s)" % (elb.name, elb.vpc_id)
         if (elb.vpc_id != vpc.id):
-            raise Exception("Error: Wrong VPC association: ELB(%s) is associated with VPC(%s) rather than VPC(%s)" % (elb.name, elb.vpc_id, vpc.id))
+            raise Exception("Error: Wrong VPC association: ELB(%s) is associated with VPC(%s) rather than VPC(%s)"
+                            % (elb.name, elb.vpc_id, vpc.id))
     #elb.register_instances(ins.id)
     return elb
 
@@ -383,19 +392,24 @@ def provision_pinger(config):
     # create vpc
     try:
         vpc = create_vpc(conn, vpc_config["name"], vpc_config["vpc_cidr_block"], vpc_config["instance_tenancy"])
-        subnet = create_subnet(conn, vpc, vpc_config["name"]+"-SN", vpc_config["subnet_cidr_block"], vpc_config["availability_zone"])
+        subnet = create_subnet(conn, vpc, vpc_config["name"]+"-SN", vpc_config["subnet_cidr_block"],
+                               vpc_config["availability_zone"])
         ig = create_ig(conn, vpc, vpc_config["name"]+"-IG")
         rt = update_route_table(conn, vpc, ig, vpc_config["name"]+"-RT")
         elb_sg_config = config["elb_config"]["sg_config"]
-        elb_sg = create_sg(conn, vpc, vpc_config["name"]+elb_sg_config["name"]+"-SG", elb_sg_config["description"] + " for " + vpc_config["name"])
+        elb_sg = create_sg(conn, vpc, vpc_config["name"]+elb_sg_config["name"]+"-SG", elb_sg_config["description"]
+                           + " for " + vpc_config["name"])
         add_rules_to_sg(conn, elb_sg, elb_sg_config["ingress-rules"], True)
         add_rules_to_sg(conn, elb_sg, elb_sg_config["egress-rules"], False)
-        elb = create_elb(aws_config["region_name"], vpc, subnet, elb_sg, vpc_config["name"] + "-ELB", elb_config, s3_config["s3_files"]["cert"])
+        elb = create_elb(aws_config["region_name"], vpc, subnet, elb_sg, vpc_config["name"] + "-ELB",
+                         elb_config, s3_config["s3_files"]["cert"])
         ins_sg_config = config["autoscale_config"]["sg_config"]
-        ins_sg = create_sg(conn, vpc, vpc_config["name"]+ins_sg_config["name"]+"-SG", ins_sg_config["description"] + " for " + vpc_config["name"])
+        ins_sg = create_sg(conn, vpc, vpc_config["name"]+ins_sg_config["name"]+"-SG",
+                           ins_sg_config["description"] + " for " + vpc_config["name"])
         add_rules_to_sg(conn, ins_sg, ins_sg_config["ingress-rules"], True)
         add_rules_to_sg(conn, ins_sg, ins_sg_config["egress-rules"], False)
-        ascaler = create_autoscaler(aws_config["region_name"], vpc, elb, subnet, ins_sg, vpc_config["name"] + "-AS", aws_config, as_config)
+        ascaler = create_autoscaler(aws_config["region_name"], vpc, elb, subnet,
+                                    ins_sg, vpc_config["name"] + "-AS", aws_config, as_config)
     except (BotoServerError, S3ResponseError, EC2ResponseError) as e:
         print "Error :%s(%s):%s" % (e.error_code, e.status, e.message)
         print traceback.format_exc()
