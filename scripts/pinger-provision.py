@@ -323,11 +323,14 @@ def create_elb(region_name, vpc, subnet, sg, name, config, cert):
         )
         elb.configure_health_check(hc)
         pkp_name = "PublicKeyPolicy-%s-BackendCert" % elb.name
-        conn.create_lb_policy(elb.name, pkp_name , "PublicKeyPolicyType", {"PublicKey": cert})
+        conn.create_lb_policy(elb.name, pkp_name, "PublicKeyPolicyType", {"PublicKey": cert})
         besap_name = "BackendAuthPolicy-%s-BackendCert" % elb.name
         conn.create_lb_policy(elb.name, besap_name, "BackendServerAuthenticationPolicyType",
                                        {"PublicKeyPolicyName": pkp_name})
         conn.set_lb_policies_of_backend_server(elb.name, config["backend_port"], [besap_name])
+        sp_name = "Sticky-%s" % elb.name
+        conn.create_lb_cookie_stickiness_policy(None, elb.name, sp_name)
+        conn.set_lb_policies_of_listener(elb.name, config["elb_port"], sp_name)
         print "Created Elastic Load Balancer (%s) for VPC(%s)" % (elb.name, vpc.id)
     else:
         elb = elb_list[0]
