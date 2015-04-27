@@ -37,7 +37,7 @@ func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger
 		}
 	case DBHandlerDynamo:
 	}
-	
+
 	return backend, nil
 }
 

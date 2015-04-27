@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
 	"net/http"
-	"strings"
 	"reflect"
 	"regexp"
+	"strings"
 )
 
 func init() {
@@ -76,7 +76,7 @@ func (pd *registerPostData) Validate() error {
 			if vReflect.FieldByName(f).Len() == 0 {
 				missing = append(missing, f)
 			}
-			
+
 		case int64:
 			if vReflect.FieldByName(f).Int() == 0 {
 				missing = append(missing, f)

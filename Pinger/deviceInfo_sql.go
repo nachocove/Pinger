@@ -63,7 +63,7 @@ func (h *DeviceInfoDbHandleSql) getAllMyDeviceInfo(pingerHostId string) ([]Devic
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return deviceList, nil
 }
 

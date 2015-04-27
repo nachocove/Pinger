@@ -13,7 +13,7 @@ type mailClientTester struct {
 	suite.Suite
 	logger            *Logging.Logger
 	dbmap             *gorp.DbMap
-	db         DBHandler
+	db                DBHandler
 	testClientId      string
 	testClientContext string
 	testDeviceId      string

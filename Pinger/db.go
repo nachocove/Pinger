@@ -15,13 +15,13 @@ const (
 )
 
 func (d *DBHandlerType) String() string {
-	switch (*d) {
+	switch *d {
 	case DBHandlerSql:
 		return "sql"
-		
+
 	case DBHandlerDynamo:
 		return "dynamo"
-		
+
 	default:
 		panic("Unknown DBHandlerType")
 	}
@@ -34,10 +34,10 @@ func (d *DBHandlerType) UnmarshalText(text []byte) error {
 	case strings.EqualFold(strings.ToLower(string(text)), "dynamo"):
 		*d = DBHandlerDynamo
 		return nil
-		
+
 	default:
 		return fmt.Errorf("Unknown DBHandlerType")
-	} 
+	}
 }
 
 type DBHandler interface {

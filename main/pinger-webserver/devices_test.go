@@ -148,7 +148,7 @@ func (s *devicesTester) TestPostInfoValidate() {
 	s.Contains(err.Error(), "MailServerUrl")
 	s.Contains(err.Error(), "Protocol")
 	s.Contains(err.Error(), "WaitBeforeUse")
-	
+
 	pd.ClientId = "foo"
 	err = pd.Validate()
 	s.Error(err)
@@ -172,7 +172,7 @@ func (s *devicesTester) TestPostInfoValidate() {
 	s.Contains(err.Error(), "MailServerUrl")
 	s.Contains(err.Error(), "Protocol")
 	s.Contains(err.Error(), "WaitBeforeUse")
-	
+
 	pd.WaitBeforeUse = 10
 	err = pd.Validate()
 	s.Error(err)
@@ -184,7 +184,7 @@ func (s *devicesTester) TestPostInfoValidate() {
 	s.Contains(err.Error(), "MailServerUrl")
 	s.Contains(err.Error(), "Protocol")
 	s.NotContains(err.Error(), "WaitBeforeUse")
-	
+
 	pd.Protocol = "foo"
 	err = pd.Validate()
 	s.Error(err)
@@ -196,7 +196,7 @@ func (s *devicesTester) TestPostInfoValidate() {
 	s.Contains(err.Error(), "Protocol")
 	s.NotContains(err.Error(), "WaitBeforeUse")
 	s.Contains(err.Error(), "Protocol foo is not known")
-	
+
 	pd.Protocol = "ActiveSync"
 	err = pd.Validate()
 	s.Error(err)
@@ -210,22 +210,22 @@ func (s *devicesTester) TestPostInfoValidate() {
 	s.NotContains(err.Error(), "is not known")
 	s.Contains(err.Error(), "RequestData")
 	s.Contains(err.Error(), "NoChangeReply")
-	
+
 	pd.RequestData = []byte("323232323")
 	err = pd.Validate()
 	s.NotContains(err.Error(), "RequestData")
 	s.Contains(err.Error(), "NoChangeReply")
-	
+
 	pd.NoChangeReply = []byte("323232323")
 	err = pd.Validate()
 	s.NotContains(err.Error(), "RequestData")
 	s.NotContains(err.Error(), "NoChangeReply")
-	
+
 	pd.Platform = "foo"
 	err = pd.Validate()
 	s.Error(err)
 	s.Contains(err.Error(), "Platform foo is not known")
-	
+
 	pd.Platform = "ios"
 	err = pd.Validate()
 	s.Error(err)
