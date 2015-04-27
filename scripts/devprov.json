@@ -1,0 +1,83 @@
+{
+    "aws_config": {
+        "region_name": "us-west-2",
+        "zones": ["us-west-2a"]
+    },
+    "s3_config": {
+          "s3_bucket": "nchoconfal",
+          "s3_filenames": {
+            "cert_spem": "/devpinger/pinger/pingercerts.pem",
+            "key_pem": "/devpinger/pinger/pingerkey.pem",
+            "pinger_config": "/devpinger/pinger/pinger.cfg"
+          }
+    },
+    "vpc_config": {
+        "name": "BackEndAuthApr25DevVPC",
+        "vpc_cidr_block": "10.0.0.0/20",
+        "subnet_cidr_block": "10.0.0.0/24",
+        "availability_zone": "us-west-2a",
+        "instance_tenancy": "default"
+    },
+    "elb_config": {
+        "ports": [
+            [443, 8443, "https", "https", "arn:aws:iam::263277746520:server-certificate/DevPinger"]
+        ],
+        "health_check": {
+            "interval" :20,
+            "healthy_threshold": 3,
+            "unhealthy_threshold": 5,
+            "target": "HTTPS:8443/1/alive?token="
+        },
+      "elb_port": 443,
+      "backend_port": 8443,
+        "sg_config": {
+            "name" : "ELB",
+            "description": "The SG for Pinger ELB",
+            "ingress-rules": [
+              {
+                "protocol": "tcp",
+                "from_port": 443,
+                "to_port": 443,
+                "cidr_ip": "0.0.0.0/0"
+              }
+            ],
+            "egress-rules": [
+            ]
+        }
+    },
+    "autoscale_config": {
+        "ami_id": "ami-e981b5d9",
+        "key_pair": "Dev Pinger VPC KeyPair",
+        "instance_type": "t1.micro",
+        "instance_monitoring": false,
+        "min_size": 1,
+        "max_size": 1,
+        "user_data_file": "nacho_init_devpinger.sh",
+        "sg_config": {
+            "name" : "ASIns",
+            "description": "The SG for Pinger AS - Instance",
+            "ingress-rules": [
+                {
+                  "protocol": "tcp",
+                  "from_port": 8443,
+                  "to_port": 8443,
+                  "cidr_ip": "0.0.0.0/0"
+                }
+            ],
+            "egress-rules": [
+              {
+                "protocol": "tcp",
+                "from_port": 443,
+                "to_port": 443,
+                "cidr_ip": "0.0.0.0/0"
+              },
+              {
+                "protocol": "tcp",
+                "from_port": 80,
+                "to_port": 80,
+                "cidr_ip": "0.0.0.0/0"
+              }
+            ]
+        }
+    }
+}
