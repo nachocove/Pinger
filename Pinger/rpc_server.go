@@ -15,27 +15,34 @@ type BackendPolling struct {
 	pollMap      pollMapType
 	aws          *AWS.AWSHandle
 	pollMapMutex sync.Mutex
+	dbtype       DBHandlerType
 }
 
 func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger) (*BackendPolling, error) {
-	dbm, err := config.Db.initDB(true, logger)
-	if err != nil {
-		return nil, err
-	}
 	backend := &BackendPolling{
-		dbm:          dbm,
 		logger:       logger,
 		loggerLevel:  -1,
 		debug:        debug,
 		pollMap:      make(pollMapType),
 		aws:          config.Aws.NewHandle(),
 		pollMapMutex: sync.Mutex{},
+		dbtype:       config.Backend.DB,
 	}
+	var err error
+	switch config.Backend.DB {
+	case DBHandlerSql:
+		backend.dbm, err = config.Db.initDB(true, logger)
+		if err != nil {
+			return nil, err
+		}
+	case DBHandlerDynamo:
+	}
+	
 	return backend, nil
 }
 
 func (t *BackendPolling) newMailClientContext(pi *MailPingInformation, doStats bool) (MailClientContextType, error) {
-	return NewMailClientContext(newDbHandler(DBHandlerSql, t.dbm, t.aws), t.aws, pi, t.debug, false, t.logger)
+	return NewMailClientContext(newDbHandler(t.dbtype, t.dbm, t.aws), t.aws, pi, t.debug, false, t.logger)
 }
 
 func (t *BackendPolling) ToggleDebug() {
@@ -72,5 +79,5 @@ func (t *BackendPolling) AliveCheck(args *AliveCheckArgs, reply *AliveCheckRespo
 }
 
 func (t *BackendPolling) newDBHandler() DBHandler {
-	return newDbHandler(DBHandlerSql, t.dbm, t.aws)
+	return newDbHandler(t.dbtype, t.dbm, t.aws)
 }

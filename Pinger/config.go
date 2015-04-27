@@ -33,6 +33,7 @@ type BackendConfiguration struct {
 	APNSSound             string
 	APNSContentAvailable  int
 	APNSExpirationSeconds int64
+	DB                    DBHandlerType
 }
 
 var days_28 int64 = 28 * 24 * 60 * 60
@@ -48,6 +49,7 @@ func NewBackendConfiguration() *BackendConfiguration {
 		APNSSound:             "silent.wav",
 		APNSContentAvailable:  1,
 		APNSExpirationSeconds: days_28,
+		DB: DBHandlerSql,
 	}
 }
 
