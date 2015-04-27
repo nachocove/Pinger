@@ -208,16 +208,23 @@ def sg_rule_exists(sg, rule, is_ingress):
             return True
     return False
 
+# load sg by id
+def get_sg_by_id(conn, sgid):
+    sg_list = conn.get_all_security_groups(group_ids=[sgid])
+    if not len(sg_list):
+        print "Security Group (%s) not found" % sgid
+        return None
+    else:
+        print "Security Group (%s) found" % sgid
+        return sg_list[0]
+
 # delete all egress rules
 def delete_egress_rules_from_sg(conn, sg):
-        sg_list = conn.get_all_security_groups(group_ids=[sg.id])
-        if not len(sg_list):
-            print "Security Group (%s) not found" % sg.id
-        else:
-            sg = sg_list[0]
-            for rule in sg.rules_egress:
-                print "Deleting egress rule ", rule
-                conn.revoke_security_group_egress(sg.id, ip_protocol=rule.ip_protocol, from_port=rule.from_port,
+    sg=get_sg_by_id(conn, sg.id)
+    if sg:
+        for rule in sg.rules_egress:
+            print "Deleting egress rule ", rule
+            conn.revoke_security_group_egress(sg.id, ip_protocol=rule.ip_protocol, from_port=rule.from_port,
                                               to_port=rule.to_port, cidr_ip=rule.grants[0])
 
 # add rules to sg
@@ -227,6 +234,8 @@ def add_rules_to_sg(conn, sg, rules, is_ingress):
         if len(rules):
             delete_egress_rules_from_sg(conn, sg)
     for rule in rules:
+        # reload sg again
+        sg = get_sg_by_id(conn, sg.id)
         if sg_rule_exists(sg, rule, is_ingress):
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) exists." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
         else:
