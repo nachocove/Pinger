@@ -20,7 +20,12 @@ func aliveCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "UNKNOWN METHOD", http.StatusBadRequest)
 		return
 	}
-	ipParts := strings.Split(r.RemoteAddr, ":")
+
+	rIp := r.Header.Get("X-Forwarded-For")
+	if rIp == "" {
+		rIp = r.RemoteAddr
+	}
+	ipParts := strings.Split(rIp, ":")
 	if len(ipParts) < 1 {
 		context.Logger.Error("Could not split remote address %s", r.RemoteAddr)
 		http.Error(w, "INTERNAL ERROR", http.StatusInternalServerError)
