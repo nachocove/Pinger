@@ -18,6 +18,7 @@ from boto.ec2.autoscale import AutoScalingGroup
 from boto.vpc import VPCConnection
 import configparser
 import StringIO
+import pem
 
 # get region from region_name
 def get_region(region_name):
@@ -365,6 +366,9 @@ def load_config_from_s3(s3_config):
     pinger_config = configparser.ConfigParser()
     pinger_config.read_file(buf)
     s3_config["pinger_config"] = pinger_config
+    certs = pem.parse(s3_config["s3_files"]["cert_spem"])
+    s3_config["certs"] = certs
+    s3_config["first_cert_pem"] = certs[0].pem_str
 
 # load json config
 def json_config(file_name):
@@ -411,7 +415,7 @@ def provision_pinger(config):
         add_rules_to_sg(conn, elb_sg, elb_sg_config["ingress-rules"], True)
         add_rules_to_sg(conn, elb_sg, elb_sg_config["egress-rules"], False)
         elb = create_elb(aws_config["region_name"], vpc, subnet, elb_sg, vpc_config["name"] + "-ELB",
-                         elb_config, s3_config["s3_files"]["cert"])
+                         elb_config, s3_config["first_cert_pem"])
         ins_sg_config = config["autoscale_config"]["sg_config"]
         ins_sg = create_sg(conn, vpc, vpc_config["name"]+ins_sg_config["name"]+"-SG",
                            ins_sg_config["description"] + " for " + vpc_config["name"])

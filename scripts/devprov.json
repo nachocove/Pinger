@@ -6,8 +6,8 @@
     "s3_config": {
           "s3_bucket": "nchoconfal",
           "s3_filenames": {
-            "cert": "/devpinger/pinger/devCerts.crt",
-            "key": "/devpinger/pinger/devCerts.key",
+            "cert_spem": "/devpinger/pinger/pingercerts.pem",
+            "key_pem": "/devpinger/pinger/pingerkey.pem",
             "pinger_config": "/devpinger/pinger/pinger.cfg"
           }
     },
