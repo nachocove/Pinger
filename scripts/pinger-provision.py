@@ -16,6 +16,8 @@ from boto.exception import S3ResponseError, EC2ResponseError, BotoServerError
 from boto.ec2.autoscale import LaunchConfiguration
 from boto.ec2.autoscale import AutoScalingGroup
 from boto.vpc import VPCConnection
+import configparser
+import StringIO
 
 # get region from region_name
 def get_region(region_name):
@@ -319,7 +321,7 @@ def create_elb(region_name, vpc, subnet, sg, name, config, cert):
             interval = config["health_check"]["interval"],
             healthy_threshold = config["health_check"]["healthy_threshold"],
             unhealthy_threshold = config["health_check"]["unhealthy_threshold"],
-            target = config["health_check"]["target"]
+            target = config["health_check"]["target"] + config["alive-check-token"]
         )
         elb.configure_health_check(hc)
         pkp_name = "PublicKeyPolicy-%s-BackendCert" % elb.name
@@ -359,6 +361,10 @@ def load_config_from_s3(s3_config):
         s3_key = Key(bucket, s3_config["s3_filenames"][key])
         s3_files[key] = s3_key.get_contents_as_string()
     s3_config["s3_files"] = s3_files
+    buf = StringIO.StringIO(s3_config["s3_files"]["pinger_config"])
+    pinger_config = configparser.ConfigParser()
+    pinger_config.read_file(buf)
+    s3_config["pinger_config"] = pinger_config
 
 # load json config
 def json_config(file_name):
@@ -387,6 +393,7 @@ def provision_pinger(config):
     as_config = config["autoscale_config"]
     elb_config = config["elb_config"]
     load_config_from_s3(s3_config)
+    elb_config["alive-check-token"] = s3_config["pinger_config"]["server"]["alive-check-token"].strip('"')
 
     print "Provisioning Pinger %s" % vpc_config["name"]
     # create connection

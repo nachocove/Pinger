@@ -8,7 +8,7 @@
           "s3_filenames": {
             "cert": "/devpinger/pinger/devCerts.crt",
             "key": "/devpinger/pinger/devCerts.key",
-            "config": "/devpinger/pinger/pinger.cfg"
+            "pinger_config": "/devpinger/pinger/pinger.cfg"
           }
     },
     "vpc_config": {
@@ -26,7 +26,7 @@
             "interval" :20,
             "healthy_threshold": 3,
             "unhealthy_threshold": 5,
-            "target": "HTTPS:8443/1/alive?token=7701056ede5b4717babf239d215efaf0"
+            "target": "HTTPS:8443/1/alive?token="
         },
       "elb_port": 443,
       "backend_port": 8443,
