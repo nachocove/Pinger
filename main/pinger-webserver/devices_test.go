@@ -40,7 +40,7 @@ func (s *devicesTester) SetupSuite() {
 		Port:     s.rpcTestPort,
 	}
 	s.pingerConfig = Pinger.NewConfiguration()
-	s.pingerConfig.Db.Type = "sqlite"
+	s.pingerConfig.Db.Type = Pinger.DBTypeSqlite
 	s.pingerConfig.Db.Filename = ":memory:"
 	s.pingerConfig.Rpc = rpcConfig
 
