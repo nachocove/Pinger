@@ -52,6 +52,7 @@ const (
 	KeyComparisonGt KeyComparisonType = iota
 	KeyComparisonLt KeyComparisonType = iota
 )
+
 func (c KeyComparisonType) String() string {
 	return string(*c.awsComparison())
 }
@@ -226,7 +227,7 @@ func (d *DynamoDb) CreateTableReq(tableName string, attributes []DBAttrDefinitio
 	createReq := dynamodb.CreateTableInput{
 		TableName: aws.String(tableName),
 	}
-	
+
 	createReq.AttributeDefinitions = make([]dynamodb.AttributeDefinition, 0, 1)
 	for _, a := range attributes {
 		attr := dynamodb.AttributeDefinition{AttributeName: aws.String(a.Name), AttributeType: a.Type.AwsString()}
