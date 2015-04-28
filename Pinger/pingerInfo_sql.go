@@ -33,6 +33,8 @@ func addPingerInfoTable(dbmap *gorp.DbMap) {
 	cMap = tMap.ColMap("Pinger")
 	cMap.SetNotNull(true)
 	cMap.SetUnique(true)
+	
+	createPingerInfoSqlStatements(dbmap.Dialect)
 }
 
 const (
@@ -41,8 +43,20 @@ const (
 
 var getPingerSql string
 
-func init() {
-	getPingerSql = fmt.Sprintf("select * from %s where %s=?", PingerTableName, piPingerField.Tag.Get("db"))
+func createPingerInfoSqlStatements(dialect gorp.Dialect) {
+	_, isSqlite := dialect.(gorp.SqliteDialect)
+	_, isMysql := dialect.(gorp.MySQLDialect)
+	_, isPostgres := dialect.(gorp.PostgresDialect)
+	switch {
+	case isSqlite || isMysql:
+		getPingerSql = fmt.Sprintf("select * from %s where %s=?", PingerTableName, piPingerField.Tag.Get("db"))
+
+	case isPostgres:
+		getPingerSql = fmt.Sprintf("select * from %s where %s=$1", PingerTableName, piPingerField.Tag.Get("db"))
+		
+	default:
+		panic("Unknown db dialect")
+	}
 }
 
 func (h *PingerInfoDbHandleSql) update(pinger *PingerInfo) (int64, error) {

@@ -108,21 +108,44 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) {
 
 	cMap = tMap.ColMap("SessionId")
 	cMap.SetNotNull(true)
+	
+	createDeviceInfoSqlStatements(dbmap.Dialect)
 }
 
 var getAllMyDeviceInfoSql string
 var distinctPushServiceTokenSql string
 var clientContextsSql string
 
-func init() {
-	getAllMyDeviceInfoSql = fmt.Sprintf("select * from %s where %s=?",
-		deviceTableName,
-		diPingerField.Tag.Get("db"))
-	distinctPushServiceTokenSql = fmt.Sprintf("select distinct %s, %s from %s where %s=?",
-		diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"),
-		deviceTableName,
-		diPingerField.Tag.Get("db"),
-	)
-	clientContextsSql = fmt.Sprintf("select distinct %s from %s where %s=? and %s=?",
-		diClientContextField.Tag.Get("db"), deviceTableName, diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"))
+func createDeviceInfoSqlStatements(dialect gorp.Dialect) {
+	_, isSqlite := dialect.(gorp.SqliteDialect)
+	_, isMysql := dialect.(gorp.MySQLDialect)
+	_, isPostgres := dialect.(gorp.PostgresDialect)
+	switch {
+	case isSqlite || isMysql:
+		getAllMyDeviceInfoSql = fmt.Sprintf("select * from %s where %s=$1",
+			deviceTableName,
+			diPingerField.Tag.Get("db"))
+		distinctPushServiceTokenSql = fmt.Sprintf("select distinct %s, %s from %s where %s=$1",
+			diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"),
+			deviceTableName,
+			diPingerField.Tag.Get("db"),
+		)
+		clientContextsSql = fmt.Sprintf("select distinct %s from %s where %s=$1 and %s=$2",
+			diClientContextField.Tag.Get("db"), deviceTableName, diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"))
+
+	case isPostgres:
+		getAllMyDeviceInfoSql = fmt.Sprintf("select * from %s where %s=$1",
+			deviceTableName,
+			diPingerField.Tag.Get("db"))
+		distinctPushServiceTokenSql = fmt.Sprintf("select distinct %s, %s from %s where %s=$1",
+			diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"),
+			deviceTableName,
+			diPingerField.Tag.Get("db"),
+		)
+		clientContextsSql = fmt.Sprintf("select distinct %s from %s where %s=$1 and %s=$2",
+			diClientContextField.Tag.Get("db"), deviceTableName, diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"))
+		
+	default:
+		panic("Unknown db dialect")
+	}
 }
