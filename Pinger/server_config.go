@@ -1,12 +1,14 @@
 package Pinger
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"strings"
@@ -68,18 +70,23 @@ func (cfg *ServerConfiguration) validate() error {
 	if cfg.TokenAuthKey != "" {
 		fmt.Fprintf(os.Stderr, "TokenAuthKey is deprecated and will be ignored. Please remove it from the config.\n")
 	}
+	return cfg.initAes()
+}
 
-	aesKey := make([]byte, 32)
-	_, err := rand.Read(aesKey)
-	if err != nil {
-		panic(err)
-	}
-	cfg.aesKey = aesKey
+func (cfg *ServerConfiguration) initAes() error {
+	if cfg.aesKey == nil {
+		aesKey := make([]byte, 32)
+		_, err := rand.Read(aesKey)
+		if err != nil {
+			panic(err)
+		}
+		cfg.aesKey = aesKey
 
-	// test the key
-	_, err = aes.NewCipher(cfg.aesKey)
-	if err != nil {
-		return err
+		// test the key
+		_, err = aes.NewCipher(cfg.aesKey)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -115,27 +122,59 @@ func (cfg *ServerConfiguration) CheckToken(token string) bool {
 }
 
 func (cfg *ServerConfiguration) CreateAuthToken(clientId, clientContext, deviceId string) (string, error) {
+	err := cfg.initAes()
+	if err != nil {
+		return "", err
+	}
+
 	block, err := aes.NewCipher(cfg.aesKey)
 	if err != nil {
 		return "", err
 	}
-	str := fmt.Sprintf("%d::%s::%s::%s", time.Now().UTC().Unix(), clientId, clientContext, deviceId)
-	ciphertext := make([]byte, aes.BlockSize+len(str))
-	iv := ciphertext[:aes.BlockSize]
+	var b bytes.Buffer
+	blocksize := aes.BlockSize
+
+	str := fmt.Sprintf("%d::%s::%s::%s::", time.Now().UTC().Unix(), clientId, clientContext, deviceId)
+	outBlocks := len(str) / blocksize
+	if len(str)%blocksize != 0 {
+		outBlocks++
+	}
+	ciphertext := make([]byte, outBlocks*blocksize)
+	copy(ciphertext, []byte(str))
+
+	mac := hmac.New(sha256.New, cfg.aesKey)
+	mac.Write(ciphertext)
+	expectedMAC := mac.Sum(nil)
+	b.Write(expectedMAC)
+
+	iv := make([]byte, blocksize)
 	// TODO Check the RNG algorithm
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+	_, err = rand.Read(iv)
+	if err != nil {
 		return "", err
 	}
-	// TODO Check this code for forgeability. Make sure it's encrypted and auth'd (hmac + encryption)
-	cfb := cipher.NewCFBEncrypter(block, iv)
-	cfb.XORKeyStream(ciphertext[aes.BlockSize:], []byte(str))
-	b64 := base64.StdEncoding.EncodeToString(ciphertext)
+	b.Write(iv)
+
+
+	mode := cipher.NewCBCEncrypter(block, iv)
+	mode.CryptBlocks(ciphertext, ciphertext)
+	b.Write(ciphertext)
+
+	b64 := base64.StdEncoding.EncodeToString(b.Bytes())
 	return b64, nil
 }
 
 func (cfg *ServerConfiguration) ValidateAuthToken(clientId, clientContext, deviceId, token string) (time.Time, error) {
-	// TODO Check length on token so base64 decoding doesn't blow up
 	errTime := time.Time{}
+	if len(token) > 500 {
+		return errTime, fmt.Errorf("token length seems excessive")
+	}
+
+	err := cfg.initAes()
+	if err != nil {
+		return errTime, err
+	}
+	// TODO Check length on token so base64 decoding doesn't blow up
 	block, err := aes.NewCipher(cfg.aesKey)
 	if err != nil {
 		return errTime, err
@@ -144,24 +183,38 @@ func (cfg *ServerConfiguration) ValidateAuthToken(clientId, clientContext, devic
 	if err != nil {
 		return errTime, err
 	}
-	if len(data) < aes.BlockSize {
+
+	// do sanity checks on the string.
+	if len(data) < 2*aes.BlockSize+sha256.BlockSize {
 		return errTime, fmt.Errorf("ciphertext too short")
 	}
-	// do a sanity check on the string.
-	if len(data) > 512 {
+	if len(data) > 10*aes.BlockSize+sha256.BlockSize {
 		return errTime, fmt.Errorf("data exceeds acceptable limits")
 	}
 
-	iv := []byte(data[:aes.BlockSize])
-	text := []byte(data[aes.BlockSize:])
-	cfb := cipher.NewCFBDecrypter(block, iv)
-	cfb.XORKeyStream(text, text)
-	if err != nil {
-		return errTime, err
+	i := 0
+	sentHmac := data[0:len(cfg.aesKey)]
+	i += len(cfg.aesKey)
+
+	iv := make([]byte, aes.BlockSize)
+	copy(iv, data[i:i+aes.BlockSize])
+	i += aes.BlockSize
+
+	text := data[i:]
+
+	mode := cipher.NewCBCDecrypter(block, iv)
+	mode.CryptBlocks(text, text)
+
+	mac := hmac.New(sha256.New, cfg.aesKey)
+	mac.Write(text)
+	expectedMAC := mac.Sum(nil)
+
+	if !hmac.Equal(sentHmac, expectedMAC) {
+		return errTime, fmt.Errorf("Message does not pass the hmac check")
 	}
 
 	parts := strings.Split(string(text), "::")
-	if len(parts) != 4 {
+	if len(parts) != 5 { // Why 5? 4 parts plus any encryption-added padding.
 		return errTime, fmt.Errorf("Bad tokenized string %s", string(text))
 	}
 	var timestamp int64
