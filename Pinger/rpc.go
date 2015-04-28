@@ -2,7 +2,6 @@ package Pinger
 
 import (
 	"fmt"
-	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"io/ioutil"
@@ -79,6 +78,7 @@ type BackendPoller interface {
 	Defer(args *DeferPollArgs, reply *PollingResponse) (err error)
 	LockMap()
 	UnlockMap()
+	DBHandler() DBHandler
 }
 
 type pollMapType map[string]MailClientContextType
@@ -95,10 +95,10 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 	rpcServer := rpc.NewServer()
 	rpcServer.Register(pollingAPI)
 	go FeedbackListener(logger)
-	go alertAllDevices(pollingAPI.dbm, pollingAPI.aws, pollingAPI.logger)
+	go alertAllDevices(pollingAPI.dbHandler, pollingAPI.logger)
 
 	if config.Backend.PingerUpdater > 0 {
-		pinger, err := newPingerInfo(newPingerInfoSqlHandler(pollingAPI.dbm), logger)
+		pinger, err := newPingerInfo(pollingAPI.dbHandler, logger)
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func (sa *StartPollArgs) pollMapKey() string {
 func (sa *StartPollArgs) getLogPrefix() string {
 	return sa.MailInfo.getLogPrefix()
 }
-func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *StartPollArgs, reply *StartPollingResponse, logger *Logging.Logger) (err error) {
+func RPCStartPoll(t BackendPoller, pollMap *pollMapType, args *StartPollArgs, reply *StartPollingResponse, logger *Logging.Logger) (err error) {
 	defer func() {
 		e := Utils.RecoverCrash(logger)
 		if e != nil {
@@ -267,7 +267,7 @@ type PollingResponse struct {
 	Message string
 }
 
-func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *StopPollArgs, reply *PollingResponse, logger *Logging.Logger) (err error) {
+func RPCStopPoll(t BackendPoller, pollMap *pollMapType, args *StopPollArgs, reply *PollingResponse, logger *Logging.Logger) (err error) {
 	defer func() {
 		e := Utils.RecoverCrash(logger)
 		if e != nil {
@@ -320,7 +320,7 @@ func (dp *DeferPollArgs) getLogPrefix() string {
 	return dp.logPrefix
 }
 
-func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *DeferPollArgs, reply *PollingResponse, logger *Logging.Logger) (err error) {
+func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, args *DeferPollArgs, reply *PollingResponse, logger *Logging.Logger) (err error) {
 	defer func() {
 		e := Utils.RecoverCrash(logger)
 		if e != nil {
@@ -380,7 +380,7 @@ func (fs *FindSessionsArgs) getLogPrefix() string {
 	return fs.logPrefix
 }
 
-func RPCFindActiveSessions(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *FindSessionsArgs, reply *FindSessionsResponse, logger *Logging.Logger) (err error) {
+func RPCFindActiveSessions(t BackendPoller, pollMap *pollMapType, args *FindSessionsArgs, reply *FindSessionsResponse, logger *Logging.Logger) (err error) {
 	defer func() {
 		e := Utils.RecoverCrash(logger)
 		if e != nil {
@@ -427,7 +427,7 @@ type AliveCheckResponse struct {
 	Message string
 }
 
-func RPCAliveCheck(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *AliveCheckArgs, reply *AliveCheckResponse, logger *Logging.Logger) (err error) {
+func RPCAliveCheck(t BackendPoller, pollMap *pollMapType, args *AliveCheckArgs, reply *AliveCheckResponse, logger *Logging.Logger) (err error) {
 	defer func() {
 		e := Utils.RecoverCrash(logger)
 		if e != nil {
@@ -438,7 +438,7 @@ func RPCAliveCheck(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args 
 	if globals.config.PingerUpdater > 0 {
 		logger.Warning("Running both auto-updater and a remote Alive Check")
 	}
-	_, err = newPingerInfo(newPingerInfoSqlHandler(dbm), logger) // this updates the timestamp
+	_, err = newPingerInfo(t.DBHandler(), logger) // this updates the timestamp
 	if err != nil {
 		return err
 	}

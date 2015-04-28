@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"github.com/nachocove/Pinger/Pinger"
 	"net/http"
+	"reflect"
+	"regexp"
 	"strings"
 )
 
@@ -60,39 +62,58 @@ func (pd *registerPostData) getLogPrefix() string {
 }
 
 // Validate validate the structure/information to make sure required information exists.
-func (pd *registerPostData) Validate() (bool, []string) {
+func (pd *registerPostData) Validate() error {
 	// TODO Enhance this function to do more security validation.
-	ok := true
-	MissingFields := []string{}
-	if pd.ClientId == "" {
-		MissingFields = append(MissingFields, "ClientId")
-		ok = false
+	errors := make([]string, 0, 0)
+	requiredFields := []string{
+		"ClientId", "ClientContext", "DeviceId", "MailServerUrl", "Protocol", "Platform", "OSVersion", "WaitBeforeUse",
 	}
-	if pd.ClientContext == "" {
-		MissingFields = append(MissingFields, "ClientContext")
-		ok = false
+	missing := []string{}
+	vReflect := reflect.Indirect(reflect.ValueOf(pd))
+	for _, f := range requiredFields {
+		switch vReflect.FieldByName(f).Interface().(type) {
+		case string:
+			if vReflect.FieldByName(f).Len() == 0 {
+				missing = append(missing, f)
+			}
+
+		case int64:
+			if vReflect.FieldByName(f).Int() == 0 {
+				missing = append(missing, f)
+			}
+		}
 	}
-	if pd.DeviceId == "" {
-		MissingFields = append(MissingFields, "DeviceId")
-		ok = false
+	if pd.Platform != "" {
+		matched, err := regexp.MatchString("(ios|android)", pd.Platform)
+		if err != nil {
+			errors = append(errors, err.Error())
+		} else {
+			if matched == false {
+				errors = append(errors, fmt.Sprintf("Platform %s is not known", pd.Platform))
+			}
+		}
 	}
-	if pd.MailServerUrl == "" {
-		MissingFields = append(MissingFields, "MailServerUrl")
-		ok = false
+	if pd.Protocol != "" {
+		switch pd.Protocol {
+		case Pinger.MailClientActiveSync:
+			if len(pd.RequestData) <= 0 {
+				missing = append(missing, "RequestData")
+			}
+			if len(pd.NoChangeReply) <= 0 {
+				missing = append(missing, "NoChangeReply")
+			}
+		default:
+			errors = append(errors, fmt.Sprintf("Protocol %s is not known", pd.Protocol))
+		}
 	}
-	if len(pd.RequestData) <= 0 {
-		MissingFields = append(MissingFields, "RequestData")
-		ok = false
+
+	if len(missing) > 0 {
+		errors = append(errors, fmt.Sprintf("Missing required fields: %s", strings.Join(missing, ",")))
 	}
-	if len(pd.NoChangeReply) <= 0 {
-		MissingFields = append(MissingFields, "NoChangeReply")
-		ok = false
+	if len(errors) > 0 {
+		return fmt.Errorf(strings.Join(errors, ","))
 	}
-	if pd.ClientContext == "" {
-		MissingFields = append(MissingFields, "ClientContext")
-		ok = false
-	}
-	return ok, MissingFields
+	return nil
 }
 
 func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInformation {
@@ -170,10 +191,10 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
 		return
 	}
-	ok, missingFields := postInfo.Validate()
-	if ok == false {
-		context.Logger.Warning("%s: Missing non-optional data: %s", postInfo.getLogPrefix(), strings.Join(missingFields, ","))
-		responseError(w, MissingRequiredData, strings.Join(missingFields, ","))
+	err := postInfo.Validate()
+	if err != nil {
+		context.Logger.Warning("%s: Missing non-optional data: %s", postInfo.getLogPrefix(), err)
+		responseError(w, MissingRequiredData, err.Error())
 		return
 	}
 	token, err := context.Config.Server.CreateAuthToken(postInfo.ClientId, postInfo.ClientContext, postInfo.DeviceId)

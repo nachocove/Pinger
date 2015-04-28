@@ -17,8 +17,8 @@ type exchangeTester struct {
 func (s *exchangeTester) SetupSuite() {
 	var err error
 	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
-	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
-	s.dbmap, err = initDB(&dbconfig, true, s.logger)
+	dbconfig := DBConfiguration{Type: DBTypeSqlite, Filename: ":memory:"}
+	s.dbmap, err = dbconfig.initDB(true, s.logger)
 	if err != nil {
 		panic("Could not create DB")
 	}

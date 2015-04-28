@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/coopernurse/gorp"
 	"github.com/looplab/fsm"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/AWS"
@@ -19,7 +18,6 @@ import (
 type MailClientContextType interface {
 	deferPoll(timeout int64)
 	stop()
-	updateLastContact() error
 	Status() (MailClientStatus, error)
 	setStatus(MailClientStatus, error)
 	Action(action PingerCommand) error
@@ -120,7 +118,7 @@ const (
 	DefaultMaxPollTimeout int64 = 2 * 24 * 60 * 60 * 1000 // 2 days in milliseconds
 )
 
-func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
+func NewMailClientContext(db DBHandler, aws AWS.AWSHandler, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
 	client := &MailClientContext{
 		logger:          logger.Copy(),
 		stopAllCh:       make(chan int),
@@ -144,17 +142,12 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 
 	client.logger.SetCallDepth(1)
 
-	di, err := pi.newDeviceInfo(newDeviceInfoSqlHandler(dbm), aws, logger)
+	di, err := pi.newDeviceInfo(db, aws, logger)
 	if err != nil {
 		return nil, err
 	}
 	if di == nil {
 		panic("Could not create device info")
-	}
-	client.Debug("Validating client info")
-	err = di.validateClient()
-	if err != nil {
-		return nil, err
 	}
 	client.di = di
 	if doStats {
@@ -181,7 +174,6 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 	if mailclient == nil {
 		return nil, fmt.Errorf("%s: Could not create new Mail Client Pinger", pi.getLogPrefix())
 	}
-	client.updateLastContact()
 	client.Debug("Starting polls for %s", pi.String())
 	client.mailClient = mailclient
 	go client.start()
@@ -498,11 +490,7 @@ func (client *MailClientContext) stop() {
 		return
 	}
 	client.Debug("Stopping polls")
-	err := client.updateLastContact()
-	if err != nil {
-		client.Error("Could not update last contact: %s", err.Error())
-	}
-	err = client.Action(PingerStop)
+	err := client.Action(PingerStop)
 	if err != nil {
 		client.Error("Could not send stop action: %s", err.Error())
 	}
@@ -515,22 +503,14 @@ func (client *MailClientContext) deferPoll(timeout int64) {
 		return
 	}
 	client.Debug("Deferring polls")
-	err := client.updateLastContact()
-	if err != nil {
-		client.Error("Could not update last contact: %s", err.Error())
-	}
 	if timeout > 0 {
 		client.WaitBeforeUse = timeout
 	}
-	err = client.Action(PingerDefer)
+	err := client.Action(PingerDefer)
 	if err != nil {
 		client.Error("Could not send defer action: %s", err.Error())
 
 	}
-}
-
-func (client *MailClientContext) updateLastContact() error {
-	return client.di.updateLastContact()
 }
 
 type ClientSessionInfo struct {

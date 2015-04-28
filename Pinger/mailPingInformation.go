@@ -75,29 +75,6 @@ func (pi *MailPingInformation) cleanup() {
 	pi.AppBuildVersion = ""
 }
 
-// Validate validate the structure/information to make sure required information exists.
-func (pi *MailPingInformation) Validate() bool {
-	// TODO more checking of all fields, since this is all 'user input', including URL for sanity
-	// TODO Check the sanity of the Expected replies. Perhaps use some 'reasonable' max?
-	if pi.ClientId == "" || pi.MailServerUrl == "" {
-		return false
-	}
-	switch {
-	case pi.Protocol == MailClientActiveSync:
-		if len(pi.RequestData) <= 0 || len(pi.HttpHeaders) <= 0 {
-			return false
-		}
-	case pi.Protocol == MailClientIMAP:
-		// not yet supported
-		return false
-
-	default:
-		// unknown protocols are never supported
-		return false
-	}
-	return true
-}
-
 func (pi *MailPingInformation) getLogPrefix() string {
 	if pi.logPrefix == "" {
 		pi.logPrefix = fmt.Sprintf("%s:%s:%s:%s", pi.DeviceId, pi.ClientId, pi.ClientContext, pi.SessionId)
@@ -105,7 +82,7 @@ func (pi *MailPingInformation) getLogPrefix() string {
 	return pi.logPrefix
 }
 
-func (pi *MailPingInformation) newDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, logger *Logging.Logger) (*DeviceInfo, error) {
+func (pi *MailPingInformation) newDeviceInfo(db DBHandler, aws AWS.AWSHandler, logger *Logging.Logger) (*DeviceInfo, error) {
 	var err error
 	di, err := getDeviceInfo(db, aws, pi.ClientId, pi.ClientContext, pi.DeviceId, pi.SessionId, logger)
 	if err != nil {
@@ -132,22 +109,15 @@ func (pi *MailPingInformation) newDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWS
 		if di == nil {
 			return nil, fmt.Errorf("Could not create DeviceInfo")
 		}
-		err = db.insert(di)
+		err = di.insert(db)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		_, err := di.updateDeviceInfo(pi.PushService, pi.PushToken, pi.Platform, pi.OSVersion, pi.AppBuildVersion, pi.AppBuildNumber)
+		_, err := di.updateDeviceInfo(pi.PushService, pi.PushToken)
 		if err != nil {
 			return nil, err
 		}
-	}
-	dc, err := di.getContactInfoObj(true)
-	if err != nil {
-		return nil, err
-	}
-	if dc == nil {
-		panic("Could not create DeviceContact record")
 	}
 	return di, nil
 }

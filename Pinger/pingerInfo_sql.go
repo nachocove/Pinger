@@ -4,9 +4,19 @@ import (
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
-	"reflect"
-	"time"
 )
+
+type PingerInfoDbHandleSql struct {
+	db *DBHandleSql
+}
+
+func newPingerInfoDbHandleSql(db DBHandler) PingerInfoDbHandler {
+	return &PingerInfoDbHandleSql{db.(*DBHandleSql)}
+}
+
+func (h *PingerInfoDbHandleSql) createTable() error {
+	return nil
+}
 
 func addPingerInfoTable(dbmap *gorp.DbMap) {
 	tMap := dbmap.AddTableWithName(PingerInfo{}, PingerTableName)
@@ -23,74 +33,53 @@ func addPingerInfoTable(dbmap *gorp.DbMap) {
 	cMap = tMap.ColMap("Pinger")
 	cMap.SetNotNull(true)
 	cMap.SetUnique(true)
+
+	createPingerInfoSqlStatements(dbmap.Dialect)
 }
 
 const (
 	PingerTableName string = "pinger_info"
 )
 
-type PingerInfoSqlHandler struct {
-	PingerInfoDbHandler
-	dbm *gorp.DbMap
-}
-
-func newPingerInfoSqlHandler(dbm *gorp.DbMap) *PingerInfoSqlHandler {
-	return &PingerInfoSqlHandler{dbm: dbm}
-}
-
 var getPingerSql string
 
-func init() {
-	var pingerInfoReflection reflect.Type
-	var pingerField reflect.StructField
-	var ok bool
-	pingerInfoReflection = reflect.TypeOf(PingerInfo{})
-	pingerField, ok = pingerInfoReflection.FieldByName("Pinger")
-	if ok == false {
-		panic("Could not get Pinger Field information")
+func createPingerInfoSqlStatements(dialect gorp.Dialect) {
+	_, isSqlite := dialect.(gorp.SqliteDialect)
+	_, isMysql := dialect.(gorp.MySQLDialect)
+	_, isPostgres := dialect.(gorp.PostgresDialect)
+	switch {
+	case isSqlite || isMysql:
+		getPingerSql = fmt.Sprintf("select * from %s where %s=?", PingerTableName, piPingerField.Tag.Get("db"))
+
+	case isPostgres:
+		getPingerSql = fmt.Sprintf("select * from %s where %s=$1", PingerTableName, piPingerField.Tag.Get("db"))
+
+	default:
+		panic("Unknown db dialect")
 	}
-	getPingerSql = fmt.Sprintf("select * from %s where %s=?", PingerTableName, pingerField.Tag.Get("db"))
 }
 
-func (h *PingerInfoSqlHandler) update(pinger *PingerInfo) (int64, error) {
-	n, err := h.dbm.Update(pinger)
-	if err != nil {
-		panic(fmt.Sprintf("update error: %s", err.Error()))
-	}
-	return n, nil
+func (h *PingerInfoDbHandleSql) update(pinger *PingerInfo) (int64, error) {
+	return h.db.update(pinger, "")
 }
 
-func (h *PingerInfoSqlHandler) insert(pinger *PingerInfo) error {
-	return h.dbm.Insert(pinger)
+func (h *PingerInfoDbHandleSql) insert(pinger *PingerInfo) error {
+	return h.db.insert(pinger, "")
 }
 
-func (h *PingerInfoSqlHandler) delete(pinger *PingerInfo) (int64, error) {
-	return h.dbm.Delete(pinger)
+func (h *PingerInfoDbHandleSql) delete(pinger *PingerInfo) (int64, error) {
+	return h.db.delete(pinger, "", nil)
 }
 
-func (h *PingerInfoSqlHandler) get(keys []AWS.DBKeyValue) (*PingerInfo, error) {
-	args := make([]interface{}, 0, len(keys))
-	for _, a := range keys {
-		if a.Comparison != AWS.KeyComparisonEq {
-			panic("Can only use KeyComparisonEq for get")
-		}
-		args = append(args, a.Value)
-	}
-	obj, err := h.dbm.Get(&PingerInfo{}, args...)
+func (h *PingerInfoDbHandleSql) get(keys []AWS.DBKeyValue) (*PingerInfo, error) {
+	obj, err := h.db.get(&PingerInfo{}, "", keys)
 	if err != nil {
 		return nil, err
 	}
 	var pinger *PingerInfo
 	if obj != nil {
 		pinger = obj.(*PingerInfo)
-		pinger.db = h
+		pinger.dbHandler = h
 	}
 	return pinger, nil
-
-}
-
-func (pinger *PingerInfo) PreInsert(s gorp.SqlExecutor) error {
-	pinger.Created = time.Now().UnixNano()
-	pinger.Updated = pinger.Created
-	return nil
 }

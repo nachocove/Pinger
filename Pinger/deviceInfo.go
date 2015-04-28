@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
+	"reflect"
 	"regexp"
-	"strings"
+	"time"
 )
 
 type DeviceInfoDbHandler interface {
@@ -15,30 +16,82 @@ type DeviceInfoDbHandler interface {
 	update(di *DeviceInfo) (int64, error)
 	delete(di *DeviceInfo) (int64, error)
 	get(keys []AWS.DBKeyValue) (*DeviceInfo, error)
-	findByPingerId(pingerId string) ([]*DeviceInfo, error)
+	distinctPushServiceTokens(pingerHostId string) ([]DeviceInfo, error)
+	clientContexts(pushService, pushToken string) ([]string, error)
+	getAllMyDeviceInfo(pingerHostId string) ([]DeviceInfo, error)
+	createTable() error
+}
+
+func newDeviceInfoDbHandler(db DBHandler) DeviceInfoDbHandler {
+	if _, ok := db.(*DBHandleSql); ok {
+		return newDeviceInfoSqlHandler(db)
+	} else {
+		return newDeviceInfoDynamoDbHandler(db)
+	}
 }
 
 type DeviceInfo struct {
-	Id              int64  `db:"id"`
-	Created         int64  `db:"created"`
-	Updated         int64  `db:"updated"`
-	ClientId        string `db:"client_id"` // us-east-1a-XXXXXXXX
-	ClientContext   string `db:"client_context"`
-	DeviceId        string `db:"device_id"` // NCHO348348384384.....
-	SessionId       string `db:"session_id"`
-	Platform        string `db:"device_platform"` // "ios", "android", etc..
-	PushToken       string `db:"push_token"`
-	PushService     string `db:"push_service"` // APNS, GCM, ...
-	OSVersion       string `db:"os_version"`
-	AppBuildVersion string `db:"build_version"`
-	AppBuildNumber  string `db:"build_number"`
-	AWSEndpointArn  string `db:"aws_endpoint_arn"`
-	Pinger          string `db:"pinger"`
+	Id            int64  `db:"id" dynamo:"id"`
+	Created       int64  `db:"created" dynamo:"created"`
+	Updated       int64  `db:"updated" dynamo:"updated"`
+	ClientId      string `db:"client_id" dynamo:"client_id"` // us-east-1a-XXXXXXXX
+	ClientContext string `db:"client_context" dynamo:"client_context"`
+	DeviceId      string `db:"device_id" dynamo:"device_id"` // NCHO348348384384.....
+	PushToken     string `db:"push_token" dynamo:"push_token"`
+	PushService   string `db:"push_service" dynamo:"push_service"` // APNS, GCM, ...
+	Pinger        string `db:"pinger" dynamo:"pinger"`
+	SessionId     string `db:"session" dynamo:"session"`
 
-	db        DeviceInfoDbHandler `db:"-"`
-	logger    *Logging.Logger     `db:"-"`
-	logPrefix string              `db:"-"`
-	aws       AWS.AWSHandler      `db:"-"`
+	Platform        string `db:"-" dynamo:"-"` // "ios", "android", etc..
+	OSVersion       string `db:"-" dynamo:"-"`
+	AppBuildVersion string `db:"-" dynamo:"-"`
+	AppBuildNumber  string `db:"-" dynamo:"-"`
+
+	dbHandler DeviceInfoDbHandler `db:"-" dynamo:"-"`
+	logger    *Logging.Logger     `db:"-" dynamo:"-"`
+	logPrefix string              `db:"-" dynamo:"-"`
+	aws       AWS.AWSHandler      `db:"-" dynamo:"-"`
+}
+
+var deviceInfoReflection reflect.Type
+var diIdField, diClientIdField, diDeviceIdField, diClientContextField, diSessionIdField, diPingerField,
+	diPushServiceField, diPushTokenField reflect.StructField
+
+func init() {
+	var ok bool
+	deviceInfoReflection = reflect.TypeOf(DeviceInfo{})
+	diIdField, ok = deviceInfoReflection.FieldByName("Id")
+	if ok == false {
+		panic("Could not get Id Field information")
+	}
+	diClientIdField, ok = deviceInfoReflection.FieldByName("ClientId")
+	if ok == false {
+		panic("Could not get ClientId Field information")
+	}
+	diDeviceIdField, ok = deviceInfoReflection.FieldByName("DeviceId")
+	if ok == false {
+		panic("Could not get DeviceId Field information")
+	}
+	diClientContextField, ok = deviceInfoReflection.FieldByName("ClientContext")
+	if ok == false {
+		panic("Could not get ClientContext Field information")
+	}
+	diSessionIdField, ok = deviceInfoReflection.FieldByName("SessionId")
+	if ok == false {
+		panic("Could not get SessionId Field information")
+	}
+	diPingerField, ok = deviceInfoReflection.FieldByName("Pinger")
+	if ok == false {
+		panic("Could not get Pinger Field information")
+	}
+	diPushServiceField, ok = deviceInfoReflection.FieldByName("PushService")
+	if ok == false {
+		panic("Could not get PushService Field information")
+	}
+	diPushTokenField, ok = deviceInfoReflection.FieldByName("PushToken")
+	if ok == false {
+		panic("Could not get PushToken Field information")
+	}
 }
 
 func (di *DeviceInfo) validate() error {
@@ -62,16 +115,8 @@ func (di *DeviceInfo) validate() error {
 			return fmt.Errorf("PushService %s is not known", di.PushService)
 		}
 	}
-	if di.Platform == "" {
-		return errors.New("Platform can not be empty")
-	} else {
-		matched, err := regexp.MatchString("(ios|android)", di.Platform)
-		if err != nil {
-			return err
-		}
-		if matched == false {
-			return fmt.Errorf("Platform %s is not known", di.Platform)
-		}
+	if di.PushToken == "" {
+		return errors.New("PushToken can not be empty")
 	}
 	return nil
 }
@@ -83,7 +128,7 @@ func newDeviceInfo(
 	appBuildVersion, appBuildNumber string,
 	sessionId string,
 	aws AWS.AWSHandler,
-	db DeviceInfoDbHandler,
+	db DBHandler,
 	logger *Logging.Logger) (*DeviceInfo, error) {
 	if sessionId == "" {
 		panic("session ID needs to be set")
@@ -100,7 +145,7 @@ func newDeviceInfo(
 		AppBuildVersion: appBuildVersion,
 		AppBuildNumber:  appBuildNumber,
 		aws:             aws,
-		db:              db,
+		dbHandler:       newDeviceInfoDbHandler(db),
 	}
 	di.SetLogger(logger)
 	err := di.validate()
@@ -139,12 +184,12 @@ func (di *DeviceInfo) Warning(format string, args ...interface{}) {
 }
 
 func (di *DeviceInfo) delete() (int64, error) {
-	return di.db.delete(di)
+	return di.dbHandler.delete(di)
 }
 
 func (di *DeviceInfo) cleanup() {
 	di.Debug("Cleaning up DeviceInfo")
-	n, err := di.db.delete(di)
+	n, err := di.dbHandler.delete(di)
 	if n == 0 {
 		di.Warning("Not deleted from DB!")
 	}
@@ -167,22 +212,20 @@ func (di *DeviceInfo) cleanup() {
 	di.Id = 0
 }
 
-func getDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, clientId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
+func getDeviceInfo(db DBHandler, aws AWS.AWSHandler, clientId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
 	keys := []AWS.DBKeyValue{
-		AWS.DBKeyValue{Key: "clientId", Value: clientId, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "clientContext", Value: clientContext, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "deviceId", Value: deviceId, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "sessionId", Value: sessionId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "ClientId", Value: clientId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "ClientContext", Value: clientContext, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "DeviceId", Value: deviceId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "SessionId", Value: sessionId, Comparison: AWS.KeyComparisonEq},
 	}
-	di, err := db.get(keys)
+	h := newDeviceInfoDbHandler(db)
+	di, err := h.get(keys)
 	if err != nil {
 		return nil, err
 	}
 	if di != nil {
-		if di.db == nil {
-			panic("db handler must fill this in")
-		}
-
+		di.dbHandler = h
 		di.aws = aws
 		di.SetLogger(logger)
 		if di.Pinger != pingerHostId {
@@ -194,57 +237,18 @@ func getDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, clientId, clientC
 	return di, nil
 }
 
-func getAllMyDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, logger *Logging.Logger) ([]*DeviceInfo, error) {
-	devices, err := db.findByPingerId(pingerHostId)
-	if err != nil {
-		return nil, err
-	}
-	for k := range devices {
-		devices[k].aws = aws
-		devices[k].SetLogger(logger)
-	}
-	return devices, nil
-}
-
-func (di *DeviceInfo) updateDeviceInfo(pushService, pushToken, platform, osVersion, appBuildVersion, appBuildNumber string) (bool, error) {
+func (di *DeviceInfo) updateDeviceInfo(pushService, pushToken string) (bool, error) {
 	changed := false
-	deleteAWSEndpoint := false
 
-	if di.OSVersion != osVersion {
-		di.OSVersion = osVersion
-		changed = true
-	}
-	if di.AppBuildVersion != appBuildVersion {
-		di.AppBuildVersion = appBuildVersion
-		changed = true
-	}
-	if di.AppBuildNumber != appBuildNumber {
-		di.AppBuildNumber = appBuildNumber
-		changed = true
-	}
-	if di.Platform != platform {
-		// TODO a change in platform seems unlikely. Should we even allow this? Need to reset all push parameters
-		di.Platform = platform
-		di.PushService = ""
-		di.PushToken = ""
-		di.AWSEndpointArn = ""
-		changed = true
-		deleteAWSEndpoint = true
-	}
 	if di.PushService != pushService {
-		di.Warning("Resetting Token ('%s') and AWSEndpointArn ('%s')", di.PushToken, di.AWSEndpointArn)
+		di.Warning("Resetting Token ('%s')", di.PushToken)
 		di.PushService = pushService
 		di.PushToken = ""
-		di.AWSEndpointArn = ""
 		changed = true
-		deleteAWSEndpoint = true
 	}
 	if di.PushToken != pushToken {
-		di.Warning("Resetting AWSEndpointArn ('%s')", di.AWSEndpointArn)
 		di.PushToken = pushToken
-		di.AWSEndpointArn = ""
 		changed = true
-		deleteAWSEndpoint = true
 	}
 	if changed {
 		n, err := di.update()
@@ -255,99 +259,50 @@ func (di *DeviceInfo) updateDeviceInfo(pushService, pushToken, platform, osVersi
 			return false, errors.New("No rows updated but should have")
 		}
 	}
-	if deleteAWSEndpoint {
-		// TODO if the push token or service change, then the AWS endpoint is no longer valid: We should send a delete to AWS for the endpoint
-		di.Warning("Need to delete the AWS endpoint to clean up")
-	}
 	return changed, nil
 }
 
 func (di *DeviceInfo) update() (int64, error) {
-	if di.db == nil {
+	if di.dbHandler == nil {
 		panic("Can not update device info without having fetched it")
 	}
-	n, err := di.db.update(di)
+	di.Updated = time.Now().UnixNano()
+	if di.Pinger == "" {
+		di.Pinger = pingerHostId
+	}
+	err := di.validate()
+	if err != nil {
+		return 0, err
+	}
+	n, err := di.dbHandler.update(di)
 	if err != nil {
 		panic(fmt.Sprintf("%s: update error: %s", di.getLogPrefix(), err.Error()))
 	}
 	return n, nil
 }
 
-func (di *DeviceInfo) insert(db DeviceInfoDbHandler) error {
-	if db == nil {
-		db = di.db
+func (di *DeviceInfo) insert(db DBHandler) error {
+	if db != nil {
+		di.dbHandler = newDeviceInfoDbHandler(db)
 	}
-	if db == nil {
+	if di.dbHandler == nil {
 		panic("Can not insert device info without db information")
 	}
-	if di.db == nil {
-		di.db = db
+	di.Created = time.Now().UnixNano()
+	di.Updated = di.Created
+
+	if di.Pinger == "" {
+		di.Pinger = pingerHostId
 	}
-	err := db.insert(di)
+	err := di.validate()
+	if err != nil {
+		return err
+	}
+	err = di.dbHandler.insert(di)
 	if err != nil {
 		panic(fmt.Sprintf("%s: insert error: %s", di.getLogPrefix(), err.Error()))
 	}
-	dc, err := di.getContactInfoObj(true)
-	if err != nil {
-		panic(fmt.Sprintf("%s: insert error(1): %s", di.getLogPrefix(), err.Error()))
-	}
-	if dc == nil {
-		panic(fmt.Sprintf("%s: insert error(2)", di.getLogPrefix()))
-	}
 	return nil
-}
-
-func (di *DeviceInfo) getContactInfoObj(insert bool) (*deviceContact, error) {
-	if di.db == nil {
-		panic("Must have fetched di first")
-	}
-	var db DeviceContactDbHandler
-	diSql, ok := di.db.(*DeviceInfoSqlHandler)
-	if ok {
-		db = newDeviceContactSqlDbHandler(diSql.dbm)
-	} else {
-		db = newDeviceContactDynamoDbHandler(di.aws)
-	}
-	dc, err := deviceContactGet(db, di.ClientId, di.ClientContext, di.DeviceId)
-	if err != nil {
-		return nil, err
-	}
-	if dc == nil {
-		if insert {
-			dc = newDeviceContact(db, di.ClientId, di.ClientContext, di.DeviceId)
-			err = dc.insert()
-			if err != nil {
-				panic(err)
-			}
-		} else {
-			return nil, fmt.Errorf("No object found")
-		}
-	}
-	return dc, nil
-}
-
-func (di *DeviceInfo) getContactInfo(insert bool) (int64, int64, error) {
-	dc, err := di.getContactInfoObj(insert)
-	if err != nil {
-		return 0, 0, err
-	}
-	return dc.LastContact, dc.LastContactRequest, nil
-}
-
-func (di *DeviceInfo) updateLastContact() error {
-	dc, err := di.getContactInfoObj(false)
-	if err != nil {
-		return err
-	}
-	return dc.updateLastContact()
-}
-
-func (di *DeviceInfo) updateLastContactRequest() error {
-	dc, err := di.getContactInfoObj(false)
-	if err != nil {
-		return err
-	}
-	return dc.updateLastContactRequest()
 }
 
 type PingerNotification string
@@ -376,10 +331,7 @@ func (di *DeviceInfo) PushNewMail() error {
 func (di *DeviceInfo) Push(message PingerNotification, alert, sound string, contentAvailable int) error {
 	pingerMap := pingerPushMessageMapV2([](*sessionContextMessage){newSessionContextMessage(message, di.ClientContext, di.SessionId)})
 	ttl := globals.config.APNSExpirationSeconds
-	err := Push(di.aws, di.Platform, di.PushService, di.PushToken, di.AWSEndpointArn, alert, sound, contentAvailable, ttl, pingerMap, di.logger)
-	if err == nil {
-		err = di.updateLastContactRequest()
-	}
+	err := Push(di.PushService, di.PushToken, alert, sound, contentAvailable, ttl, pingerMap, di.logger)
 	return err
 }
 
@@ -392,108 +344,4 @@ func (di *DeviceInfo) customerData() string {
 		return ""
 	}
 	return string(customJson)
-}
-
-var alreadyRegisted *regexp.Regexp
-
-func init() {
-	alreadyRegisted = regexp.MustCompile("^.*Endpoint (?P<arn>arn:aws:sns:[^ ]+) already exists.*$")
-}
-
-func (di *DeviceInfo) registerAws() error {
-	var pushToken string
-	var err error
-	var attributes map[string]string
-	need_di_update := false
-	need_attr_update := false
-
-	if di.AWSEndpointArn == "" {
-		// Need to register first
-		switch {
-		case di.PushService == PushServiceAPNS:
-			pushToken, err = AWS.DecodeAPNSPushToken(di.PushToken)
-			if err != nil {
-				return err
-			}
-			if len(pushToken) != 64 {
-				return fmt.Errorf("APNS token length wrong. %d ('%s')", len(pushToken), string(pushToken))
-			}
-
-		default:
-			return fmt.Errorf("Unsupported push service %s:%s", di.PushService, di.PushToken)
-		}
-
-		di.Debug("Registering %s:%s with AWS.", di.PushService, di.PushToken)
-		arn, registerErr := di.aws.RegisterEndpointArn(di.PushService, pushToken, di.customerData())
-		if registerErr != nil {
-			if alreadyRegisted.MatchString(registerErr.Error()) == true {
-				replaceString := fmt.Sprintf("${%s}", alreadyRegisted.SubexpNames()[1])
-				arn = alreadyRegisted.ReplaceAllString(registerErr.Error(), replaceString)
-				di.Warning("Previously registered as %s. Updating.", arn)
-			} else {
-				return registerErr
-			}
-		} else {
-			di.Debug("endpoint created %s", arn)
-		}
-		di.AWSEndpointArn = arn
-		need_di_update = true
-	}
-
-	// fetch the attributes
-	di.Debug("fetching attributes for %s.", di.AWSEndpointArn)
-	attributes, err = di.aws.GetEndpointAttributes(di.AWSEndpointArn)
-	if err != nil {
-		return err
-	}
-	if attributes == nil {
-		panic("attributes should not be nil")
-	}
-	enabled, ok := attributes["Enabled"]
-	if !ok || enabled != "true" {
-		if enabled != "true" {
-			di.Warning("AWS has endpoint disabled. Reenabling it")
-			attributes["Enabled"] = "true"
-			need_attr_update = true
-		}
-	}
-
-	if attributes["Token"] == "" || (pushToken != "" && pushToken != attributes["Token"]) {
-		// need to update the token with aws
-		attributes["Token"] = pushToken
-		need_attr_update = true
-	}
-
-	cd := di.customerData()
-	if cd != attributes["CustomUserData"] {
-		attributes["CustomUserData"] = cd
-		need_attr_update = true
-	}
-	if need_attr_update {
-		di.Debug("Setting new attributes for %s: %+v", di.AWSEndpointArn, attributes)
-		err := di.aws.SetEndpointAttributes(di.AWSEndpointArn, attributes)
-		if err != nil {
-			di.Debug("Could not set attributes")
-			return err
-		}
-	}
-	if need_di_update {
-		di.update()
-	}
-	return nil
-}
-
-func (di *DeviceInfo) validateClient() error {
-	if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
-		// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
-		err := di.registerAws()
-		if err != nil {
-			if di.aws.IgnorePushFailures() == false {
-				return err
-			} else {
-				di.Warning("Registering %s:%s error (ignored): %s", di.PushService, di.PushToken, err.Error())
-			}
-		}
-	}
-	return nil
 }

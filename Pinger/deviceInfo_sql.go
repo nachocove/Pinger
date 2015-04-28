@@ -4,65 +4,71 @@ import (
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
-	"reflect"
-	"time"
 )
 
-type DeviceInfoSqlHandler struct {
-	DeviceInfoDbHandler
-	dbm *gorp.DbMap
+type DeviceInfoDbHandleSql struct {
+	db *DBHandleSql
 }
 
-func newDeviceInfoSqlHandler(dbm *gorp.DbMap) *DeviceInfoSqlHandler {
-	return &DeviceInfoSqlHandler{dbm: dbm}
-}
-func (h *DeviceInfoSqlHandler) insert(di *DeviceInfo) error {
-	return h.dbm.Insert(di)
+func newDeviceInfoSqlHandler(db DBHandler) DeviceInfoDbHandler {
+	return &DeviceInfoDbHandleSql{db.(*DBHandleSql)}
 }
 
-func (h *DeviceInfoSqlHandler) update(di *DeviceInfo) (int64, error) {
-	n, err := h.dbm.Update(di)
-	if err != nil {
-		return n, err
-	}
-	return n, nil
+func (h *DeviceInfoDbHandleSql) createTable() error {
+	return nil
 }
 
-func (h *DeviceInfoSqlHandler) delete(di *DeviceInfo) (int64, error) {
-	return h.dbm.Delete(di)
+func (h *DeviceInfoDbHandleSql) insert(di *DeviceInfo) error {
+	return h.db.insert(di, "")
 }
 
-func (h *DeviceInfoSqlHandler) get(keys []AWS.DBKeyValue) (*DeviceInfo, error) {
-	args := make([]interface{}, 0, len(keys))
-	for _, a := range keys {
-		if a.Comparison != AWS.KeyComparisonEq {
-			panic("Can only use KeyComparisonEq for get")
-		}
-		args = append(args, a.Value)
-	}
-	obj, err := h.dbm.Get(&DeviceInfo{}, args...)
+func (h *DeviceInfoDbHandleSql) update(di *DeviceInfo) (int64, error) {
+	return h.db.update(di, "")
+}
+
+func (h *DeviceInfoDbHandleSql) delete(di *DeviceInfo) (int64, error) {
+	return h.db.delete(di, "", nil)
+}
+
+func (h *DeviceInfoDbHandleSql) get(keys []AWS.DBKeyValue) (*DeviceInfo, error) {
+	obj, err := h.db.get(&DeviceInfo{}, "", keys)
 	if err != nil {
 		return nil, err
 	}
 	var di *DeviceInfo
 	if obj != nil {
 		di = obj.(*DeviceInfo)
-		di.db = h
+		di.dbHandler = h
 	}
 	return di, nil
 }
 
-func (h *DeviceInfoSqlHandler) findByPingerId(pingerId string) ([]*DeviceInfo, error) {
-	var devices []*DeviceInfo
-	var err error
-	_, err = h.dbm.Select(&devices, getAllMyDeviceInfoSql, pingerHostId)
+func (h *DeviceInfoDbHandleSql) distinctPushServiceTokens(pingerHostId string) ([]DeviceInfo, error) {
+	servicesAndTokens := make([]DeviceInfo, 0, 100)
+	_, err := h.db.dbm.Select(&servicesAndTokens, distinctPushServiceTokenSql, pingerHostId)
 	if err != nil {
 		return nil, err
 	}
-	for k := range devices {
-		devices[k].db = h
+	return servicesAndTokens, nil
+}
+
+func (h *DeviceInfoDbHandleSql) clientContexts(pushservice, pushToken string) ([]string, error) {
+	contexts := make([]string, 0, 5)
+	_, err := h.db.dbm.Select(&contexts, clientContextsSql, pushservice, pushToken)
+	if err != nil {
+		return nil, err
 	}
-	return devices, nil
+	return contexts, nil
+}
+
+func (h *DeviceInfoDbHandleSql) getAllMyDeviceInfo(pingerHostId string) ([]DeviceInfo, error) {
+	deviceList := make([]DeviceInfo, 0, 100)
+	_, err := h.db.dbm.Select(&deviceList, getAllMyDeviceInfoSql, pingerHostId)
+	if err != nil {
+		return nil, err
+	}
+
+	return deviceList, nil
 }
 
 const (
@@ -91,85 +97,55 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) {
 	cMap = tMap.ColMap("DeviceId")
 	cMap.SetNotNull(true)
 
-	cMap = tMap.ColMap("Platform")
-	cMap.SetNotNull(true)
-
 	cMap = tMap.ColMap("PushToken")
 	cMap.SetNotNull(true)
 
 	cMap = tMap.ColMap("PushService")
 	cMap.SetNotNull(true)
 
-	cMap = tMap.ColMap("OSVersion")
-	cMap.SetNotNull(false)
-
-	cMap = tMap.ColMap("AppBuildNumber")
-	cMap.SetNotNull(false)
-
-	cMap = tMap.ColMap("AppBuildVersion")
-	cMap.SetNotNull(false)
-
 	cMap = tMap.ColMap("Pinger")
 	cMap.SetNotNull(true)
+
+	cMap = tMap.ColMap("SessionId")
+	cMap.SetNotNull(true)
+
+	createDeviceInfoSqlStatements(dbmap.Dialect)
 }
 
 var getAllMyDeviceInfoSql string
 var distinctPushServiceTokenSql string
 var clientContextsSql string
 
-func init() {
-	var ok bool
-	deviceInfoReflection := reflect.TypeOf(DeviceInfo{})
-	pingerField, ok := deviceInfoReflection.FieldByName("Pinger")
-	if ok == false {
-		panic("Could not get Pinger Field information")
-	}
-	pushServiceField, ok := deviceInfoReflection.FieldByName("PushService")
-	if ok == false {
-		panic("Could not get Pinger Field information")
-	}
-	pushTokenField, ok := deviceInfoReflection.FieldByName("PushToken")
-	if ok == false {
-		panic("Could not get Pinger Field information")
-	}
-	platformField, ok := deviceInfoReflection.FieldByName("Platform")
-	if ok == false {
-		panic("Could not get Pinger Field information")
-	}
-	awsEndpointField, ok := deviceInfoReflection.FieldByName("AWSEndpointArn")
-	if ok == false {
-		panic("Could not get Pinger Field information")
-	}
-	clientContextField, ok := deviceInfoReflection.FieldByName("ClientContext")
-	if ok == false {
-		panic("Could not get Pinger Field information")
-	}
-	getAllMyDeviceInfoSql = fmt.Sprintf("select * from %s where %s=?",
-		deviceTableName,
-		pingerField.Tag.Get("db"))
-	distinctPushServiceTokenSql = fmt.Sprintf("select distinct %s, %s, %s, %s from %s where %s=?",
-		pushServiceField.Tag.Get("db"), pushTokenField.Tag.Get("db"), platformField.Tag.Get("db"), awsEndpointField.Tag.Get("db"),
-		deviceTableName,
-		pingerField.Tag.Get("db"),
-	)
-	clientContextsSql = fmt.Sprintf("select distinct %s from %s where %s=? and %s=?",
-		clientContextField.Tag.Get("db"), deviceTableName, pushServiceField.Tag.Get("db"), pushTokenField.Tag.Get("db"))
-}
+func createDeviceInfoSqlStatements(dialect gorp.Dialect) {
+	_, isSqlite := dialect.(gorp.SqliteDialect)
+	_, isMysql := dialect.(gorp.MySQLDialect)
+	_, isPostgres := dialect.(gorp.PostgresDialect)
+	switch {
+	case isSqlite || isMysql:
+		getAllMyDeviceInfoSql = fmt.Sprintf("select * from %s where %s=$1",
+			deviceTableName,
+			diPingerField.Tag.Get("db"))
+		distinctPushServiceTokenSql = fmt.Sprintf("select distinct %s, %s from %s where %s=$1",
+			diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"),
+			deviceTableName,
+			diPingerField.Tag.Get("db"),
+		)
+		clientContextsSql = fmt.Sprintf("select distinct %s from %s where %s=$1 and %s=$2",
+			diClientContextField.Tag.Get("db"), deviceTableName, diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"))
 
-func (di *DeviceInfo) PreUpdate(s gorp.SqlExecutor) error {
-	di.Updated = time.Now().UnixNano()
-	if di.Pinger == "" {
-		di.Pinger = pingerHostId
-	}
-	return di.validate()
-}
+	case isPostgres:
+		getAllMyDeviceInfoSql = fmt.Sprintf("select * from %s where %s=$1",
+			deviceTableName,
+			diPingerField.Tag.Get("db"))
+		distinctPushServiceTokenSql = fmt.Sprintf("select distinct %s, %s from %s where %s=$1",
+			diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"),
+			deviceTableName,
+			diPingerField.Tag.Get("db"),
+		)
+		clientContextsSql = fmt.Sprintf("select distinct %s from %s where %s=$1 and %s=$2",
+			diClientContextField.Tag.Get("db"), deviceTableName, diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"))
 
-func (di *DeviceInfo) PreInsert(s gorp.SqlExecutor) error {
-	di.Created = time.Now().UnixNano()
-	di.Updated = di.Created
-
-	if di.Pinger == "" {
-		di.Pinger = pingerHostId
+	default:
+		panic("Unknown db dialect")
 	}
-	return di.validate()
 }

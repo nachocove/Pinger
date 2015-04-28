@@ -18,6 +18,17 @@ const (
 	Number DBAttributeType = iota
 )
 
+func (a DBAttributeType) String() string {
+	switch a {
+	case String:
+		return "String"
+
+	case Number:
+		return "Number"
+	}
+	panic("Unknown value")
+}
+
 func (a DBAttributeType) AwsString() aws.StringValue {
 	switch a {
 	case String:
@@ -42,6 +53,10 @@ const (
 	KeyComparisonLt KeyComparisonType = iota
 )
 
+func (c KeyComparisonType) String() string {
+	return string(*c.awsComparison())
+}
+
 func (c KeyComparisonType) awsComparison() aws.StringValue {
 	switch c {
 	case KeyComparisonEq:
@@ -52,6 +67,20 @@ func (c KeyComparisonType) awsComparison() aws.StringValue {
 
 	case KeyComparisonLt:
 		return aws.String("LT")
+	}
+	panic("unknown KeyComparisonType")
+}
+
+func (c KeyComparisonType) awsConditionOperator() aws.StringValue {
+	switch c {
+	case KeyComparisonEq:
+		return aws.String("=")
+
+	case KeyComparisonGt:
+		return aws.String(">")
+
+	case KeyComparisonLt:
+		return aws.String("<")
 	}
 	panic("unknown KeyComparisonType")
 }
@@ -68,6 +97,10 @@ const (
 	KeyTypeHash  KeyType = iota
 	KeyTypeRange KeyType = iota
 )
+
+func (t KeyType) String() string {
+	return *t.awsKeyType()
+}
 
 func (t KeyType) awsKeyType() aws.StringValue {
 	switch t {
@@ -99,6 +132,7 @@ func (ah *AWSHandle) GetDynamoDbSession() *DynamoDb {
 }
 
 func (d *DynamoDb) Get(tableName string, keys []DBKeyValue) (*map[string]interface{}, error) {
+	fmt.Printf("JAN: Getting item %+v\n", keys)
 	dKeys := make(map[string]dynamodb.AttributeValue)
 	for _, k := range keys {
 		if k.Comparison != KeyComparisonEq {
@@ -117,20 +151,19 @@ func (d *DynamoDb) Get(tableName string, keys []DBKeyValue) (*map[string]interfa
 	return awsAttributeMapToGo(&getResp.Item), nil
 }
 
-func (d *DynamoDb) Search(tableName string, attributes []DBKeyValue) ([]map[string]interface{}, error) {
+func (d *DynamoDb) Search(tableName, indexName string, keys []DBKeyValue) ([]map[string]interface{}, error) {
+	fmt.Printf("JAN: Searching %s %v for item %+v\n", tableName, indexName, keys)
 	req := dynamodb.QueryInput{
 		TableName:      aws.String(tableName),
 		ConsistentRead: aws.Boolean(false),
 	}
 
-	// TODO Need to map the keys passed in to an Indexname, if appropriate
-	indexName := ""
 	if indexName != "" {
 		req.IndexName = aws.String(indexName)
 	}
 
 	req.KeyConditions = make(map[string]dynamodb.Condition)
-	for _, attr := range attributes {
+	for _, attr := range keys {
 		req.KeyConditions[attr.Key] = dynamodb.Condition{
 			AttributeValueList: []dynamodb.AttributeValue{goTypeToAttributeValue(attr.Value)},
 			ComparisonOperator: attr.Comparison.awsComparison(),
@@ -149,6 +182,7 @@ func (d *DynamoDb) Search(tableName string, attributes []DBKeyValue) ([]map[stri
 }
 
 func (d *DynamoDb) Insert(tableName string, entry map[string]interface{}) error {
+	fmt.Printf("JAN: Inserting item %+v\n", entry)
 	req := dynamodb.PutItemInput{
 		TableName: aws.StringValue(&tableName),
 		Item:      *goMaptoAwsAttributeMap(&entry),
@@ -161,23 +195,31 @@ func (d *DynamoDb) Insert(tableName string, entry map[string]interface{}) error 
 }
 
 func (d *DynamoDb) Update(tableName string, entry map[string]interface{}) error {
+	fmt.Printf("JAN: Updating item %+v\n", entry)
 	return d.Insert(tableName, entry)
 }
 
-func (d *DynamoDb) Delete(tableName string, entry map[string]interface{}) error {
+func (d *DynamoDb) Delete(tableName string, attributes []DBKeyValue) (int64, error) {
 	req := dynamodb.DeleteItemInput{
 		TableName: aws.StringValue(&tableName),
-		Key:       *goMaptoAwsAttributeMap(&entry),
+		//ReturnItemCollectionMetrics: aws.String("SIZE"),
+	}
+	req.Key = make(map[string]dynamodb.AttributeValue)
+	for _, attr := range attributes {
+		req.Key[attr.Key] = goTypeToAttributeValue(attr.Value)
 	}
 	_, err := d.session.DeleteItem(&req)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	return 1, nil
 }
 
 func (d *DynamoDb) CreateTable(tableDefinition *dynamodb.CreateTableInput) error {
 	_, err := d.session.CreateTable(tableDefinition)
+	if err != nil {
+		panic(err)
+	}
 	return err
 }
 
@@ -200,6 +242,12 @@ func (d *DynamoDb) CreateTableReq(tableName string, attributes []DBAttrDefinitio
 	createReq.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{ReadCapacityUnits: aws.Long(throughput.Read), WriteCapacityUnits: aws.Long(throughput.Write)}
 
 	return &createReq
+}
+
+func (d *DynamoDb) DeleteTable(tableName string) error {
+	req := dynamodb.DeleteTableInput{TableName: aws.String(tableName)}
+	_, err := d.session.DeleteTable(&req)
+	return err
 }
 
 func (d *DynamoDb) AddGlobalSecondaryIndexStruct(createReq *dynamodb.CreateTableInput, indexName string, keys []DBKeyType, throughput ThroughPut) error {
