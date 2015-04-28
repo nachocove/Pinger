@@ -19,6 +19,7 @@ type DeviceInfoDbHandler interface {
 	distinctPushServiceTokens(pingerHostId string) ([]DeviceInfo, error)
 	clientContexts(pushService, pushToken string) ([]string, error)
 	getAllMyDeviceInfo(pingerHostId string) ([]DeviceInfo, error)
+	createTable() error
 }
 
 func newDeviceInfoDbHandler(db DBHandler) DeviceInfoDbHandler {
@@ -46,14 +47,14 @@ type DeviceInfo struct {
 	AppBuildVersion string `db:"-" dynamo:"-"`
 	AppBuildNumber  string `db:"-" dynamo:"-"`
 
-	dbHandler DeviceInfoDbHandler `db:"-"`
-	logger    *Logging.Logger     `db:"-"`
-	logPrefix string              `db:"-"`
-	aws       AWS.AWSHandler      `db:"-"`
+	dbHandler DeviceInfoDbHandler `db:"-" dynamo:"-"`
+	logger    *Logging.Logger     `db:"-" dynamo:"-"`
+	logPrefix string              `db:"-" dynamo:"-"`
+	aws       AWS.AWSHandler      `db:"-" dynamo:"-"`
 }
 
 var deviceInfoReflection reflect.Type
-var diIdField, diClientIdField, diDeviceIdField, diClientContextField, diPingerField,
+var diIdField, diClientIdField, diDeviceIdField, diClientContextField, diSessionIdField, diPingerField,
 	diPushServiceField, diPushTokenField reflect.StructField
 
 func init() {
@@ -74,6 +75,10 @@ func init() {
 	diClientContextField, ok = deviceInfoReflection.FieldByName("ClientContext")
 	if ok == false {
 		panic("Could not get ClientContext Field information")
+	}
+	diSessionIdField, ok = deviceInfoReflection.FieldByName("SessionId")
+	if ok == false {
+		panic("Could not get SessionId Field information")
 	}
 	diPingerField, ok = deviceInfoReflection.FieldByName("Pinger")
 	if ok == false {
@@ -209,10 +214,10 @@ func (di *DeviceInfo) cleanup() {
 
 func getDeviceInfo(db DBHandler, aws AWS.AWSHandler, clientId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
 	keys := []AWS.DBKeyValue{
-		AWS.DBKeyValue{Key: "clientId", Value: clientId, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "clientContext", Value: clientContext, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "deviceId", Value: deviceId, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "sessionId", Value: sessionId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "ClientId", Value: clientId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "ClientContext", Value: clientContext, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "DeviceId", Value: deviceId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "SessionId", Value: sessionId, Comparison: AWS.KeyComparisonEq},
 	}
 	h := newDeviceInfoDbHandler(db)
 	di, err := h.get(keys)

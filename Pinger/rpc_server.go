@@ -8,7 +8,6 @@ import (
 )
 
 type BackendPolling struct {
-	dbm          *gorp.DbMap
 	logger       *Logging.Logger
 	loggerLevel  Logging.Level
 	debug        bool
@@ -16,6 +15,7 @@ type BackendPolling struct {
 	aws          *AWS.AWSHandle
 	pollMapMutex sync.Mutex
 	dbtype       DBHandlerType
+	dbHandler    DBHandler
 }
 
 func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger) (*BackendPolling, error) {
@@ -29,20 +29,28 @@ func NewBackendPolling(config *Configuration, debug bool, logger *Logging.Logger
 		dbtype:       config.Backend.DB,
 	}
 	var err error
-	switch config.Backend.DB {
-	case DBHandlerSql:
-		backend.dbm, err = config.Db.initDB(true, logger)
+	var dbm *gorp.DbMap
+	// There's a bit of a chicken and egg problem, that we can probably resolve by teasing apart
+	// the creation of the dbm pointer, and the actual creation of the DB/tables. For DBM,
+	// this currently happens together, so we need to create dbm here first, BEFORE we
+	// can create the DBHandler. For Dynamo, we attach the initDb method and call it later.
+	if config.Backend.DB == DBHandlerSql {
+		dbm, err = config.Db.initDB(true, logger)
 		if err != nil {
 			return nil, err
 		}
-	case DBHandlerDynamo:
 	}
 
+	backend.dbHandler = newDbHandler(config.Backend.DB, dbm, backend.aws)
+	err = backend.dbHandler.initDb()
+	if err != nil {
+		panic(err)
+	}
 	return backend, nil
 }
 
 func (t *BackendPolling) newMailClientContext(pi *MailPingInformation, doStats bool) (MailClientContextType, error) {
-	return NewMailClientContext(newDbHandler(t.dbtype, t.dbm, t.aws), t.aws, pi, t.debug, false, t.logger)
+	return NewMailClientContext(t.dbHandler, t.aws, pi, t.debug, false, t.logger)
 }
 
 func (t *BackendPolling) ToggleDebug() {
@@ -59,25 +67,25 @@ func (t *BackendPolling) UnlockMap() {
 }
 
 func (t *BackendPolling) Start(args *StartPollArgs, reply *StartPollingResponse) (err error) {
-	return RPCStartPoll(t, &t.pollMap, t.dbm, args, reply, t.logger)
+	return RPCStartPoll(t, &t.pollMap, args, reply, t.logger)
 }
 
 func (t *BackendPolling) Stop(args *StopPollArgs, reply *PollingResponse) (err error) {
-	return RPCStopPoll(t, &t.pollMap, t.dbm, args, reply, t.logger)
+	return RPCStopPoll(t, &t.pollMap, args, reply, t.logger)
 }
 
 func (t *BackendPolling) Defer(args *DeferPollArgs, reply *PollingResponse) (err error) {
-	return RPCDeferPoll(t, &t.pollMap, t.dbm, args, reply, t.logger)
+	return RPCDeferPoll(t, &t.pollMap, args, reply, t.logger)
 }
 
 func (t *BackendPolling) FindActiveSessions(args *FindSessionsArgs, reply *FindSessionsResponse) (err error) {
-	return RPCFindActiveSessions(t, &t.pollMap, t.dbm, args, reply, t.logger)
+	return RPCFindActiveSessions(t, &t.pollMap, args, reply, t.logger)
 }
 
 func (t *BackendPolling) AliveCheck(args *AliveCheckArgs, reply *AliveCheckResponse) (err error) {
-	return RPCAliveCheck(t, &t.pollMap, t.dbm, args, reply, t.logger)
+	return RPCAliveCheck(t, &t.pollMap, args, reply, t.logger)
 }
 
-func (t *BackendPolling) newDBHandler() DBHandler {
-	return newDbHandler(t.dbtype, t.dbm, t.aws)
+func (t *BackendPolling) DBHandler() DBHandler {
+	return t.dbHandler
 }

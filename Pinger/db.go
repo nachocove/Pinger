@@ -45,6 +45,7 @@ type DBHandler interface {
 	update(i interface{}, tableName string) (int64, error)
 	delete(i interface{}, tableName string, keys []AWS.DBKeyValue) (int64, error)
 	get(i interface{}, tableName string, keys []AWS.DBKeyValue) (interface{}, error)
+	initDb() error
 }
 
 func newDbHandler(db DBHandlerType, dbm *gorp.DbMap, aws AWS.AWSHandler) DBHandler {

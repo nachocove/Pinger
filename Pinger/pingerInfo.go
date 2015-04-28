@@ -14,6 +14,7 @@ type PingerInfoDbHandler interface {
 	update(pinger *PingerInfo) (int64, error)
 	delete(pinger *PingerInfo) (int64, error)
 	get(keys []AWS.DBKeyValue) (*PingerInfo, error)
+	createTable() error
 }
 
 func newPingerInfoDbHandler(db DBHandler) PingerInfoDbHandler {
@@ -112,6 +113,8 @@ func newPingerInfo(db DBHandler, logger *Logging.Logger) (*PingerInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("JAN pinger returned as %+v\n", pinger)
+	
 	if pinger != nil {
 		pinger.logger = logger
 		err = pinger.UpdateEntry()

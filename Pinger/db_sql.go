@@ -178,3 +178,7 @@ func (h *DBHandleSql) search(i interface{}, tableName, indexName string, keys []
 func (h *DBHandleSql) selectItems(i interface{}, sql string, args ...interface{}) ([]interface{}, error) {
 	return h.dbm.Select(i, sql, args...)
 }
+
+func (h *DBHandleSql) initDb() error {
+	return nil
+}

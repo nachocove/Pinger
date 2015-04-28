@@ -14,6 +14,10 @@ func newPingerInfoDbHandleSql(db DBHandler) PingerInfoDbHandler {
 	return &PingerInfoDbHandleSql{db.(*DBHandleSql)}
 }
 
+func (h *PingerInfoDbHandleSql) createTable() error {
+	return nil
+}
+
 func addPingerInfoTable(dbmap *gorp.DbMap) {
 	tMap := dbmap.AddTableWithName(PingerInfo{}, PingerTableName)
 	if tMap.SetKeys(false, "Pinger") == nil {

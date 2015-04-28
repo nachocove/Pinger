@@ -14,6 +14,10 @@ func newDeviceInfoSqlHandler(db DBHandler) DeviceInfoDbHandler {
 	return &DeviceInfoDbHandleSql{db.(*DBHandleSql)}
 }
 
+func (h *DeviceInfoDbHandleSql) createTable() error {
+	return nil
+}
+
 func (h *DeviceInfoDbHandleSql) insert(di *DeviceInfo) error {
 	return h.db.insert(di, "")
 }

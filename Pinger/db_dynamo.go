@@ -31,22 +31,43 @@ func (h *DBHandleDynamo) delete(i interface{}, tableName string, keys []AWS.DBKe
 	return h.dynamo.Delete(tableName, h.withDynamoTags(i, keys))
 }
 
+type HasToType interface {
+	ToType(m *map[string]interface{}) (interface{}, error)
+}
+
 func (h *DBHandleDynamo) get(i interface{}, tableName string, keys []AWS.DBKeyValue) (interface{}, error) {
+	ptrv := reflect.ValueOf(i)
+	if ptrv.Kind() != reflect.Ptr {
+		panic(fmt.Sprintf("Type %#v must be pointer", i))
+	}
+	elem := ptrv.Elem()
+	t, ok := elem.Addr().Interface().(HasToType)
+	if !ok {
+		panic(fmt.Sprintf("Type %#v must have ToType", i))
+	}
 	m, err := h.dynamo.Get(tableName, h.withDynamoTags(i, keys))
 	if err != nil {
 		return nil, err
 	}
-	return h.toType(i, m)
+	if len(*m) == 0 {
+		return nil, nil
+	}
+	return t.ToType(m)
 }
 
 func (h *DBHandleDynamo) search(i interface{}, tableName, indexName string, keys []AWS.DBKeyValue) ([]interface{}, error) {
+	t, ok := i.(HasToType)
+	if !ok {
+		panic("Type must have ToType")
+	}
+	fmt.Printf("JAN searching table %s index %v keys %+v\n", tableName, indexName, h.withDynamoTags(i, keys))
 	mArray, err := h.dynamo.Search(tableName, indexName, h.withDynamoTags(i, keys))
 	if err != nil {
 		return nil, err
 	}
 	iArray := make([]interface{}, 0, len(mArray))
 	for _, m := range mArray {
-		item, err := h.toType(i, &m)
+		item, err := t.ToType(&m)
 		if err != nil {
 			return nil, err
 		}
@@ -55,36 +76,18 @@ func (h *DBHandleDynamo) search(i interface{}, tableName, indexName string, keys
 	return iArray, nil
 }
 
-func (h *DBHandleDynamo) toType(i interface{}, m *map[string]interface{}) (interface{}, error) {
-	item := reflect.New(reflect.TypeOf(i))
-	vReflect := reflect.ValueOf(item)
-	for k, v := range *m {
-		for i := 0; i < vReflect.NumField(); i++ {
-			if vReflect.Type().Field(i).Tag.Get(k) != "" {
-				vv := reflect.ValueOf(v)
-				if vReflect.Field(i).Type() != vv.Type() {
-					return nil, fmt.Errorf(fmt.Sprintf("Wrong type for field %s. Expected %s, got %s", k, vv.Type(), vReflect.Field(i).Type()))
-				}
-				vReflect.Field(i).Set(vv)
-			}
-		}
-	}
-	return &item, nil
-
-}
 func (h *DBHandleDynamo) toMap(i interface{}) map[string]interface{} {
 	m := make(map[string]interface{})
-	vReflect := reflect.Indirect(reflect.ValueOf(i))
-	t := vReflect.Type()
-	for i := 0; i < vReflect.NumField(); i++ {
-		k := t.Field(i).Tag.Get("dynamo")
+	vType, vElem := h.TypeAndElem(i)
+	for i := 0; i < vElem.NumField(); i++ {
+		k := vType.Field(i).Tag.Get("dynamo")
 		if k != "" && k != "-" {
-			switch v := vReflect.Field(i).Interface().(type) {
+			switch v := vElem.Field(i).Interface().(type) {
 			case string:
 				if v != "" {
 					m[k] = v
 				} else {
-					panic(fmt.Sprintf("Field is empty", k))
+					panic(fmt.Sprintf("Field %s is empty", k))
 				}
 
 			default:
@@ -95,11 +98,23 @@ func (h *DBHandleDynamo) toMap(i interface{}) map[string]interface{} {
 	return m
 }
 
+func (h *DBHandleDynamo) TypeAndElem(ptr interface{}) (reflect.Type, reflect.Value) {
+	ptrv := reflect.ValueOf(ptr)
+	if ptrv.Kind() != reflect.Ptr {
+		panic(fmt.Sprintf("Dynamo passed non-pointer: %v (kind=%v)", ptr,
+			ptrv.Kind()))
+	}
+	elem := ptrv.Elem()
+	etype := reflect.TypeOf(elem.Interface())
+	return etype, elem
+}
+
+
 func (h *DBHandleDynamo) withDynamoTags(i interface{}, keys []AWS.DBKeyValue) []AWS.DBKeyValue {
-	v := reflect.TypeOf(i)
+	vType, _ := h.TypeAndElem(i)
 	reqKeys := make([]AWS.DBKeyValue, 0, len(keys))
 	for _, k := range keys {
-		field, ok := v.FieldByName(k.Key)
+		field, ok := vType.FieldByName(k.Key)
 		if !ok {
 			panic(fmt.Sprintf("No dynamo tag for field %s", k.Key))
 		}
@@ -113,4 +128,19 @@ func (h *DBHandleDynamo) withDynamoTags(i interface{}, keys []AWS.DBKeyValue) []
 		panic("No keys found to get")
 	}
 	return reqKeys
+}
+
+func (h *DBHandleDynamo) initDb() error {
+	dh := newDeviceInfoDynamoDbHandler(h)
+	err := dh.createTable()
+	if err != nil {
+		panic(err)
+	}
+	
+	ph := newPingerInfoDbHandleDynamo(h)
+	err = ph.createTable()
+	if err != nil {
+		panic(err)
+	}
+	return nil	
 }

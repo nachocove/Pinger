@@ -101,6 +101,10 @@ func (t *TestingBackend) FindActiveSessions(args *FindSessionsArgs, reply *FindS
 	return RPCFindActiveSessions(t, &t.pollMap, t.dbm, args, reply, t.logger)
 }
 
+func (t *TestingBackend) DBHandler() DBHandler {
+	return t.dbHandler
+}
+
 //func (t *TestingBackend) LockMap() {
 //	return
 //}

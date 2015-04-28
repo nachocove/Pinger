@@ -18,6 +18,17 @@ const (
 	Number DBAttributeType = iota
 )
 
+func (a DBAttributeType) String() string {
+	switch a {
+	case String:
+		return "String"
+
+	case Number:
+		return "Number"
+	}
+	panic("Unknown value")
+}
+
 func (a DBAttributeType) AwsString() aws.StringValue {
 	switch a {
 	case String:
@@ -41,6 +52,9 @@ const (
 	KeyComparisonGt KeyComparisonType = iota
 	KeyComparisonLt KeyComparisonType = iota
 )
+func (c KeyComparisonType) String() string {
+	return string(*c.awsComparison())
+}
 
 func (c KeyComparisonType) awsComparison() aws.StringValue {
 	switch c {
@@ -83,6 +97,10 @@ const (
 	KeyTypeRange KeyType = iota
 )
 
+func (t KeyType) String() string {
+	return *t.awsKeyType()
+}
+
 func (t KeyType) awsKeyType() aws.StringValue {
 	switch t {
 	case KeyTypeHash:
@@ -113,6 +131,7 @@ func (ah *AWSHandle) GetDynamoDbSession() *DynamoDb {
 }
 
 func (d *DynamoDb) Get(tableName string, keys []DBKeyValue) (*map[string]interface{}, error) {
+	fmt.Printf("JAN: Getting item %+v\n", keys)
 	dKeys := make(map[string]dynamodb.AttributeValue)
 	for _, k := range keys {
 		if k.Comparison != KeyComparisonEq {
@@ -132,6 +151,7 @@ func (d *DynamoDb) Get(tableName string, keys []DBKeyValue) (*map[string]interfa
 }
 
 func (d *DynamoDb) Search(tableName, indexName string, keys []DBKeyValue) ([]map[string]interface{}, error) {
+	fmt.Printf("JAN: Searching %s %v for item %+v\n", tableName, indexName, keys)
 	req := dynamodb.QueryInput{
 		TableName:      aws.String(tableName),
 		ConsistentRead: aws.Boolean(false),
@@ -161,6 +181,7 @@ func (d *DynamoDb) Search(tableName, indexName string, keys []DBKeyValue) ([]map
 }
 
 func (d *DynamoDb) Insert(tableName string, entry map[string]interface{}) error {
+	fmt.Printf("JAN: Inserting item %+v\n", entry)
 	req := dynamodb.PutItemInput{
 		TableName: aws.StringValue(&tableName),
 		Item:      *goMaptoAwsAttributeMap(&entry),
@@ -173,6 +194,7 @@ func (d *DynamoDb) Insert(tableName string, entry map[string]interface{}) error 
 }
 
 func (d *DynamoDb) Update(tableName string, entry map[string]interface{}) error {
+	fmt.Printf("JAN: Updating item %+v\n", entry)
 	return d.Insert(tableName, entry)
 }
 
@@ -194,6 +216,9 @@ func (d *DynamoDb) Delete(tableName string, attributes []DBKeyValue) (int64, err
 
 func (d *DynamoDb) CreateTable(tableDefinition *dynamodb.CreateTableInput) error {
 	_, err := d.session.CreateTable(tableDefinition)
+	if err != nil {
+		panic(err)
+	}
 	return err
 }
 
@@ -201,7 +226,7 @@ func (d *DynamoDb) CreateTableReq(tableName string, attributes []DBAttrDefinitio
 	createReq := dynamodb.CreateTableInput{
 		TableName: aws.String(tableName),
 	}
-
+	
 	createReq.AttributeDefinitions = make([]dynamodb.AttributeDefinition, 0, 1)
 	for _, a := range attributes {
 		attr := dynamodb.AttributeDefinition{AttributeName: aws.String(a.Name), AttributeType: a.Type.AwsString()}
