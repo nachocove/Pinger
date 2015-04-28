@@ -27,22 +27,23 @@ type RPCServerTester struct {
 func (s *RPCServerTester) SetupSuite() {
 	var err error
 	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
-	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
+	dbconfig := DBConfiguration{Type: DBTypeSqlite, Filename: ":memory:"}
 	s.dbmap, err = dbconfig.initDB(true, s.logger)
 	if err != nil {
 		panic("Could not create DB")
 	}
 
 	config := NewConfiguration()
-	config.Db.Type = "sqlite"
+	config.Db.Type = DBTypeSqlite
 	config.Db.Filename = ":memory:"
 
 	testingBackend := &TestingBackend{BackendPolling{
-		dbm:         s.dbmap,
-		logger:      s.logger,
-		loggerLevel: -1,
-		debug:       true,
-		pollMap:     nil,
+			dbtype:      DBHandlerSql,
+			dbHandler:   newDbHandler(DBHandlerSql, s.dbmap, s.aws),
+			logger:      s.logger,
+			loggerLevel: -1,
+			debug:       true,
+			pollMap:     nil,
 	}}
 	s.backend = testingBackend
 	s.testClientId = "sometestClientId"
@@ -86,19 +87,19 @@ func (t *TestingBackend) newMailClientContext(pi *MailPingInformation, doStats b
 }
 
 func (t *TestingBackend) Start(args *StartPollArgs, reply *StartPollingResponse) (err error) {
-	return RPCStartPoll(t, &t.pollMap, t.dbm, args, reply, t.logger)
+	return RPCStartPoll(t, &t.pollMap, args, reply, t.logger)
 }
 
 func (t *TestingBackend) Stop(args *StopPollArgs, reply *PollingResponse) (err error) {
-	return RPCStopPoll(t, &t.pollMap, t.dbm, args, reply, t.logger)
+	return RPCStopPoll(t, &t.pollMap, args, reply, t.logger)
 }
 
 func (t *TestingBackend) Defer(args *DeferPollArgs, reply *PollingResponse) (err error) {
-	return RPCDeferPoll(t, &t.pollMap, t.dbm, args, reply, t.logger)
+	return RPCDeferPoll(t, &t.pollMap, args, reply, t.logger)
 }
 
 func (t *TestingBackend) FindActiveSessions(args *FindSessionsArgs, reply *FindSessionsResponse) (err error) {
-	return RPCFindActiveSessions(t, &t.pollMap, t.dbm, args, reply, t.logger)
+	return RPCFindActiveSessions(t, &t.pollMap, args, reply, t.logger)
 }
 
 func (t *TestingBackend) DBHandler() DBHandler {

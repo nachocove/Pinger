@@ -31,7 +31,7 @@ type deviceInfoTester struct {
 func (s *deviceInfoTester) SetupSuite() {
 	var err error
 	s.logger = Logging.InitLogging("unittest", "", Logging.DEBUG, true, Logging.DEBUG, nil, true)
-	dbconfig := DBConfiguration{Type: "sqlite", Filename: ":memory:"}
+	dbconfig := DBConfiguration{Type: DBTypeSqlite, Filename: ":memory:"}
 	s.dbm, err = dbconfig.initDB(true, s.logger)
 	if err != nil {
 		panic("Could not create DB")
