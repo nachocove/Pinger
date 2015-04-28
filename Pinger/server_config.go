@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strings"
 	"time"
 )
@@ -37,6 +38,7 @@ type ServerConfiguration struct {
 	TokenAuthKey     string
 
 	aliveCheckCidrList []*net.IPNet `gcfg:"-"`
+	aesKey             []byte       `gcfg:"-"`
 }
 
 func NewServerConfiguration() *ServerConfiguration {
@@ -63,10 +65,19 @@ func (cfg *ServerConfiguration) validate() error {
 	if len(badIP) > 0 {
 		return fmt.Errorf("alive-check-ip: %s", strings.Join(badIP, ", "))
 	}
-	if cfg.TokenAuthKey == "" {
-		return fmt.Errorf("TokenAuthKey can not be empty")
+	if cfg.TokenAuthKey != "" {
+		fmt.Fprintf(os.Stderr, "TokenAuthKey is deprecated and will be ignored. Please remove it from the config.\n")
 	}
-	_, err := aes.NewCipher([]byte(cfg.TokenAuthKey))
+
+	aesKey := make([]byte, 32)
+	_, err := rand.Read(aesKey)
+	if err != nil {
+		panic(err)
+	}
+	cfg.aesKey = aesKey
+
+	// test the key
+	_, err = aes.NewCipher(cfg.aesKey)
 	if err != nil {
 		return err
 	}
@@ -104,7 +115,7 @@ func (cfg *ServerConfiguration) CheckToken(token string) bool {
 }
 
 func (cfg *ServerConfiguration) CreateAuthToken(clientId, clientContext, deviceId string) (string, error) {
-	block, err := aes.NewCipher([]byte(cfg.TokenAuthKey))
+	block, err := aes.NewCipher(cfg.aesKey)
 	if err != nil {
 		return "", err
 	}
@@ -125,7 +136,7 @@ func (cfg *ServerConfiguration) CreateAuthToken(clientId, clientContext, deviceI
 func (cfg *ServerConfiguration) ValidateAuthToken(clientId, clientContext, deviceId, token string) (time.Time, error) {
 	// TODO Check length on token so base64 decoding doesn't blow up
 	errTime := time.Time{}
-	block, err := aes.NewCipher([]byte(cfg.TokenAuthKey))
+	block, err := aes.NewCipher(cfg.aesKey)
 	if err != nil {
 		return errTime, err
 	}
