@@ -38,12 +38,12 @@ func (s *RPCServerTester) SetupSuite() {
 	config.Db.Filename = ":memory:"
 
 	testingBackend := &TestingBackend{BackendPolling{
-			dbtype:      DBHandlerSql,
-			dbHandler:   newDbHandler(DBHandlerSql, s.dbmap, s.aws),
-			logger:      s.logger,
-			loggerLevel: -1,
-			debug:       true,
-			pollMap:     nil,
+		dbtype:      DBHandlerSql,
+		dbHandler:   newDbHandler(DBHandlerSql, s.dbmap, s.aws),
+		logger:      s.logger,
+		loggerLevel: -1,
+		debug:       true,
+		pollMap:     nil,
 	}}
 	s.backend = testingBackend
 	s.testClientId = "sometestClientId"

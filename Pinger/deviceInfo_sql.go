@@ -108,7 +108,7 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) {
 
 	cMap = tMap.ColMap("SessionId")
 	cMap.SetNotNull(true)
-	
+
 	createDeviceInfoSqlStatements(dbmap.Dialect)
 }
 
@@ -144,7 +144,7 @@ func createDeviceInfoSqlStatements(dialect gorp.Dialect) {
 		)
 		clientContextsSql = fmt.Sprintf("select distinct %s from %s where %s=$1 and %s=$2",
 			diClientContextField.Tag.Get("db"), deviceTableName, diPushServiceField.Tag.Get("db"), diPushTokenField.Tag.Get("db"))
-		
+
 	default:
 		panic("Unknown db dialect")
 	}

@@ -2,8 +2,8 @@ package Pinger
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/suite"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
 )
@@ -38,7 +38,7 @@ func (s *ServerConfigTests) TestTokenCreationValidation() {
 	testClientId := "us-east-1:44211d8c-caf6-4b17-80cf-72febe0ebb2d"
 	testClientContext := "123451234512345"
 	testDeviceId := "NchoDC28E565X072CX46B1XBF205"
-	s.cfg.AliveCheckIPList = nil	
+	s.cfg.AliveCheckIPList = nil
 	err := s.cfg.validate()
 	require.NoError(s.T(), err)
 	token, err := s.cfg.CreateAuthToken(testClientId, testClientContext, testDeviceId)

@@ -33,7 +33,7 @@ func addPingerInfoTable(dbmap *gorp.DbMap) {
 	cMap = tMap.ColMap("Pinger")
 	cMap.SetNotNull(true)
 	cMap.SetUnique(true)
-	
+
 	createPingerInfoSqlStatements(dbmap.Dialect)
 }
 
@@ -53,7 +53,7 @@ func createPingerInfoSqlStatements(dialect gorp.Dialect) {
 
 	case isPostgres:
 		getPingerSql = fmt.Sprintf("select * from %s where %s=$1", PingerTableName, piPingerField.Tag.Get("db"))
-		
+
 	default:
 		panic("Unknown db dialect")
 	}

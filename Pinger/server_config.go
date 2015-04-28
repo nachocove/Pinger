@@ -155,7 +155,6 @@ func (cfg *ServerConfiguration) CreateAuthToken(clientId, clientContext, deviceI
 	}
 	b.Write(iv)
 
-
 	mode := cipher.NewCBCEncrypter(block, iv)
 	mode.CryptBlocks(ciphertext, ciphertext)
 	b.Write(ciphertext)

@@ -114,7 +114,7 @@ func newPingerInfo(db DBHandler, logger *Logging.Logger) (*PingerInfo, error) {
 		return nil, err
 	}
 	fmt.Printf("JAN pinger returned as %+v\n", pinger)
-	
+
 	if pinger != nil {
 		pinger.logger = logger
 		err = pinger.UpdateEntry()

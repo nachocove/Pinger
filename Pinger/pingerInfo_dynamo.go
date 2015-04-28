@@ -1,9 +1,9 @@
 package Pinger
 
 import (
+	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"strings"
-	"fmt"
 )
 
 type PingerInfoDbHandleDynamo struct {
@@ -90,10 +90,10 @@ func (pi *PingerInfo) ToType(m *map[string]interface{}) (interface{}, error) {
 		switch k {
 		case piPingerField.Tag.Get("dynamo"):
 			newPi.Pinger = v.(string)
-			
+
 		case piUpdatedField.Tag.Get("dynamo"):
 			newPi.Updated = v.(int64)
-			
+
 		case piCreatedField.Tag.Get("dynamo"):
 			newPi.Created = v.(int64)
 

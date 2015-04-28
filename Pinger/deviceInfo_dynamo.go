@@ -1,10 +1,10 @@
 package Pinger
 
 import (
+	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"reflect"
 	"strings"
-	"fmt"
 )
 
 type DeviceInfoDbHandleDynamo struct {
@@ -31,7 +31,7 @@ func (h *DeviceInfoDbHandleDynamo) createTable() error {
 	} else {
 		return nil
 	}
-	
+
 	createReq := h.db.dynamo.CreateTableReq(dynamoDeviceInfoTableName,
 		[]AWS.DBAttrDefinition{
 			{Name: diIdField.Tag.Get("dynamo"), Type: AWS.Number},
@@ -117,7 +117,7 @@ func (h *DeviceInfoDbHandleDynamo) findIndexForKeys(keys []AWS.DBKeyValue) (stri
 		indexName = dynamoDeviceInfoClientDeviceIndexName
 		filteredKeys = append(filteredKeys, keys[0])
 		filteredKeys = append(filteredKeys, keys[2])
-		
+
 	case keys[0].Key == "Pinger":
 		indexName = dynamoDeviceInfoPingerClientIndexName
 		filteredKeys = append(filteredKeys, keys[0])
@@ -127,7 +127,7 @@ func (h *DeviceInfoDbHandleDynamo) findIndexForKeys(keys []AWS.DBKeyValue) (stri
 		filteredKeys = append(filteredKeys, keys[0])
 		filteredKeys = append(filteredKeys, keys[1])
 	}
-	return indexName, filteredKeys, nil	
+	return indexName, filteredKeys, nil
 }
 
 func (h *DeviceInfoDbHandleDynamo) get(keys []AWS.DBKeyValue) (*DeviceInfo, error) {
@@ -191,7 +191,7 @@ func (h *DeviceInfoDbHandleDynamo) clientContexts(pushservice, pushToken string)
 	indexName, filtered, err := h.findIndexForKeys(keys)
 	if err != nil {
 		return nil, err
-	}	
+	}
 	fmt.Printf("JAN: searching on %s %s\n", dynamoDeviceInfoTableName, indexName)
 	objs, err := h.db.search(&DeviceInfo{}, dynamoDeviceInfoTableName, indexName, filtered)
 	if err != nil {
@@ -218,13 +218,13 @@ func (di *DeviceInfo) ToType(m *map[string]interface{}) (interface{}, error) {
 		switch k {
 		case piPingerField.Tag.Get("dynamo"):
 			newDi.Pinger = v.(string)
-			
+
 		case piUpdatedField.Tag.Get("dynamo"):
 			newDi.Updated = v.(int64)
-			
+
 		case piCreatedField.Tag.Get("dynamo"):
 			newDi.Created = v.(int64)
-			
+
 		default:
 			errString = append(errString, fmt.Sprintf("Unhandled key %s", k))
 		}

@@ -109,7 +109,6 @@ func (h *DBHandleDynamo) TypeAndElem(ptr interface{}) (reflect.Type, reflect.Val
 	return etype, elem
 }
 
-
 func (h *DBHandleDynamo) withDynamoTags(i interface{}, keys []AWS.DBKeyValue) []AWS.DBKeyValue {
 	vType, _ := h.TypeAndElem(i)
 	reqKeys := make([]AWS.DBKeyValue, 0, len(keys))
@@ -136,11 +135,11 @@ func (h *DBHandleDynamo) initDb() error {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	ph := newPingerInfoDbHandleDynamo(h)
 	err = ph.createTable()
 	if err != nil {
 		panic(err)
 	}
-	return nil	
+	return nil
 }

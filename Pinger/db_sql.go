@@ -6,8 +6,8 @@ import (
 	"fmt"
 	_ "github.com/Go-SQL-Driver/MySQL" // blank import to get the mysql mappings for gorp
 	"github.com/coopernurse/gorp"
+	_ "github.com/lib/pq"           // blank import to get the postgres mappings for gorp
 	_ "github.com/mattn/go-sqlite3" // blank import to get the mysql mappings for gorp
-	_ "github.com/lib/pq" // blank import to get the postgres mappings for gorp
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"strings"
@@ -26,11 +26,13 @@ type DBConfiguration struct {
 }
 
 type DBType int
+
 const (
-	DBTypeSqlite DBType = iota
-	DBTypeMySql DBType = iota
+	DBTypeSqlite   DBType = iota
+	DBTypeMySql    DBType = iota
 	DBTypePostgres DBType = iota
 )
+
 func (d *DBType) String() string {
 	switch *d {
 	case DBTypeSqlite:
@@ -41,7 +43,7 @@ func (d *DBType) String() string {
 
 	case DBTypePostgres:
 		return "postgres"
-		
+
 	default:
 		panic("Unknown DBType")
 	}
@@ -115,7 +117,7 @@ func (dbconfig *DBConfiguration) initDB(init bool, logger *Logging.Logger) (*gor
 
 	case DBTypePostgres:
 		dbmap, err = dbconfig.initDbPostgres()
-		
+
 	default:
 		return nil, fmt.Errorf("Unknown db type %s", dbconfig.Type)
 	}
@@ -163,7 +165,6 @@ func (dbconfig *DBConfiguration) initDbSqlite() (*gorp.DbMap, error) {
 	return &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}, nil
 }
 
-
 func (dbConfig *DBConfiguration) initDbMySql() (*gorp.DbMap, error) {
 	const mysqlDBInitString string = "%s:%s@tcp(%s:%d)/%s"
 	// connect to db using standard Go database/sql API
@@ -203,7 +204,6 @@ func (dbConfig *DBConfiguration) initDbPostgres() (*gorp.DbMap, error) {
 	}
 	return &gorp.DbMap{Db: db, Dialect: gorp.PostgresDialect{}}, nil
 }
-
 
 type DBHandleSql struct {
 	DBHandler
