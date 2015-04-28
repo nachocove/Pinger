@@ -6,13 +6,13 @@
     "s3_config": {
           "s3_bucket": "nchoconfal",
           "s3_filenames": {
-            "certs_spem": "/devpinger/pinger/pingercerts.pem",
-            "key_pem": "/devpinger/pinger/pingerkey.pem",
-            "pinger_config": "/devpinger/pinger/pinger.cfg"
+            "certs_pem": "/alphapinger/pinger/alphaDC.crt",
+            "key_pem": "/alphapinger/pinger/alphaDC.key",
+            "pinger_config": "/alphapinger/pinger/pinger.cfg"
           }
     },
     "vpc_config": {
-        "name": "3-Apr24DevVPC",
+        "name": "AlphaPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
@@ -20,7 +20,7 @@
     },
     "elb_config": {
         "ports": [
-            [443, 8443, "https", "https", "arn:aws:iam::263277746520:server-certificate/DevPinger"]
+            [443, 8443, "https", "https", "arn:aws:iam::263277746520:server-certificate/AlphaPinger_DigiCert_2015"]
         ],
         "health_check": {
             "interval" :20,
@@ -32,7 +32,7 @@
       "backend_port": 8443,
         "sg_config": {
             "name" : "ELB",
-            "description": "The SG for Pinger ELB",
+            "description": "The SG for Alpha Pinger ELB",
             "ingress-rules": [
               {
                 "protocol": "tcp",
@@ -47,15 +47,15 @@
     },
     "autoscale_config": {
         "ami_id": "ami-e981b5d9",
-        "key_pair": "Dev Pinger VPC KeyPair",
-        "instance_type": "t1.micro",
+        "key_pair": "AlphaPinger",
+        "instance_type": "c1.medium",
         "instance_monitoring": false,
         "min_size": 1,
         "max_size": 1,
-        "user_data_file": "nacho_init_devpinger.sh",
+        "user_data_file": "nacho_init_alphapinger.sh",
         "sg_config": {
             "name" : "ASIns",
-            "description": "The SG for Pinger AS - Instance",
+            "description": "The SG for Alpha Pinger AS - Instance",
             "ingress-rules": [
                 {
                   "protocol": "tcp",

@@ -375,7 +375,7 @@ def load_config_from_s3(s3_config):
     pinger_config = configparser.ConfigParser()
     pinger_config.read_file(buf)
     s3_config["pinger_config"] = pinger_config
-    certs = pem.parse(s3_config["s3_files"]["cert_spem"])
+    certs = pem.parse(s3_config["s3_files"]["certs_pem"])
     s3_config["certs"] = certs
     s3_config["first_cert_pem"] = certs[0].pem_str
 
