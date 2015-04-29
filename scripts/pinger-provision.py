@@ -15,6 +15,7 @@ import boto.ec2.autoscale
 from boto.exception import S3ResponseError, EC2ResponseError, BotoServerError
 from boto.ec2.autoscale import LaunchConfiguration
 from boto.ec2.autoscale import AutoScalingGroup
+import boto.iam
 from boto.vpc import VPCConnection
 import configparser
 import StringIO
@@ -318,7 +319,7 @@ def delete_elb(profile_name, region_name, name):
 
 # create load balancer
 def create_elb(profile_name, region_name, vpc, subnet, sg, name, config, cert):
-    print "Creating elastic load balancer"
+    print "Creating elastic load balancer %s" % name
     conn = boto.ec2.elb.connect_to_region(region_name, profile_name=profile_name)
     try:
         elb_list = conn.get_all_load_balancers(load_balancer_names=[name])
@@ -352,6 +353,55 @@ def create_elb(profile_name, region_name, vpc, subnet, sg, name, config, cert):
                             % (elb.name, elb.vpc_id, vpc.id))
     #elb.register_instances(ins.id)
     return elb
+
+def delete_iam_users_and_policies(profile_name, region_name, name_prefix, iam_config):
+    print "Deleting IAM users and policies for %s" % name_prefix
+    conn=boto.iam.connect_to_region(region_name, profile_name=profile_name)
+    for user_config in iam_config["users"]:
+        user_name = name_prefix + "-" + user_config["user_name_suffix"]
+        try:
+            user =  conn.get_user(user_name=user_name)
+        except BotoServerError:
+            user = None
+        if user:
+            for policy_config in user_config["inline_policies"]:
+                policy_name = user_name + "-policy"
+                try:
+                    policy =  conn.get_user_policy(user_name, policy_name)
+                except BotoServerError:
+                    policy = None
+                if policy:
+                    print "Deleting policy (%s)" % policy_name
+                    conn.delete_user_policy(user_name, policy_name)
+            print "Deleting user (%s)" % user_name
+            conn.delete_user(user_name)
+
+def create_iam_users_and_policies(profile_name, region_name, name_prefix, iam_config):
+    print "Creating IAM users and policies for %s" % name_prefix
+    conn=boto.iam.connect_to_region(region_name, profile_name=profile_name)
+    for user_config in iam_config["users"]:
+        user_name = name_prefix + "-" + user_config["user_name_suffix"]
+        try:
+            user =  conn.get_user(user_name=user_name)
+        except BotoServerError:
+            user = None
+        if not user:
+            print "Creating user (%s)" % user_name
+            conn.create_user(user_name)
+        else:
+            print "User (%s) already exists." % user_name
+        for policy_config in user_config["inline_policies"]:
+            policy_name = user_name + "-policy"
+            try:
+                policy =  conn.get_user_policy(user_name, policy_name)
+            except BotoServerError:
+                policy = None
+            if not policy:
+                print "Creating policy (%s)" % policy_name
+                conn.put_user_policy(user_name, policy_name, json.dumps(policy_config["policy"], indent=4))
+            else:
+                print "Updating policy (%s)" % policy_name
+                conn.put_user_policy(user_name, policy_name, json.dumps(policy_config["policy"], indent=4))
 
 # cleanup
 def cleanup(config):
@@ -390,6 +440,7 @@ def json_config(file_name):
 def deprovision_pinger(config):
     aws_config = config["aws_config"]
     profile_name = aws_config["profile_name"]
+    iam_config = config["iam_config"]
     s3_config = config["s3_config"]
     vpc_config = config["vpc_config"]
     as_config = config["autoscale_config"]
@@ -398,11 +449,13 @@ def deprovision_pinger(config):
     delete_autoscaler(profile_name, aws_config["region_name"], vpc_config["name"] + "-AS")
     delete_elb(profile_name, aws_config["region_name"], vpc_config["name"] + "-ELB")
     delete_vpc(profile_name, aws_config["region"], vpc_config["name"])
+    delete_iam_users_and_policies(profile_name,  aws_config["region_name"], vpc_config["name"], iam_config)
 
 # create VPC et al
 def provision_pinger(config):
     aws_config = config["aws_config"]
     profile_name = aws_config["profile_name"]
+    iam_config = config["iam_config"]
     s3_config = config["s3_config"]
     vpc_config = config["vpc_config"]
     as_config = config["autoscale_config"]
@@ -414,6 +467,7 @@ def provision_pinger(config):
     conn = VPCConnection(region=aws_config["region"], profile_name=profile_name)
     # create vpc
     try:
+        create_iam_users_and_policies(profile_name,  aws_config["region_name"], vpc_config["name"], iam_config)
         vpc = create_vpc(conn, vpc_config["name"], vpc_config["vpc_cidr_block"], vpc_config["instance_tenancy"])
         subnet = create_subnet(conn, vpc, vpc_config["name"]+"-SN", vpc_config["subnet_cidr_block"],
                                vpc_config["availability_zone"])

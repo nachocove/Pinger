@@ -4,6 +4,27 @@
         "zones": ["us-west-2a"],
       "profile_name": "provisioner"
     },
+    "vpc_config": {
+        "name": "TestApr29AlphaPingerVPC",
+        "vpc_cidr_block": "10.0.0.0/20",
+        "subnet_cidr_block": "10.0.0.0/24",
+        "availability_zone": "us-west-2a",
+        "instance_tenancy": "default"
+    },
+    "iam_config": {
+        "users": [
+            {
+                "user_name_suffix": "alphapinger",
+                "inline_policies" : [
+                ]
+            },
+            {
+                "user_name_suffix": "alphapinger_boot",
+                "inline_policies" : [
+                ]
+            }
+        ]
+    },
     "s3_config": {
           "s3_bucket": "nchoconfal",
           "s3_filenames": {
@@ -11,13 +32,6 @@
             "key_pem": "/alphapinger/pinger/alphaDC.key",
             "pinger_config": "/alphapinger/pinger/pinger.cfg"
           }
-    },
-    "vpc_config": {
-        "name": "AlphaPingerVPC",
-        "vpc_cidr_block": "10.0.0.0/20",
-        "subnet_cidr_block": "10.0.0.0/24",
-        "availability_zone": "us-west-2a",
-        "instance_tenancy": "default"
     },
     "elb_config": {
         "ports": [

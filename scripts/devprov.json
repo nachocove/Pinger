@@ -4,20 +4,89 @@
         "zones": ["us-west-2a"],
         "profile_name": "provisioner"
     },
-    "s3_config": {
-          "s3_bucket": "nchoconfal",
-          "s3_filenames": {
-            "certs_pem": "/devpinger/pinger/pingercerts.pem",
-            "key_pem": "/devpinger/pinger/pingerkey.pem",
-            "pinger_config": "/devpinger/pinger/pinger.cfg"
-          }
-    },
     "vpc_config": {
-        "name": "TestApr28DevVPC",
+        "name": "TestApr29DevVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
         "instance_tenancy": "default"
+    },
+    "iam_config": {
+        "users": [
+            {
+                "user_name_suffix": "devpinger",
+                "inline_policies" : [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "Stmt1426990618000",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:ListBucket",
+                                        "s3:PutObject"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:s3:::nchoteleal/*"
+                                    ]
+                                },
+                                {
+                                    "Sid": "Stmt1426990755000",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "cognito-identity:DescribeIdentity",
+                                        "cognito-identity:ListIdentities"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:cognito-identity:us-east-1:263277746520:identitypool/"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            {
+                "user_name_suffix": "devpinger_boot",
+                "inline_policies" : [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:Get*",
+                                        "s3:List*"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:s3:::nchoconfal/devpinger/*"
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:ListBucket"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:s3:::nchoconfal"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    "s3_config": {
+          "s3_bucket": "nchoconfal",
+          "s3_filenames": {
+              "certs_pem": "/devpinger/pinger/pingercerts.pem",
+              "key_pem": "/devpinger/pinger/pingerkey.pem",
+              "pinger_config": "/devpinger/pinger/pinger.cfg"
+          }
     },
     "elb_config": {
         "ports": [
@@ -35,12 +104,12 @@
             "name" : "ELB",
             "description": "The SG for Pinger ELB",
             "ingress-rules": [
-              {
-                "protocol": "tcp",
-                "from_port": 443,
-                "to_port": 443,
-                "cidr_ip": "0.0.0.0/0"
-              }
+                {
+                  "protocol": "tcp",
+                  "from_port": 443,
+                  "to_port": 443,
+                  "cidr_ip": "0.0.0.0/0"
+                }
             ],
             "egress-rules": [
             ]
@@ -59,42 +128,42 @@
             "description": "The SG for Pinger AS - Instance",
             "ingress-rules": [
                 {
-                  "protocol": "tcp",
-                  "from_port": 8443,
-                  "to_port": 8443,
-                  "cidr_ip": "0.0.0.0/0"
+                    "protocol": "tcp",
+                    "from_port": 8443,
+                    "to_port": 8443,
+                    "cidr_ip": "0.0.0.0/0"
                 }
             ],
             "egress-rules": [
               {
-                "protocol": "tcp",
-                "from_port": 443,
-                "to_port": 443,
-                "cidr_ip": "0.0.0.0/0"
+                  "protocol": "tcp",
+                  "from_port": 443,
+                  "to_port": 443,
+                  "cidr_ip": "0.0.0.0/0"
               },
               {
-                "protocol": "tcp",
-                "from_port": 2195,
-                "to_port": 2195,
-                "cidr_ip": "17.0.0.0/8"
+                  "protocol": "tcp",
+                  "from_port": 2195,
+                  "to_port": 2195,
+                  "cidr_ip": "17.0.0.0/8"
               },
               {
-                "protocol": "tcp",
-                "from_port": 2196,
-                "to_port": 2196,
-                "cidr_ip": "17.0.0.0/8"
+                  "protocol": "tcp",
+                  "from_port": 2196,
+                  "to_port": 2196,
+                  "cidr_ip": "17.0.0.0/8"
               },
               {
-                "protocol": "tcp",
-                "from_port": 123,
-                "to_port": 123,
-                "cidr_ip": "0.0.0.0/0"
+                  "protocol": "tcp",
+                  "from_port": 123,
+                  "to_port": 123,
+                  "cidr_ip": "0.0.0.0/0"
               },
               {
-                "protocol": "udp",
-                "from_port": 123,
-                "to_port": 123,
-                "cidr_ip": "0.0.0.0/0"
+                  "protocol": "udp",
+                  "from_port": 123,
+                  "to_port": 123,
+                  "cidr_ip": "0.0.0.0/0"
               }
             ]
         }

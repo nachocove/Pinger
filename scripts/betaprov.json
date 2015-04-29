@@ -4,6 +4,27 @@
         "zones": ["us-west-2a"],
       "profile_name": "prod_provisioner"
     },
+    "vpc_config": {
+        "name": "TestApr29BetaPingerVPC",
+        "vpc_cidr_block": "10.0.0.0/20",
+        "subnet_cidr_block": "10.0.0.0/24",
+        "availability_zone": "us-west-2a",
+        "instance_tenancy": "default"
+    },
+    "iam_config": {
+        "users": [
+            {
+                "user_name_suffix": "betapinger",
+                "inline_policies" : [
+                ]
+            },
+            {
+                "user_name_suffix": "betapinger_boot",
+                "inline_policies" : [
+                ]
+            }
+        ]
+    },
     "s3_config": {
           "s3_bucket": "nachobetaconf",
           "s3_filenames": {
@@ -12,13 +33,7 @@
             "pinger_config": "/betapinger/pinger/pinger.cfg"
           }
     },
-    "vpc_config": {
-        "name": "BetaPingerVPC",
-        "vpc_cidr_block": "10.0.0.0/20",
-        "subnet_cidr_block": "10.0.0.0/24",
-        "availability_zone": "us-west-2a",
-        "instance_tenancy": "default"
-    },
+
     "elb_config": {
         "ports": [
             [443, 8443, "https", "https", "arn:aws:iam::610813048224:server-certificate/BetaPinger_DigiCert_2015"]
