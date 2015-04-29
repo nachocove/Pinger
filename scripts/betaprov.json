@@ -2,18 +2,18 @@
     "aws_config": {
         "region_name": "us-west-2",
         "zones": ["us-west-2a"],
-      "profile_name": "provisioner"
+      "profile_name": "prod_provisioner"
     },
     "s3_config": {
-          "s3_bucket": "nchoconfal",
+          "s3_bucket": "nachobetaconf",
           "s3_filenames": {
-            "certs_pem": "/alphapinger/pinger/alphaDC.crt",
-            "key_pem": "/alphapinger/pinger/alphaDC.key",
-            "pinger_config": "/alphapinger/pinger/pinger.cfg"
+            "certs_pem": "/betapinger/pinger/betaDC.crt",
+            "key_pem": "/betapinger/pinger/betaDC.key",
+            "pinger_config": "/betapinger/pinger/pinger.cfg"
           }
     },
     "vpc_config": {
-        "name": "AlphaPingerVPC",
+        "name": "BetaPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
@@ -21,7 +21,7 @@
     },
     "elb_config": {
         "ports": [
-            [443, 8443, "https", "https", "arn:aws:iam::263277746520:server-certificate/AlphaPinger_DigiCert_2015"]
+            [443, 8443, "https", "https", "arn:aws:iam::610813048224:server-certificate/BetaPinger_DigiCert_2015"]
         ],
         "health_check": {
             "interval" :20,
@@ -33,7 +33,7 @@
       "backend_port": 8443,
         "sg_config": {
             "name" : "ELB",
-            "description": "The SG for Alpha Pinger ELB",
+            "description": "The SG for Beta Pinger ELB",
             "ingress-rules": [
               {
                 "protocol": "tcp",
@@ -48,15 +48,15 @@
     },
     "autoscale_config": {
         "ami_id": "ami-e981b5d9",
-        "key_pair": "AlphaPinger",
+        "key_pair": "BetaPinger",
         "instance_type": "c1.medium",
         "instance_monitoring": false,
         "min_size": 1,
         "max_size": 1,
-        "user_data_file": "nacho_init_alphapinger.sh",
+        "user_data_file": "nacho_init_betapinger.sh",
         "sg_config": {
             "name" : "ASIns",
-            "description": "The SG for Alpha Pinger AS - Instance",
+            "description": "The SG for Beta Pinger AS - Instance",
             "ingress-rules": [
                 {
                   "protocol": "tcp",
@@ -94,6 +94,12 @@
                 "protocol": "udp",
                 "from_port": 123,
                 "to_port": 123,
+                "cidr_ip": "0.0.0.0/0"
+              },
+              {
+                "protocol": "tcp",
+                "from_port": 80,
+                "to_port": 80,
                 "cidr_ip": "0.0.0.0/0"
               }
             ]
