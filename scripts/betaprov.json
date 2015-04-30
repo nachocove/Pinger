@@ -12,21 +12,20 @@
         "instance_tenancy": "default"
     },
     "iam_config": {
-        "users": [
-            {
-                "user_name_suffix": "betapinger",
+        "users": {
+            "pinger": {
                 "inline_policies" : [
                 ]
             },
-            {
-                "user_name_suffix": "betapinger_boot",
+            "pinger_boot": {
                 "inline_policies" : [
                 ]
             }
-        ]
+        }
     },
     "s3_config": {
           "s3_bucket": "nachobetaconf",
+          "bucket_prefix": "betapinger",
           "s3_filenames": {
             "certs_pem": "/betapinger/pinger/betaDC.crt",
             "key_pem": "/betapinger/pinger/betaDC.key",
@@ -68,7 +67,6 @@
         "instance_monitoring": false,
         "min_size": 1,
         "max_size": 1,
-        "user_data_file": "nacho_init_betapinger.sh",
         "sg_config": {
             "name" : "ASIns",
             "description": "The SG for Beta Pinger AS - Instance",

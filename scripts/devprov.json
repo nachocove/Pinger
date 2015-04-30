@@ -12,9 +12,8 @@
         "instance_tenancy": "default"
     },
     "iam_config": {
-        "users": [
-            {
-                "user_name_suffix": "devpinger",
+        "users": {
+            "pinger": {
                 "inline_policies" : [
                     {
                         "policy": {
@@ -47,8 +46,7 @@
                     }
                 ]
             },
-            {
-                "user_name_suffix": "devpinger_boot",
+            "pinger_boot": {
                 "inline_policies" : [
                     {
                         "policy": {
@@ -78,10 +76,11 @@
                     }
                 ]
             }
-        ]
+        }
     },
     "s3_config": {
           "s3_bucket": "nchoconfal",
+          "bucket_prefix": "devpinger",
           "s3_filenames": {
               "certs_pem": "/devpinger/pinger/pingercerts.pem",
               "key_pem": "/devpinger/pinger/pingerkey.pem",
@@ -122,7 +121,6 @@
         "instance_monitoring": false,
         "min_size": 1,
         "max_size": 1,
-        "user_data_file": "nacho_init_devpinger.sh",
         "sg_config": {
             "name" : "ASIns",
             "description": "The SG for Pinger AS - Instance",

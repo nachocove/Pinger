@@ -20,6 +20,10 @@ from boto.vpc import VPCConnection
 import configparser
 import StringIO
 import pem
+import subprocess
+
+# TODO : replace this
+CREATE_NACHO_INIT_SH="../config/nacho_init.sh-template"
 
 # get region from region_name
 def get_region(region_name):
@@ -269,8 +273,6 @@ def create_autoscaler(profile_name, region_name, vpc, elb, subnet, sg, name, aws
     conn = boto.ec2.autoscale.connect_to_region(region_name, profile_name=profile_name)
     asg_list = conn.get_all_groups(names=[name])
     if not len(asg_list):
-        with open (as_config["user_data_file"], "r") as udfile:
-            user_data = udfile.read()
         lc_name = name + "-LC"
         lc_list = conn.get_all_launch_configurations(names=[lc_name])
         if not len(lc_list):
@@ -278,10 +280,10 @@ def create_autoscaler(profile_name, region_name, vpc, elb, subnet, sg, name, aws
             lc = LaunchConfiguration(name=lc_name, image_id=as_config["ami_id"],
                 key_name=as_config["key_pair"],
                 security_groups=[sg.id],
-                user_data = user_data,
-                instance_type = as_config["instance_type"],
-                instance_monitoring = as_config["instance_monitoring"],
-                associate_public_ip_address = True
+                user_data=as_config["user_data"],
+                instance_type=as_config["instance_type"],
+                instance_monitoring=as_config["instance_monitoring"],
+                associate_public_ip_address=True
                 )
             conn.create_launch_configuration(lc)
         else:
@@ -354,18 +356,37 @@ def create_elb(profile_name, region_name, vpc, subnet, sg, name, config, cert):
     #elb.register_instances(ins.id)
     return elb
 
+# create create_nacho_init_sh
+def create_nacho_init_sh(config):
+    M4 = subprocess.Popen("which m4", shell=True, stdout=subprocess.PIPE).stdout.readline().rstrip()
+    if M4 == "":
+        print "Error:m4 not found"
+        config["as_config"]["user_data"]=""
+    else:
+        user_name = config["vpc_config"]["name"] + "_pinger_boot"
+
+        command = M4 + " -DACCESS_KEY=" + config["iam_config"][user_name + "_access_key"]["access_key_id"] + \
+        " -DSECRET_KEY=" + config["iam_config"][user_name + "_access_key"]["secret_access_key"] + \
+        " -DBUCKET=" + config["s3_config"]["s3_bucket"] + " -DPREFIX=" + config["s3_config"]["bucket_prefix"] + \
+        " " + CREATE_NACHO_INIT_SH
+        init_sh = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
+        config["autoscale_config"]["user_data"]=init_sh
+
+
+# delete iam users and policies
 def delete_iam_users_and_policies(profile_name, region_name, name_prefix, iam_config):
     print "Deleting IAM users and policies for %s" % name_prefix
     conn=boto.iam.connect_to_region(region_name, profile_name=profile_name)
     for user_config in iam_config["users"]:
-        user_name = name_prefix + "-" + user_config["user_name_suffix"]
+        user_name = name_prefix + "_" + user_config
         try:
             user =  conn.get_user(user_name=user_name)
         except BotoServerError:
             user = None
         if user:
-            for policy_config in user_config["inline_policies"]:
-                policy_name = user_name + "-policy"
+            policy_configs = iam_config["users"][user_config]["inline_policies"]
+            for policy_config in policy_configs:
+                policy_name = user_name + "_policy"
                 try:
                     policy =  conn.get_user_policy(user_name, policy_name)
                 except BotoServerError:
@@ -380,13 +401,14 @@ def delete_iam_users_and_policies(profile_name, region_name, name_prefix, iam_co
             print "Deleting user (%s)" % user_name
             conn.delete_user(user_name)
 
+# create iam users and policies
 def create_iam_users_and_policies(profile_name, region_name, name_prefix, iam_config):
     print "Creating IAM users and policies for %s" % name_prefix
     conn=boto.iam.connect_to_region(region_name, profile_name=profile_name)
     for user_config in iam_config["users"]:
-        user_name = name_prefix + "-" + user_config["user_name_suffix"]
+        user_name = name_prefix + "_" + user_config
         try:
-            user =  conn.get_user(user_name=user_name)
+            user = conn.get_user(user_name=user_name)
         except BotoServerError:
             user = None
         if not user:
@@ -394,7 +416,8 @@ def create_iam_users_and_policies(profile_name, region_name, name_prefix, iam_co
             conn.create_user(user_name)
         else:
             print "User (%s) already exists." % user_name
-        for policy_config in user_config["inline_policies"]:
+        policy_configs = iam_config["users"][user_config]["inline_policies"]
+        for policy_config in policy_configs:
             policy_name = user_name + "-policy"
             try:
                 policy =  conn.get_user_policy(user_name, policy_name)
@@ -414,6 +437,8 @@ def create_iam_users_and_policies(profile_name, region_name, name_prefix, iam_co
         else:
             access_key = acccess_keys_list[0]
             print "Access key exists for user (%s)" % user_name, access_key["access_key_id"]
+            print "No 'secret_access_key' available. Please fill it in the init.sh in the user_data"
+            access_key["secret_access_key"] = "Fill_ME_IN"
         iam_config[user_name + "_access_key"] = access_key
 
 # cleanup
@@ -481,8 +506,7 @@ def provision_pinger(config):
     # create vpc
     try:
         create_iam_users_and_policies(profile_name,  aws_config["region_name"], vpc_config["name"], iam_config)
-        delete_iam_users_and_policies(profile_name,  aws_config["region_name"], vpc_config["name"], iam_config)
-        exit()
+        create_nacho_init_sh(config)
         vpc = create_vpc(conn, vpc_config["name"], vpc_config["vpc_cidr_block"], vpc_config["instance_tenancy"])
         subnet = create_subnet(conn, vpc, vpc_config["name"]+"-SN", vpc_config["subnet_cidr_block"],
                                vpc_config["availability_zone"])
