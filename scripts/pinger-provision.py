@@ -373,6 +373,10 @@ def delete_iam_users_and_policies(profile_name, region_name, name_prefix, iam_co
                 if policy:
                     print "Deleting policy (%s)" % policy_name
                     conn.delete_user_policy(user_name, policy_name)
+            acccess_keys_list =  conn.get_all_access_keys(user_name)['list_access_keys_response']['list_access_keys_result']['access_key_metadata']
+            for access_key in acccess_keys_list:
+                print "Deleting access_key (%s) for user (%s)" % (access_key["access_key_id"], user_name)
+                conn.delete_access_key(access_key["access_key_id"], user_name=user_name)
             print "Deleting user (%s)" % user_name
             conn.delete_user(user_name)
 
@@ -402,6 +406,15 @@ def create_iam_users_and_policies(profile_name, region_name, name_prefix, iam_co
             else:
                 print "Updating policy (%s)" % policy_name
                 conn.put_user_policy(user_name, policy_name, json.dumps(policy_config["policy"], indent=4))
+        acccess_keys_list =  conn.get_all_access_keys(user_name)['list_access_keys_response']['list_access_keys_result']['access_key_metadata']
+        if not len(acccess_keys_list):
+            print "Creating access key for user (%s)" % user_name
+            key_response = conn.create_access_key(user_name)
+            access_key = key_response.create_access_key_response.create_access_key_result.access_key
+        else:
+            access_key = acccess_keys_list[0]
+            print "Access key exists for user (%s)" % user_name, access_key["access_key_id"]
+        iam_config[user_name + "_access_key"] = access_key
 
 # cleanup
 def cleanup(config):
@@ -468,6 +481,8 @@ def provision_pinger(config):
     # create vpc
     try:
         create_iam_users_and_policies(profile_name,  aws_config["region_name"], vpc_config["name"], iam_config)
+        delete_iam_users_and_policies(profile_name,  aws_config["region_name"], vpc_config["name"], iam_config)
+        exit()
         vpc = create_vpc(conn, vpc_config["name"], vpc_config["vpc_cidr_block"], vpc_config["instance_tenancy"])
         subnet = create_subnet(conn, vpc, vpc_config["name"]+"-SN", vpc_config["subnet_cidr_block"],
                                vpc_config["availability_zone"])
