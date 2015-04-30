@@ -5,6 +5,7 @@ accessKey=ACCESS_KEY
 secretKey=SECRET_KEY
 bucket=BUCKET
 name=PREFIX
+pingerCfg=PINGER_CFG
 
 # Probably nothing configurable beyond here
 
@@ -55,6 +56,7 @@ service postfix restart || (echo "Could not restart postfix"; exit 1) || exit 1
 
 aws --profile nacho s3 cp s3://$bucket/$name/pinger $NACHO_CONFIG --recursive --include ''*' || (echo "Could not download s3 items for pinger"; exit 1) || exit 1
 chown -R $NACHO_USER:$NACHO_USER $NACHO_CONFIG || (echo "Could not chown $NACHO_CONFIG directory"; exit 1) || exit 1
+mv $NACHO_CONFIG/$pingerCfg $NACHO_CONFIG/pinger.cfg || (echo "Could not move $pingerCfg to pinger.cfg in $NACHO_CONFIG"; exit 1) || exit 1
 
 sudo -n -u $NACHO_USER -i -H sh -c "cd $NACHO_HOME; /usr/bin/supervisord -c $NACHO_CONFIG/supervisord.conf" || (echo "Could not start supervisord"; exit 1) || exit 1
 exit 0

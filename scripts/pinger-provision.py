@@ -16,11 +16,13 @@ from boto.exception import S3ResponseError, EC2ResponseError, BotoServerError
 from boto.ec2.autoscale import LaunchConfiguration
 from boto.ec2.autoscale import AutoScalingGroup
 import boto.iam
+from boto.s3.key import Key
 from boto.vpc import VPCConnection
 import configparser
 import StringIO
 import pem
 import subprocess
+import uuid
 
 # TODO : replace this
 CREATE_NACHO_INIT_SH="../config/nacho_init.sh-template"
@@ -367,11 +369,43 @@ def create_nacho_init_sh(config):
 
         command = M4 + " -DACCESS_KEY=" + config["iam_config"][user_name + "_access_key"]["access_key_id"] + \
         " -DSECRET_KEY=" + config["iam_config"][user_name + "_access_key"]["secret_access_key"] + \
-        " -DBUCKET=" + config["s3_config"]["s3_bucket"] + " -DPREFIX=" + config["s3_config"]["bucket_prefix"] + \
+        " -DBUCKET=" + config["s3_config"]["s3_bucket"] + " -DPREFIX=" + config["s3_config"]["bucket_prefix_key"] + \
+        " -DPINGER_CFG=" + config["vpc_config"]["name"] + "-pinger.cfg" + \
         " " + CREATE_NACHO_INIT_SH
         init_sh = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
-        config["autoscale_config"]["user_data"]=init_sh
+        config["autoscale_config"]["user_data"] = init_sh
 
+# update pinger config
+def update_pinger_cfg(config):
+    user_name = config["vpc_config"]["name"] + "_pinger"
+    config["s3_config"]["pinger_config"]["aws"]["accessKey"] = config["iam_config"][user_name + "_access_key"]["access_key_id"]
+    config["s3_config"]["pinger_config"]["aws"]["secretKey"] = config["iam_config"][user_name + "_access_key"]["secret_access_key"]
+    alive_token = uuid.uuid4().hex
+    config["s3_config"]["pinger_config"]["server"]["alive-check-token"] = alive_token
+    config["elb_config"]["alive-check-token"] = alive_token
+
+# delete pinger cfg
+def delete_pinger_cfg(profile_name, vpc_name, s3_config):
+    pinger_cfg_name = vpc_name + "-pinger.cfg"
+    key_name = s3_config["bucket_prefix_key"] + "/" + s3_config["pinger_bucket_key"] + "/" + pinger_cfg_name
+    print "Deleting pinger config (%s)" % key_name
+    conn = boto.connect_s3(profile_name=profile_name)
+    bucket = boto.s3.bucket.Bucket(conn, s3_config["s3_bucket"])
+    bucket.delete_key(key_name)
+
+# upload pinger cfg
+def upload_pinger_cfg(profile_name, vpc_name, s3_config):
+    pinger_cfg_name = vpc_name + "-pinger.cfg"
+    print "Uploading pinger config (%s)" % pinger_cfg_name
+    conn = boto.connect_s3(profile_name=profile_name)
+    bucket = boto.s3.bucket.Bucket(conn, s3_config["s3_bucket"])
+    pinger_config = s3_config["pinger_config"]
+    buf = StringIO.StringIO()
+    pinger_config.write(buf)
+    new_key = Key(bucket)
+    key_name = s3_config["bucket_prefix_key"] + "/" + s3_config["pinger_bucket_key"] + "/" + pinger_cfg_name
+    new_key.key = key_name
+    new_key.set_contents_from_string(buf.getvalue())
 
 # delete iam users and policies
 def delete_iam_users_and_policies(profile_name, region_name, name_prefix, iam_config):
@@ -394,8 +428,8 @@ def delete_iam_users_and_policies(profile_name, region_name, name_prefix, iam_co
                 if policy:
                     print "Deleting policy (%s)" % policy_name
                     conn.delete_user_policy(user_name, policy_name)
-            acccess_keys_list =  conn.get_all_access_keys(user_name)['list_access_keys_response']['list_access_keys_result']['access_key_metadata']
-            for access_key in acccess_keys_list:
+            access_keys_list = conn.get_all_access_keys(user_name)['list_access_keys_response']['list_access_keys_result']['access_key_metadata']
+            for access_key in access_keys_list:
                 print "Deleting access_key (%s) for user (%s)" % (access_key["access_key_id"], user_name)
                 conn.delete_access_key(access_key["access_key_id"], user_name=user_name)
             print "Deleting user (%s)" % user_name
@@ -429,13 +463,13 @@ def create_iam_users_and_policies(profile_name, region_name, name_prefix, iam_co
             else:
                 print "Updating policy (%s)" % policy_name
                 conn.put_user_policy(user_name, policy_name, json.dumps(policy_config["policy"], indent=4))
-        acccess_keys_list =  conn.get_all_access_keys(user_name)['list_access_keys_response']['list_access_keys_result']['access_key_metadata']
-        if not len(acccess_keys_list):
+        access_keys_list =  conn.get_all_access_keys(user_name)['list_access_keys_response']['list_access_keys_result']['access_key_metadata']
+        if not len(access_keys_list):
             print "Creating access key for user (%s)" % user_name
             key_response = conn.create_access_key(user_name)
             access_key = key_response.create_access_key_response.create_access_key_result.access_key
         else:
-            access_key = acccess_keys_list[0]
+            access_key = access_keys_list[0]
             print "Access key exists for user (%s)" % user_name, access_key["access_key_id"]
             print "No 'secret_access_key' available. Please fill it in the init.sh in the user_data"
             access_key["secret_access_key"] = "Fill_ME_IN"
@@ -454,10 +488,11 @@ def process_config(config):
 def load_config_from_s3(profile_name, s3_config):
     conn = boto.connect_s3(profile_name=profile_name)
     bucket = boto.s3.bucket.Bucket(conn, s3_config["s3_bucket"])
-    s3_files = dict ()
-    for key in s3_config["s3_filenames"]:
-        s3_key = Key(bucket, s3_config["s3_filenames"][key])
-        s3_files[key] = s3_key.get_contents_as_string()
+    s3_files = dict()
+    for file_key in s3_config["s3_filenames"]:
+        file_name = s3_config["bucket_prefix_key"] + "/" + s3_config["pinger_bucket_key"] + "/" + s3_config["s3_filenames"][file_key]
+        s3_key = Key(bucket, file_name)
+        s3_files[file_key] = s3_key.get_contents_as_string()
     s3_config["s3_files"] = s3_files
     buf = StringIO.StringIO(s3_config["s3_files"]["pinger_config"])
     pinger_config = configparser.ConfigParser()
@@ -487,6 +522,7 @@ def deprovision_pinger(config):
     delete_autoscaler(profile_name, aws_config["region_name"], vpc_config["name"] + "-AS")
     delete_elb(profile_name, aws_config["region_name"], vpc_config["name"] + "-ELB")
     delete_vpc(profile_name, aws_config["region"], vpc_config["name"])
+    delete_pinger_cfg(profile_name, vpc_config["name"], s3_config)
     delete_iam_users_and_policies(profile_name,  aws_config["region_name"], vpc_config["name"], iam_config)
 
 # create VPC et al
@@ -499,13 +535,14 @@ def provision_pinger(config):
     as_config = config["autoscale_config"]
     elb_config = config["elb_config"]
     load_config_from_s3(profile_name, s3_config)
-    elb_config["alive-check-token"] = s3_config["pinger_config"]["server"]["alive-check-token"].strip('"')
     print "Provisioning Pinger %s" % vpc_config["name"]
     # create connection
     conn = VPCConnection(region=aws_config["region"], profile_name=profile_name)
     # create vpc
     try:
         create_iam_users_and_policies(profile_name,  aws_config["region_name"], vpc_config["name"], iam_config)
+        update_pinger_cfg(config)
+        upload_pinger_cfg(profile_name, vpc_config["name"], s3_config)
         create_nacho_init_sh(config)
         vpc = create_vpc(conn, vpc_config["name"], vpc_config["vpc_cidr_block"], vpc_config["instance_tenancy"])
         subnet = create_subnet(conn, vpc, vpc_config["name"]+"-SN", vpc_config["subnet_cidr_block"],

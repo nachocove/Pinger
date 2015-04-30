@@ -5,7 +5,7 @@
         "profile_name": "provisioner"
     },
     "vpc_config": {
-        "name": "TestApr29DevVPC",
+        "name": "TestApr30DevVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
@@ -80,11 +80,11 @@
     },
     "s3_config": {
           "s3_bucket": "nchoconfal",
-          "bucket_prefix": "devpinger",
+          "bucket_prefix_key": "devpinger",
+          "pinger_bucket_key": "pinger",
           "s3_filenames": {
-              "certs_pem": "/devpinger/pinger/pingercerts.pem",
-              "key_pem": "/devpinger/pinger/pingerkey.pem",
-              "pinger_config": "/devpinger/pinger/pinger.cfg"
+              "certs_pem": "pingercerts.pem",
+              "pinger_config": "pinger.cfg"
           }
     },
     "elb_config": {

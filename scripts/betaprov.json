@@ -26,13 +26,13 @@
     "s3_config": {
           "s3_bucket": "nachobetaconf",
           "bucket_prefix": "betapinger",
+          "bucket_prefix_key": "betapinger",
+          "pinger_bucket_key": "pinger",
           "s3_filenames": {
-            "certs_pem": "/betapinger/pinger/betaDC.crt",
-            "key_pem": "/betapinger/pinger/betaDC.key",
-            "pinger_config": "/betapinger/pinger/pinger.cfg"
+              "certs_pem": "betaDC.crt",
+              "pinger_config": "pinger.cfg"
           }
     },
-
     "elb_config": {
         "ports": [
             [443, 8443, "https", "https", "arn:aws:iam::610813048224:server-certificate/BetaPinger_DigiCert_2015"]

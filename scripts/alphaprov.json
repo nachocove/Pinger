@@ -25,11 +25,11 @@
     },
     "s3_config": {
           "s3_bucket": "nchoconfal",
-          "bucket_prefix": "alphapinger",
+          "bucket_prefix_key": "alphapinger",
+          "pinger_bucket_key": "pinger",
           "s3_filenames": {
-            "certs_pem": "/alphapinger/pinger/alphaDC.crt",
-            "key_pem": "/alphapinger/pinger/alphaDC.key",
-            "pinger_config": "/alphapinger/pinger/pinger.cfg"
+              "certs_pem": "alphaDC.crt",
+              "pinger_config": "pinger.cfg"
           }
     },
     "elb_config": {
