@@ -452,7 +452,7 @@ def create_iam_users_and_policies(profile_name, region_name, name_prefix, iam_co
             print "User (%s) already exists." % user_name
         policy_configs = iam_config["users"][user_config]["inline_policies"]
         for policy_config in policy_configs:
-            policy_name = user_name + "-policy"
+            policy_name = user_name + "_policy"
             try:
                 policy =  conn.get_user_policy(user_name, policy_name)
             except BotoServerError:
