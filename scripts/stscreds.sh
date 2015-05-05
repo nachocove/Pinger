@@ -8,8 +8,10 @@ fi
 TOKEN=$1
 USER=azimo
 PROFILE=azim
+ACCOUNT_ID=263277746520
 
-jsonResponse=`aws --profile $PROFILE sts get-session-token --serial-number arn:aws:iam::263277746520:mfa/$USER --token $TOKEN`
+
+jsonResponse=`aws --profile $PROFILE sts get-session-token --serial-number arn:aws:iam::$ACCOUNT_ID:mfa/$USER --token $TOKEN`
 if [ $? != 0 ] ; then
    exit 1
 fi

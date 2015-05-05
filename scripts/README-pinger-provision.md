@@ -29,9 +29,10 @@ optional arguments:
 ## Provision a dev deployment env
 1. run the following command to get the temporary security token set in your env:
    - use your own user access keys 
-   - update the stscreds.sh to refer to your user id and .aws/credentials profile_name
-        USER=azimo
-        PROFILE=azim
+   - update the stscreds.sh to refer to your user id,  .aws/credentials profile_name, account_id
+        USER=<user_name>
+        PROFILE=<aws_credentials_profile_name>
+        ACCOUNT_ID=<account_id>
    - use the MFA token as the command line argument
 $ `./stscreds.sh <token_id>`
 
@@ -42,9 +43,10 @@ $ python pinger-provision.py --config devprov.json
 ## Provision an alpha deployment env
 1. run the following command to get the temporary security token set in your env:
    - use your own user access keys 
-   - update the stscreds.sh to refer to your user id and .aws/credentials profile_name
-        USER=azimo
-        PROFILE=azim
+   - update the stscreds.sh to refer to your user id,  .aws/credentials profile_name, account_id
+        USER=<user_name>
+        PROFILE=<aws_credentials_profile_name>
+        ACCOUNT_ID=<account_id>
    - use the MFA token as the command line argument
    
 2. then run 
