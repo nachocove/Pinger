@@ -61,8 +61,8 @@ def get_vpc_by_name(conn, name):
     return None
 
 # delete VPC
-def delete_vpc(profile_name, region, name):
-    conn = VPCConnection(region=region, profile_name=profile_name)
+def delete_vpc(region, name):
+    conn = VPCConnection(region=region)
     vpc = get_vpc_by_name(conn, name)
     if not vpc:
         print "VPC %s does not exist. Nothing to delete" % name
@@ -253,8 +253,8 @@ def add_rules_to_sg(conn, sg, rules, is_ingress):
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) added." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
 
 # delete auto scale and launch configuration
-def delete_autoscaler(profile_name, region_name, name):
-    conn = boto.ec2.autoscale.connect_to_region(region_name, profile_name=profile_name)
+def delete_autoscaler(region_name, name):
+    conn = boto.ec2.autoscale.connect_to_region(region_name)
     asg_list = conn.get_all_groups(names=[name])
     if not len(asg_list):
         print "Auto Scaler %s does not exist. Nothing to delete" % name
@@ -270,9 +270,9 @@ def delete_autoscaler(profile_name, region_name, name):
         conn. delete_launch_configuration(lc_name)
 
 # create auto scaler
-def create_autoscaler(profile_name, region_name, vpc, elb, subnet, sg, name, aws_config, as_config):
+def create_autoscaler(region_name, vpc, elb, subnet, sg, name, aws_config, as_config):
     print "Creating auto scaler %s" % name
-    conn = boto.ec2.autoscale.connect_to_region(region_name, profile_name=profile_name)
+    conn = boto.ec2.autoscale.connect_to_region(region_name)
     asg_list = conn.get_all_groups(names=[name])
     if not len(asg_list):
         lc_name = name + "-LC"
@@ -309,8 +309,8 @@ def create_autoscaler(profile_name, region_name, vpc, elb, subnet, sg, name, aws
     return asg
 
 # delete load balancer
-def delete_elb(profile_name, region_name, name):
-    conn = boto.ec2.elb.connect_to_region(region_name, profile_name=profile_name)
+def delete_elb(region_name, name):
+    conn = boto.ec2.elb.connect_to_region(region_name)
     try:
         elb_list = conn.get_all_load_balancers(load_balancer_names=[name])
     except BotoServerError, e: # ELB by the given name does not exist
@@ -322,9 +322,9 @@ def delete_elb(profile_name, region_name, name):
         conn.delete_load_balancer(name)
 
 # create load balancer
-def create_elb(profile_name, region_name, vpc, subnet, sg, name, config, cert):
+def create_elb(region_name, vpc, subnet, sg, name, config, cert):
     print "Creating elastic load balancer %s" % name
-    conn = boto.ec2.elb.connect_to_region(region_name, profile_name=profile_name)
+    conn = boto.ec2.elb.connect_to_region(region_name)
     try:
         elb_list = conn.get_all_load_balancers(load_balancer_names=[name])
     except BotoServerError, e: # ELB by the given name does not exist
@@ -385,19 +385,19 @@ def update_pinger_cfg(config):
     config["elb_config"]["alive-check-token"] = alive_token
 
 # delete pinger cfg
-def delete_pinger_cfg(profile_name, vpc_name, s3_config):
+def delete_pinger_cfg(vpc_name, s3_config):
     pinger_cfg_name = vpc_name + "-pinger.cfg"
     key_name = s3_config["bucket_prefix_key"] + "/" + s3_config["pinger_bucket_key"] + "/" + pinger_cfg_name
     print "Deleting pinger config (%s)" % key_name
-    conn = boto.connect_s3(profile_name=profile_name)
+    conn = boto.connect_s3()
     bucket = boto.s3.bucket.Bucket(conn, s3_config["s3_bucket"])
     bucket.delete_key(key_name)
 
 # upload pinger cfg
-def upload_pinger_cfg(profile_name, vpc_name, s3_config):
+def upload_pinger_cfg(vpc_name, s3_config):
     pinger_cfg_name = vpc_name + "-pinger.cfg"
     print "Uploading pinger config (%s)" % pinger_cfg_name
-    conn = boto.connect_s3(profile_name=profile_name)
+    conn = boto.connect_s3()
     bucket = boto.s3.bucket.Bucket(conn, s3_config["s3_bucket"])
     pinger_config = s3_config["pinger_config"]
     buf = StringIO.StringIO()
@@ -408,9 +408,9 @@ def upload_pinger_cfg(profile_name, vpc_name, s3_config):
     new_key.set_contents_from_string(buf.getvalue())
 
 # delete iam users and policies
-def delete_iam_users_and_policies(profile_name, region_name, name_prefix, iam_config):
+def delete_iam_users_and_policies(region_name, name_prefix, iam_config):
     print "Deleting IAM users and policies for %s" % name_prefix
-    conn=boto.iam.connect_to_region(region_name, profile_name=profile_name)
+    conn=boto.iam.connect_to_region(region_name)
     for user_config in iam_config["users"]:
         user_name = name_prefix + "_" + user_config
         try:
@@ -436,9 +436,9 @@ def delete_iam_users_and_policies(profile_name, region_name, name_prefix, iam_co
             conn.delete_user(user_name)
 
 # create iam users and policies
-def create_iam_users_and_policies(profile_name, region_name, name_prefix, iam_config):
+def create_iam_users_and_policies(region_name, name_prefix, iam_config):
     print "Creating IAM users and policies for %s" % name_prefix
-    conn=boto.iam.connect_to_region(region_name, profile_name=profile_name)
+    conn=boto.iam.connect_to_region(region_name)
     for user_config in iam_config["users"]:
         user_name = name_prefix + "_" + user_config
         try:
@@ -485,8 +485,8 @@ def process_config(config):
     config["aws_config"]["region"] = get_region(config["aws_config"]["region_name"])
 
 # load config from S3
-def load_config_from_s3(profile_name, s3_config):
-    conn = boto.connect_s3(profile_name=profile_name)
+def load_config_from_s3(s3_config):
+    conn = boto.connect_s3()
     bucket = boto.s3.bucket.Bucket(conn, s3_config["s3_bucket"])
     s3_files = dict()
     for file_key in s3_config["s3_filenames"]:
@@ -512,37 +512,35 @@ def json_config(file_name):
 # delete VPC et al
 def deprovision_pinger(config):
     aws_config = config["aws_config"]
-    profile_name = aws_config["profile_name"]
     iam_config = config["iam_config"]
     s3_config = config["s3_config"]
     vpc_config = config["vpc_config"]
     as_config = config["autoscale_config"]
     elb_config = config["elb_config"]
     print "De-Provisioning Pinger %s" % vpc_config["name"]
-    delete_autoscaler(profile_name, aws_config["region_name"], vpc_config["name"] + "-AS")
-    delete_elb(profile_name, aws_config["region_name"], vpc_config["name"] + "-ELB")
-    delete_vpc(profile_name, aws_config["region"], vpc_config["name"])
-    delete_pinger_cfg(profile_name, vpc_config["name"], s3_config)
-    delete_iam_users_and_policies(profile_name,  aws_config["region_name"], vpc_config["name"], iam_config)
+    delete_autoscaler(aws_config["region_name"], vpc_config["name"] + "-AS")
+    delete_elb(aws_config["region_name"], vpc_config["name"] + "-ELB")
+    delete_vpc(aws_config["region"], vpc_config["name"])
+    delete_pinger_cfg(vpc_config["name"], s3_config)
+    delete_iam_users_and_policies(aws_config["region_name"], vpc_config["name"], iam_config)
 
 # create VPC et al
 def provision_pinger(config):
     aws_config = config["aws_config"]
-    profile_name = aws_config["profile_name"]
     iam_config = config["iam_config"]
     s3_config = config["s3_config"]
     vpc_config = config["vpc_config"]
     as_config = config["autoscale_config"]
     elb_config = config["elb_config"]
-    load_config_from_s3(profile_name, s3_config)
+    load_config_from_s3(s3_config)
     print "Provisioning Pinger %s" % vpc_config["name"]
     # create connection
-    conn = VPCConnection(region=aws_config["region"], profile_name=profile_name)
+    conn = VPCConnection(region=aws_config["region"])
     # create vpc
     try:
-        create_iam_users_and_policies(profile_name,  aws_config["region_name"], vpc_config["name"], iam_config)
+        create_iam_users_and_policies(aws_config["region_name"], vpc_config["name"], iam_config)
         update_pinger_cfg(config)
-        upload_pinger_cfg(profile_name, vpc_config["name"], s3_config)
+        upload_pinger_cfg(vpc_config["name"], s3_config)
         create_nacho_init_sh(config)
         vpc = create_vpc(conn, vpc_config["name"], vpc_config["vpc_cidr_block"], vpc_config["instance_tenancy"])
         subnet = create_subnet(conn, vpc, vpc_config["name"]+"-SN", vpc_config["subnet_cidr_block"],
@@ -554,14 +552,14 @@ def provision_pinger(config):
                            + " for " + vpc_config["name"])
         add_rules_to_sg(conn, elb_sg, elb_sg_config["ingress-rules"], True)
         add_rules_to_sg(conn, elb_sg, elb_sg_config["egress-rules"], False)
-        elb = create_elb(profile_name, aws_config["region_name"], vpc, subnet, elb_sg, vpc_config["name"] + "-ELB",
+        elb = create_elb(aws_config["region_name"], vpc, subnet, elb_sg, vpc_config["name"] + "-ELB",
                          elb_config, s3_config["first_cert_pem"])
         ins_sg_config = config["autoscale_config"]["sg_config"]
         ins_sg = create_sg(conn, vpc, vpc_config["name"]+ins_sg_config["name"]+"-SG",
                            ins_sg_config["description"] + " for " + vpc_config["name"])
         add_rules_to_sg(conn, ins_sg, ins_sg_config["ingress-rules"], True)
         add_rules_to_sg(conn, ins_sg, ins_sg_config["egress-rules"], False)
-        ascaler = create_autoscaler(profile_name, aws_config["region_name"], vpc, elb, subnet,
+        ascaler = create_autoscaler(aws_config["region_name"], vpc, elb, subnet,
                                     ins_sg, vpc_config["name"] + "-AS", aws_config, as_config)
     except (BotoServerError, S3ResponseError, EC2ResponseError) as e:
         print "Error :%s(%s):%s" % (e.error_code, e.status, e.message)

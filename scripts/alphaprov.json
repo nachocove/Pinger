@@ -1,8 +1,7 @@
 {
     "aws_config": {
         "region_name": "us-west-2",
-        "zones": ["us-west-2a"],
-      "profile_name": "provisioner"
+        "zones": ["us-west-2a"]
     },
     "vpc_config": {
         "name": "TestApr29AlphaPingerVPC",

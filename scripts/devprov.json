@@ -1,11 +1,10 @@
 {
     "aws_config": {
         "region_name": "us-west-2",
-        "zones": ["us-west-2a"],
-        "profile_name": "provisioner"
+        "zones": ["us-west-2a"]
     },
     "vpc_config": {
-        "name": "TestApr30DevPingerVPC",
+        "name": "TestMay05DevPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",

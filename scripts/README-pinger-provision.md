@@ -26,17 +26,27 @@ optional arguments:
   -d, --delete          use this flag to deprovision the pinger
   --config config_file  the config(json) file for the deployment
   
-  
 ## Provision a dev deployment env
-1. run the following with the devpinger_boot user access keys
-$ sh create_nacho_init.sh <acccess_key> <secret_key> nchoconfal devpinger
+1. run the following command to get the temporary security token set in your env:
+   - use your own user access keys 
+   - update the stscreds.sh to refer to your user id and .aws/credentials profile_name
+        USER=azimo
+        PROFILE=azim
+   - use the MFA token as the command line argument
+$ `./stscreds.sh <token_id>`
+
 2. then run 
 $ python pinger-provision.py --config devprov.json
   
   
 ## Provision an alpha deployment env
-1. run the following with the alphapinger_boot user access keys
-$ sh create_nacho_init.sh <acccess_key> <secret_key> nchoconfal alphapinger
+1. run the following command to get the temporary security token set in your env:
+   - use your own user access keys 
+   - update the stscreds.sh to refer to your user id and .aws/credentials profile_name
+        USER=azimo
+        PROFILE=azim
+   - use the MFA token as the command line argument
+   
 2. then run 
 $ python pinger-provision.py --config alphaprov.json
 
