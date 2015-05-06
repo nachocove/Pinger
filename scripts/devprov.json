@@ -129,45 +129,51 @@
                     "from_port": 8443,
                     "to_port": 8443,
                     "cidr_ip": "0.0.0.0/0"
+                },
+                {
+                    "protocol": "tcp",
+                    "from_port": 22,
+                    "to_port": 22,
+                    "cidr_ip": "10.0.0.63/32"
                 }
             ],
             "egress-rules": [
-              {
-                  "protocol": "tcp",
-                  "from_port": 443,
-                  "to_port": 443,
-                  "cidr_ip": "0.0.0.0/0"
-              },
-              {
-                  "protocol": "tcp",
-                  "from_port": 2195,
-                  "to_port": 2195,
-                  "cidr_ip": "17.0.0.0/8"
-              },
-              {
-                  "protocol": "tcp",
-                  "from_port": 2196,
-                  "to_port": 2196,
-                  "cidr_ip": "17.0.0.0/8"
-              },
-              {
-                  "protocol": "tcp",
-                  "from_port": 123,
-                  "to_port": 123,
-                  "cidr_ip": "0.0.0.0/0"
-              },
-              {
-                  "protocol": "udp",
-                  "from_port": 123,
-                  "to_port": 123,
-                  "cidr_ip": "0.0.0.0/0"
-              },
-              {
-                  "protocol": "tcp",
-                  "from_port": 80,
-                  "to_port": 80,
-                  "cidr_ip": "0.0.0.0/0"
-              }
+                {
+                    "protocol": "tcp",
+                    "from_port": 443,
+                    "to_port": 443,
+                    "cidr_ip": "0.0.0.0/0"
+                },
+                {
+                    "protocol": "tcp",
+                    "from_port": 2195,
+                    "to_port": 2195,
+                    "cidr_ip": "17.0.0.0/8"
+                },
+                {
+                    "protocol": "tcp",
+                    "from_port": 2196,
+                    "to_port": 2196,
+                    "cidr_ip": "17.0.0.0/8"
+                },
+                {
+                    "protocol": "tcp",
+                    "from_port": 123,
+                    "to_port": 123,
+                    "cidr_ip": "0.0.0.0/0"
+                },
+                {
+                    "protocol": "udp",
+                    "from_port": 123,
+                    "to_port": 123,
+                    "cidr_ip": "0.0.0.0/0"
+                },
+                {
+                    "protocol": "tcp",
+                    "from_port": 80,
+                    "to_port": 80,
+                    "cidr_ip": "0.0.0.0/0"
+                }
             ]
         }
     }
