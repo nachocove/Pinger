@@ -22,11 +22,10 @@
                                     "Sid": "Stmt1426990618000",
                                     "Effect": "Allow",
                                     "Action": [
-                                        "s3:ListBucket",
                                         "s3:PutObject"
                                     ],
                                     "Resource": [
-                                        "arn:aws:s3:::nchoteleal/*"
+                                        "arn:aws:s3:::nchoteleal/dev/*"
                                     ]
                                 },
                                 {
@@ -68,7 +67,10 @@
                                     ],
                                     "Resource": [
                                         "arn:aws:s3:::nchoconfal"
-                                    ]
+                                    ],
+                                    "Condition":{
+                                        "StringLike":{"s3:prefix":["devpinger/*"]}
+                                    }
                                 }
                             ]
                         }
@@ -134,7 +136,7 @@
                     "protocol": "tcp",
                     "from_port": 22,
                     "to_port": 22,
-                    "cidr_ip": "10.0.0.63/32"
+                    "cidr_ip": "52.24.128.121/32"
                 }
             ],
             "egress-rules": [
