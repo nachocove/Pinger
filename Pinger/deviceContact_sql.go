@@ -72,7 +72,7 @@ func (h *deviceContactSqlDbHandler) get(keys []AWS.DBKeyValue) (*deviceContact, 
 		}
 		args = append(args, a.Value)
 	}
-	fmt.Printf("Searching with args %+v\n", args)
+
 	obj, err := h.dbm.Get(&deviceContact{}, args...)
 	if err != nil {
 		return nil, err
