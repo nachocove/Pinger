@@ -14,14 +14,87 @@
         "users": {
             "pinger": {
                 "inline_policies" : [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "Stmt1426990618000",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:PutObject"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:s3:::nchoteleal/alpha/*"
+                                    ]
+                                },
+                                {
+                                    "Sid": "Stmt1426990755000",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "cognito-identity:DescribeIdentity",
+                                        "cognito-identity:ListIdentities"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:cognito-identity:us-east-1:263277746520:identitypool/"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
                 ]
             },
             "pinger_boot": {
                 "inline_policies" : [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:Get*",
+                                        "s3:List*"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:s3:::nchoconfal/alphapinger/*"
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:ListBucket"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:s3:::nchoconfal"
+                                    ],
+                                    "Condition":{
+                                        "StringLike":{"s3:prefix":["alphapinger/*"]}
+                                    }
+                                }
+                            ]
+                        }
+                    }
                 ]
             },
             "pinger_cloudwatch": {
                 "inline_policies" : [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:*"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:logs:*:*:*"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
                 ]
             }
         }
@@ -63,7 +136,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-f91122c9",
+        "ami_id": "ami-75142745",
         "key_pair": "AlphaPinger",
         "instance_type": "c1.medium",
         "instance_monitoring": false,
@@ -83,7 +156,7 @@
                     "protocol": "tcp",
                     "from_port": 22,
                     "to_port": 22,
-                    "cidr_ip": "xx.xx.xx.xx/32"
+                    "cidr_ip": "52.11.248.58/32"
                 }
 
             ],
