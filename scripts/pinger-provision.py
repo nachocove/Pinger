@@ -365,12 +365,16 @@ def create_nacho_init_sh(config):
         print "Error:m4 not found"
         config["as_config"]["user_data"]=""
     else:
-        user_name = config["vpc_config"]["name"] + "_pinger_boot"
+        boot_user_name = config["vpc_config"]["name"] + "_pinger_boot"
+        cw_user_name = config["vpc_config"]["name"] + "_pinger_cloudwatch"
 
-        command = M4 + " -DACCESS_KEY=" + config["iam_config"][user_name + "_access_key"]["access_key_id"] + \
-        " -DSECRET_KEY=" + config["iam_config"][user_name + "_access_key"]["secret_access_key"] + \
+        command = M4 + " -DACCESS_KEY=" + config["iam_config"][boot_user_name + "_access_key"]["access_key_id"] + \
+        " -DSECRET_KEY=" + config["iam_config"][boot_user_name + "_access_key"]["secret_access_key"] + \
+        " -DACCESS_KEY_CW=" + config["iam_config"][cw_user_name + "_access_key"]["access_key_id"] + \
+        " -DSECRET_KEY_CW=" + config["iam_config"][cw_user_name + "_access_key"]["secret_access_key"] + \
         " -DBUCKET=" + config["s3_config"]["s3_bucket"] + " -DPREFIX=" + config["s3_config"]["bucket_prefix_key"] + \
-        " -DPINGER_CFG=" + config["vpc_config"]["name"] + "-pinger.cfg" + \
+        " -DPINGER_CFG=" + config["vpc_config"]["name"] + "-pingerv2.cfg" + \
+        " -DPINGER_NAME=" + config["vpc_config"]["name"] + \
         " " + CREATE_NACHO_INIT_SH
         init_sh = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
         config["autoscale_config"]["user_data"] = init_sh
@@ -386,7 +390,7 @@ def update_pinger_cfg(config):
 
 # delete pinger cfg
 def delete_pinger_cfg(vpc_name, s3_config):
-    pinger_cfg_name = vpc_name + "-pinger.cfg"
+    pinger_cfg_name = vpc_name + "-pingerv2.cfg"
     key_name = s3_config["bucket_prefix_key"] + "/" + s3_config["pinger_bucket_key"] + "/" + pinger_cfg_name
     print "Deleting pinger config (%s)" % key_name
     conn = boto.connect_s3()
@@ -395,7 +399,7 @@ def delete_pinger_cfg(vpc_name, s3_config):
 
 # upload pinger cfg
 def upload_pinger_cfg(vpc_name, s3_config):
-    pinger_cfg_name = vpc_name + "-pinger.cfg"
+    pinger_cfg_name = vpc_name + "-pingerv2.cfg"
     print "Uploading pinger config (%s)" % pinger_cfg_name
     conn = boto.connect_s3()
     bucket = boto.s3.bucket.Bucket(conn, s3_config["s3_bucket"])
@@ -463,7 +467,7 @@ def create_iam_users_and_policies(region_name, name_prefix, iam_config):
             else:
                 print "Updating policy (%s)" % policy_name
                 conn.put_user_policy(user_name, policy_name, json.dumps(policy_config["policy"], indent=4))
-        access_keys_list =  conn.get_all_access_keys(user_name)['list_access_keys_response']['list_access_keys_result']['access_key_metadata']
+        access_keys_list = conn.get_all_access_keys(user_name)['list_access_keys_response']['list_access_keys_result']['access_key_metadata']
         if not len(access_keys_list):
             print "Creating access key for user (%s)" % user_name
             key_response = conn.create_access_key(user_name)

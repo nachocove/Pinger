@@ -4,7 +4,7 @@
         "zones": ["us-west-2a"]
     },
     "vpc_config": {
-        "name": "TestMay05DevPingerVPC",
+        "name": "TestMay11DevPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
@@ -76,6 +76,26 @@
                         }
                     }
                 ]
+            },
+            "pinger_cloudwatch": {
+                "inline_policies" : [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:*"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:logs:*:*:*"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
             }
         }
     },
@@ -85,7 +105,7 @@
           "pinger_bucket_key": "pinger",
           "s3_filenames": {
               "certs_pem": "pingercerts.pem",
-              "pinger_config": "pinger.cfg"
+              "pinger_config": "pingerv2.cfg"
           }
     },
     "elb_config": {
@@ -116,9 +136,9 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-e981b5d9",
-        "key_pair": "Dev Pinger VPC KeyPair",
-        "instance_type": "t1.micro",
+        "ami_id": "ami-45615275",
+        "key_pair": "goTestServer",
+        "instance_type": "t2.micro",
         "instance_monitoring": false,
         "min_size": 1,
         "max_size": 1,

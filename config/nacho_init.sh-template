@@ -6,6 +6,9 @@ secretKey=SECRET_KEY
 bucket=BUCKET
 name=PREFIX
 pingerCfg=PINGER_CFG
+pingerName=PINGER_NAME
+accessKeyCloudWatch=ACCESS_KEY_CW
+secretKeyCloudWatch=SECRET_KEY_CW
 
 # Probably nothing configurable beyond here
 
@@ -41,22 +44,16 @@ cat > $aws_cli_config << EOF
 [nacho]
 region = us-west-2
 EOF
-
-cat > /etc/sudoers.d/$NACHO_USER << EOF
-root ALL=($NACHO_USER) NOPASSWD: ALL
-Defaults:root !requiretty
+cat >> /etc/awslogs/awscli.conf << EOF
+aws_access_key_id = $accessKeyCloudWatch
+aws_secret_access_key = $secretKeyCloudWatch
 EOF
-
-cat > /etc/postfix/sasl_passwd << EOF
-email-smtp.us-west-2.amazonaws.com:587 $accessKey:$secretKey
-EOF
-
-postmap /etc/postfix/sasl_passwd || (echo "Could not write sasl_passwd file"; exit 1) || exit 1
-service postfix restart || (echo "Could not restart postfix"; exit 1) || exit 1
 
 aws --profile nacho s3 cp s3://$bucket/$name/pinger $NACHO_CONFIG --recursive --include ''*' || (echo "Could not download s3 items for pinger"; exit 1) || exit 1
 chown -R $NACHO_USER:$NACHO_USER $NACHO_CONFIG || (echo "Could not chown $NACHO_CONFIG directory"; exit 1) || exit 1
 mv $NACHO_CONFIG/$pingerCfg $NACHO_CONFIG/pinger.cfg || (echo "Could not move $pingerCfg to pinger.cfg in $NACHO_CONFIG"; exit 1) || exit 1
-
-sudo -n -u $NACHO_USER -i -H sh -c "cd $NACHO_HOME; /usr/bin/supervisord -c $NACHO_CONFIG/supervisord.conf" || (echo "Could not start supervisord"; exit 1) || exit 1
+sed "s/DEPLOY_ENV/$pingerName/g" /etc/awslogs/awslogs.conf > /tmp/awslogs.conf
+mv /tmp/awslogs.conf /etc/awslogs/awslogs.conf
+/usr/local/bin/supervisorctl restart all
+service awslogs restart
 exit 0
