@@ -19,6 +19,10 @@
             "pinger_boot": {
                 "inline_policies" : [
                 ]
+            },
+            "pinger_cloudwatch": {
+                "inline_policies" : [
+                ]
             }
         }
     },
@@ -59,7 +63,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-e981b5d9",
+        "ami_id": "ami-f91122c9",
         "key_pair": "AlphaPinger",
         "instance_type": "c1.medium",
         "instance_monitoring": false,
@@ -74,7 +78,14 @@
                   "from_port": 8443,
                   "to_port": 8443,
                   "cidr_ip": "0.0.0.0/0"
+                },
+                {
+                    "protocol": "tcp",
+                    "from_port": 22,
+                    "to_port": 22,
+                    "cidr_ip": "xx.xx.xx.xx/32"
                 }
+
             ],
             "egress-rules": [
               {

@@ -115,7 +115,15 @@ def create_ig(conn, vpc, name):
 
 # wait for subnet to be created
 def wait_for_subnet(c, sn_id):
-    subnet_list = c.get_all_subnets(subnet_ids=[sn_id])
+    # sometimes the subnet takes a bit to get created. try thrice
+    subnet_list = []
+    for x in range(0, 3):
+        try:
+            subnet_list = c.get_all_subnets(subnet_ids=[sn_id])
+            break
+        except EC2ResponseError:
+            print "Waiting for subnet(%s) to be created" % sn_id
+            time.sleep(1)
     while subnet_list[0].state == 'pending':
         print "waiting for subnet(%s) to be created" % sn_id
         time.sleep(1)
@@ -138,9 +146,9 @@ def create_subnet(conn, vpc, name, cidr_block, availability_zone):
                                                 ("availabilityZone", [availability_zone])])
     if not len(subnet_list):
         subnet = conn.create_subnet(vpc.id, cidr_block, availability_zone=availability_zone)
+        print "Created subnet %s (%s) for cidr_block: %s with available IPs: %d" % (name, subnet.id, subnet.cidr_block, subnet.available_ip_address_count)
         wait_for_subnet(conn, subnet.id)
         subnet.add_tag("Name", name)
-        print "Created subnet %s (%s) for cidr_block: %s with available IPs: %d" % (name, subnet.id, subnet.cidr_block, subnet.available_ip_address_count)
     else:
         subnet = subnet_list[0]
         print "Subnet %s (%s) already exists at cidr_block: %s!" % (name, subnet.id, subnet.cidr_block)

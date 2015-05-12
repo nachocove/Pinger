@@ -4,7 +4,7 @@
         "zones": ["us-west-2a"]
     },
     "vpc_config": {
-        "name": "TestMay11DevPingerVPC",
+        "name": "TestDevPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
@@ -136,7 +136,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-45615275",
+        "ami_id": "ami-f91122c9",
         "key_pair": "goTestServer",
         "instance_type": "t2.micro",
         "instance_monitoring": false,
@@ -156,7 +156,7 @@
                     "protocol": "tcp",
                     "from_port": 22,
                     "to_port": 22,
-                    "cidr_ip": "52.24.128.121/32"
+                    "cidr_ip": "xx.xx.xx.xx/32"
                 }
             ],
             "egress-rules": [
