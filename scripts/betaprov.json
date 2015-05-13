@@ -4,7 +4,7 @@
         "zones": ["us-west-2a"]
     },
     "vpc_config": {
-        "name": "TestApr29BetaPingerVPC",
+        "name": "TestBetaPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
@@ -29,7 +29,7 @@
           "pinger_bucket_key": "pinger",
           "s3_filenames": {
               "certs_pem": "betaDC.crt",
-              "pinger_config": "pinger.cfg"
+              "pinger_config": "pingerv2.cfg"
           }
     },
     "elb_config": {
@@ -60,9 +60,9 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-e981b5d9",
+        "ami_id": "ami-75142745",
         "key_pair": "BetaPinger",
-        "instance_type": "c1.medium",
+        "instance_type": "m3.medium",
         "instance_monitoring": false,
         "min_size": 1,
         "max_size": 1,
