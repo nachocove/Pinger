@@ -6,11 +6,14 @@ import (
 	"github.com/nachocove/Pinger/Pinger"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
+var ipv6Regex *regexp.Regexp
 func init() {
 	httpsRouter.HandleFunc("/1/alive", aliveCheck)
+	ipv6Regex = regexp.MustCompile("^\\[(?P<ip6>.+)\\]:(?P<port>\\d+)$")
 }
 
 func aliveCheck(w http.ResponseWriter, r *http.Request) {
@@ -25,13 +28,22 @@ func aliveCheck(w http.ResponseWriter, r *http.Request) {
 	if rIp == "" {
 		rIp = r.RemoteAddr
 	}
-	ipParts := strings.Split(rIp, ":")
-	if len(ipParts) < 1 {
-		context.Logger.Error("Could not split remote address %s", r.RemoteAddr)
-		http.Error(w, "INTERNAL ERROR", http.StatusInternalServerError)
-		return
+	// Try parsing the IP. For IPv6, the address will look like this: [::1] (for localhost, i.e. with brackets)
+	var remoteIP net.IP
+	if ipv6Regex.MatchString(rIp) {
+		replaceString := fmt.Sprintf("${%s}", ipv6Regex.SubexpNames()[1])
+		ip6 := ipv6Regex.ReplaceAllString(rIp, replaceString)
+		remoteIP = net.ParseIP(ip6)
+	} else {
+		// Split the port from the IP
+		ipParts := strings.Split(rIp, ":")
+		if len(ipParts) < 1 {
+			context.Logger.Error("Could not split remote address %s", r.RemoteAddr)
+			http.Error(w, "INTERNAL ERROR", http.StatusInternalServerError)
+			return
+		}
+		remoteIP = net.ParseIP(ipParts[0])
 	}
-	remoteIP := net.ParseIP(ipParts[0])
 	if remoteIP == nil {
 		context.Logger.Error("Could not parse remote address %s", r.RemoteAddr)
 		http.Error(w, "INTERNAL ERROR", http.StatusInternalServerError)
