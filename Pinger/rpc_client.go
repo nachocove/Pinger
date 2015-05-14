@@ -19,6 +19,7 @@ func StartPoll(rpcConfig *RPCServerConfiguration, pi *MailPingInformation) (*Sta
 	if err != nil {
 		return nil, err
 	}
+	defer rpcClient.Close()
 	var reply StartPollingResponse
 	err = rpcClient.Call("BackendPolling.Start", &StartPollArgs{MailInfo: pi}, &reply)
 	if err != nil {
@@ -32,6 +33,7 @@ func StopPoll(rpcConfig *RPCServerConfiguration, clientId, clientContext, device
 	if err != nil {
 		return nil, err
 	}
+	defer rpcClient.Close()
 	var reply PollingResponse
 	args := StopPollArgs{
 		ClientId:      clientId,
@@ -50,6 +52,7 @@ func DeferPoll(rpcConfig *RPCServerConfiguration, clientId, clientContext, devic
 	if err != nil {
 		return nil, err
 	}
+	defer rpcClient.Close()
 	var reply PollingResponse
 	args := DeferPollArgs{
 		ClientId:      clientId,
@@ -72,6 +75,7 @@ func FindActiveSessions(rpcConfig *RPCServerConfiguration, clientId, clientConte
 	if rpcClient == nil {
 		panic("Can not call deferPoll without rpcClient set")
 	}
+	defer rpcClient.Close()
 	var reply FindSessionsResponse
 	args := FindSessionsArgs{
 		ClientId:      clientId,
@@ -87,12 +91,13 @@ func FindActiveSessions(rpcConfig *RPCServerConfiguration, clientId, clientConte
 }
 
 func AliveCheck(rpcConfig *RPCServerConfiguration) (*AliveCheckResponse, error) {
-	client, err := getRpcClient(rpcConfig)
+	rpcClient, err := getRpcClient(rpcConfig)
 	if err != nil {
 		return nil, err
 	}
+	defer rpcClient.Close()
 	var reply AliveCheckResponse
-	err = client.Call("BackendPolling.AliveCheck", &AliveCheckArgs{}, &reply)
+	err = rpcClient.Call("BackendPolling.AliveCheck", &AliveCheckArgs{}, &reply)
 	if err != nil {
 		return nil, err
 	}
