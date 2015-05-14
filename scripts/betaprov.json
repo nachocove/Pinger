@@ -24,7 +24,6 @@
     },
     "s3_config": {
           "s3_bucket": "nachobetaconf",
-          "bucket_prefix": "betapinger",
           "bucket_prefix_key": "betapinger",
           "pinger_bucket_key": "pinger",
           "s3_filenames": {
