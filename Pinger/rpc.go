@@ -207,7 +207,7 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			reply.Code = PollingReplyError
 			return nil
 		}
-		delete((*pollMap), pollMapKey)
+		delete(*pollMap, pollMapKey)
 
 		client = nil
 	} else {
@@ -283,7 +283,7 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 	defer t.UnlockMap()
 	client, ok := (*pollMap)[pollMapKey]
 	if ok {
-		delete((*pollMap), pollMapKey)
+		delete(*pollMap, pollMapKey)
 		if client == nil {
 			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
 		}

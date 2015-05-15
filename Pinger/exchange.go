@@ -311,7 +311,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 	}
 	ex.Debug("New HTTP Client with timeout %s %s", ex.transport.ResponseHeaderTimeout, ex.pi.MailServerUrl)
 	sleepTime := 0
-	tooFastResponse := (time.Duration(ex.pi.ResponseTimeout) * time.Millisecond) / 4
+	tooFastResponse := time.Duration(ex.pi.ResponseTimeout) * time.Millisecond / 4
 	ex.Debug("TooFast timeout set to %s", tooFastResponse)
 	var responseCh chan *http.Response
 	var responseErrCh chan error

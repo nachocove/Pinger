@@ -374,7 +374,7 @@ func (di *DeviceInfo) PushNewMail() error {
 }
 
 func (di *DeviceInfo) Push(message PingerNotification, alert, sound string, contentAvailable int) error {
-	pingerMap := pingerPushMessageMapV2([](*sessionContextMessage){newSessionContextMessage(message, di.ClientContext, di.SessionId)})
+	pingerMap := pingerPushMessageMapV2([]*sessionContextMessage{newSessionContextMessage(message, di.ClientContext, di.SessionId)})
 	ttl := globals.config.APNSExpirationSeconds
 	err := Push(di.aws, di.Platform, di.PushService, di.PushToken, di.AWSEndpointArn, alert, sound, contentAvailable, ttl, pingerMap, di.logger)
 	if err == nil {
@@ -458,7 +458,7 @@ func (di *DeviceInfo) registerAws() error {
 		}
 	}
 
-	if attributes["Token"] == "" || (pushToken != "" && pushToken != attributes["Token"]) {
+	if attributes["Token"] == "" || pushToken != "" && pushToken != attributes["Token"] {
 		// need to update the token with aws
 		attributes["Token"] = pushToken
 		need_attr_update = true

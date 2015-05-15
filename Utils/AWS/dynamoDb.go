@@ -232,10 +232,10 @@ func (d *DynamoDb) DescribeTable(tableName string) (*dynamodb.TableDescription, 
 func awsAttributeValueToGo(a *dynamodb.AttributeValue) interface{} {
 	switch {
 	case a.S != nil:
-		return string(*(a.S))
+		return string(*a.S)
 
 	case a.N != nil:
-		i, err := strconv.ParseInt(*(a.N), 0, 0)
+		i, err := strconv.ParseInt(*a.N, 0, 0)
 		if err != nil {
 			panic(err)
 		}

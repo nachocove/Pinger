@@ -339,7 +339,7 @@ func (client *MailClientContext) start() {
 
 	errCh := make(chan error)
 	rearmingCount := 0
-	tooFastResponse := (time.Duration(client.ResponseTimeout) * time.Millisecond) / 4
+	tooFastResponse := time.Duration(client.ResponseTimeout) * time.Millisecond / 4
 	var timeSent time.Time
 	rearmTimeout := time.Duration(globals.config.ReArmTimeout) * time.Minute
 

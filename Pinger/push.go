@@ -81,7 +81,7 @@ func newSessionContextMessage(message PingerNotification, context, session strin
 	return &sessionContextMessage{message, context, session}
 }
 
-func pingerPushMessageMapV2(contexts [](*sessionContextMessage)) map[string]interface{} {
+func pingerPushMessageMapV2(contexts []*sessionContextMessage) map[string]interface{} {
 	//"contexts": {"context1": { "command": "new" | "register", "session": "abc123"},  ... ]\}
 	//"metadata": {"timestamp": "2015-04-10T09:30:00Z, ...}
 	pingerMap := make(map[string]interface{})
@@ -188,7 +188,7 @@ func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger
 		if err != nil {
 			panic(err)
 		}
-		sessionContexts := make([](*sessionContextMessage), 0, 5)
+		sessionContexts := make([]*sessionContextMessage, 0, 5)
 		for _, c := range contexts {
 			sessionContexts = append(sessionContexts, newSessionContextMessage(PingerNotificationRegister, c, ""))
 		}
