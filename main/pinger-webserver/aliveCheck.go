@@ -11,6 +11,7 @@ import (
 )
 
 var ipv6Regex *regexp.Regexp
+
 func init() {
 	httpsRouter.HandleFunc("/1/alive", aliveCheck)
 	ipv6Regex = regexp.MustCompile("^\\[(?P<ip6>.+)\\]:(?P<port>\\d+)$")

@@ -169,10 +169,10 @@ func (di *DeviceInfo) cleanup() {
 
 func getDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, clientId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
 	keys := []AWS.DBKeyValue{
-		AWS.DBKeyValue{Key: "clientId", Value: clientId, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "clientContext", Value: clientContext, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "deviceId", Value: deviceId, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "sessionId", Value: sessionId, Comparison: AWS.KeyComparisonEq},
+		{Key: "clientId", Value: clientId, Comparison: AWS.KeyComparisonEq},
+		{Key: "clientContext", Value: clientContext, Comparison: AWS.KeyComparisonEq},
+		{Key: "deviceId", Value: deviceId, Comparison: AWS.KeyComparisonEq},
+		{Key: "sessionId", Value: sessionId, Comparison: AWS.KeyComparisonEq},
 	}
 	di, err := db.get(keys)
 	if err != nil {

@@ -3,3 +3,13 @@
 *.log
 Pinger.sublime-workspace
 .idea
+
+*.crt
+
+*.key
+
+config/pinger.cfg
+
+pinger.db
+
+Pinger.iml

@@ -1,7 +1,5 @@
 package Pinger
 
-import ()
-
 // DevicePlatform The Platform type for a device
 type DevicePlatform int
 

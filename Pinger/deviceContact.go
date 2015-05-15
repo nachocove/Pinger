@@ -31,9 +31,9 @@ func deviceContactGet(db DeviceContactDbHandler, clientId, clientContext, device
 		// Note these are really only relevant to the dynamoDB sql handler. for gorp,
 		// the keys should be in order they are in the struct, so we need to make sure
 		// the order is correct here, as well as the values, but don't care about the column name.
-		AWS.DBKeyValue{Key: "client_id", Value: clientId, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "client_context", Value: clientContext, Comparison: AWS.KeyComparisonEq},
-		AWS.DBKeyValue{Key: "device_id", Value: deviceId, Comparison: AWS.KeyComparisonEq},
+		{Key: "client_id", Value: clientId, Comparison: AWS.KeyComparisonEq},
+		{Key: "client_context", Value: clientContext, Comparison: AWS.KeyComparisonEq},
+		{Key: "device_id", Value: deviceId, Comparison: AWS.KeyComparisonEq},
 	}
 	dc, err := db.get(keys)
 	if err != nil {

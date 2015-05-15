@@ -1,7 +1,5 @@
 package AWS
 
-import ()
-
 type TestAwsHandler struct {
 	registeredEndpoint    string
 	registeredEndpointErr error

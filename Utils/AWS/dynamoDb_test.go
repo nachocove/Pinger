@@ -203,10 +203,10 @@ func (s *awsDynamoDbTester) TestItemBatchGet() {
 
 	getReq := dynamodb.BatchGetItemInput{
 		RequestItems: map[string]dynamodb.KeysAndAttributes{
-			UnitTestTableName: dynamodb.KeysAndAttributes{
+			UnitTestTableName: {
 				ConsistentRead: aws.Boolean(true),
 				Keys: []map[string]dynamodb.AttributeValue{
-					map[string]dynamodb.AttributeValue{
+					{
 						"id": goTypeToAttributeValue(s.clientRecord["id"]),
 					},
 				},

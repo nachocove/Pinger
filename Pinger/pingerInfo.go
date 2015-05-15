@@ -69,7 +69,7 @@ func (pinger *PingerInfo) update() (int64, error) {
 
 func newPingerInfo(db PingerInfoDbHandler, logger *Logging.Logger) (*PingerInfo, error) {
 	keys := []AWS.DBKeyValue{
-		AWS.DBKeyValue{Key: "pinger", Value: pingerHostId, Comparison: AWS.KeyComparisonEq},
+		{Key: "pinger", Value: pingerHostId, Comparison: AWS.KeyComparisonEq},
 	}
 	pinger, err := db.get(keys)
 	if err != nil {
