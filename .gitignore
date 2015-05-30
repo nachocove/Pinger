@@ -3,13 +3,11 @@
 *.log
 Pinger.sublime-workspace
 .idea
-
+config/pinger-credentials.csv
+config/alphaAPNS.crt
+config/alphaAPNS.key
 *.crt
-
 *.key
-
 config/pinger.cfg
-
 pinger.db
-
 Pinger.iml
