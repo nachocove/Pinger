@@ -37,7 +37,7 @@
     },
     "elb_config": {
         "ports": [
-            [443, 8443, "https", "https", "arn:aws:iam::610813048224:server-certificate/ProdPinger_DigiCert_2015"]
+            [443, 8443, "https", "https", "arn:aws:iam::610813048224:server-certificate/ProdPinger_DigiCert_2015_With_Chain"]
         ],
         "health_check": {
             "interval" :20,
