@@ -4,7 +4,7 @@
         "zones": ["us-west-2a"]
     },
     "vpc_config": {
-        "name": "TestBetaPingerVPC",
+        "name": "TestProdPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
@@ -27,17 +27,17 @@
         }
     },
     "s3_config": {
-          "s3_bucket": "nachobetaconf",
-          "bucket_prefix_key": "betapinger",
+          "s3_bucket": "nachoprodconf",
+          "bucket_prefix_key": "prodpinger",
           "pinger_bucket_key": "pinger",
           "s3_filenames": {
-              "certs_pem": "betaDC.crt",
+              "certs_pem": "prodDC.crt",
               "pinger_config": "pingerv2.cfg"
           }
     },
     "elb_config": {
         "ports": [
-            [443, 8443, "https", "https", "arn:aws:iam::610813048224:server-certificate/BetaPinger_DigiCert_2015"]
+            [443, 8443, "https", "https", "arn:aws:iam::610813048224:server-certificate/ProdPinger_DigiCert_2015_With_Chain"]
         ],
         "health_check": {
             "interval" :20,
@@ -49,7 +49,7 @@
       "backend_port": 8443,
         "sg_config": {
             "name" : "ELB",
-            "description": "The SG for Beta Pinger ELB",
+            "description": "The SG for Prod Pinger ELB",
             "ingress-rules": [
               {
                 "protocol": "tcp",
@@ -64,14 +64,14 @@
     },
     "autoscale_config": {
         "ami_id": "ami-75142745",
-        "key_pair": "BetaPinger",
+        "key_pair": "ProdPinger",
         "instance_type": "m3.medium",
         "instance_monitoring": false,
         "min_size": 1,
         "max_size": 1,
         "sg_config": {
             "name" : "ASIns",
-            "description": "The SG for Beta Pinger AS - Instance",
+            "description": "The SG for Prod Pinger AS - Instance",
             "ingress-rules": [
                 {
                   "protocol": "tcp",
