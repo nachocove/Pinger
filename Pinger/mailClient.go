@@ -377,7 +377,7 @@ func (client *MailClientContext) start() {
 		case err := <-errCh:
 			switch {
 			case err == LongPollNewMail:
-				client.Debug("New Mail response in %s, rearmingCount %d", time.Since(timeSent), rearmingCount)
+				client.Info("New Mail response in %s, rearmingCount %d", time.Since(timeSent), rearmingCount)
 				pushSent := false
 				if time.Since(timeSent) > tooFastResponse || rearmingCount == 0 {
 					client.Info("Sending push message for new mail")
