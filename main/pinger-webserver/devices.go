@@ -24,6 +24,7 @@ func init() {
 // the underlying Pinger code.
 // That being said, there has to be a better way of doing this...
 type registerPostData struct {
+	UserId                string
 	ClientId              string
 	ClientContext         string
 	DeviceId              string
@@ -54,7 +55,7 @@ type registerPostData struct {
 
 func (pd *registerPostData) getLogPrefix() string {
 	if pd.logPrefix == "" {
-		pd.logPrefix = fmt.Sprintf("%s:%s:%s", pd.DeviceId, pd.ClientId, pd.ClientContext)
+		pd.logPrefix = fmt.Sprintf("%s:%s:%s", pd.DeviceId, pd.UserId, pd.ClientContext)
 	}
 	return pd.logPrefix
 }
@@ -64,6 +65,10 @@ func (pd *registerPostData) Validate() (bool, []string) {
 	// TODO Enhance this function to do more security validation.
 	ok := true
 	MissingFields := []string{}
+	if pd.UserId == "" {
+		MissingFields = append(MissingFields, "UserId")
+		ok = false
+	}
 	if pd.ClientId == "" {
 		MissingFields = append(MissingFields, "ClientId")
 		ok = false
@@ -98,7 +103,7 @@ func (pd *registerPostData) Validate() (bool, []string) {
 func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInformation {
 	// there's got to be a better way to do this...
 	pi := Pinger.MailPingInformation{}
-	pi.ClientId = pd.ClientId
+	pi.ClientId = pd.UserId
 	pi.ClientContext = pd.ClientContext
 	pi.DeviceId = pd.DeviceId
 	pi.Platform = pd.Platform
