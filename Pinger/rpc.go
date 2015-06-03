@@ -149,7 +149,7 @@ type StartPollArgs struct {
 }
 
 func (sa *StartPollArgs) pollMapKey() string {
-	return fmt.Sprintf("%s--%s--%s", sa.MailInfo.ClientId, sa.MailInfo.ClientContext, sa.MailInfo.DeviceId)
+	return fmt.Sprintf("%s--%s--%s", sa.MailInfo.UserId, sa.MailInfo.ClientContext, sa.MailInfo.DeviceId)
 }
 
 func (sa *StartPollArgs) getLogPrefix() string {
@@ -243,7 +243,7 @@ func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey st
 }
 
 type StopPollArgs struct {
-	ClientId      string
+	UserId      string
 	ClientContext string
 	DeviceId      string
 
@@ -251,12 +251,12 @@ type StopPollArgs struct {
 }
 
 func (sp *StopPollArgs) pollMapKey() string {
-	return fmt.Sprintf("%s--%s--%s", sp.ClientId, sp.ClientContext, sp.DeviceId)
+	return fmt.Sprintf("%s--%s--%s", sp.UserId, sp.ClientContext, sp.DeviceId)
 }
 
 func (sp *StopPollArgs) getLogPrefix() string {
 	if sp.logPrefix == "" {
-		sp.logPrefix = fmt.Sprintf("%s:%s:%s", sp.DeviceId, sp.ClientId, sp.ClientContext)
+		sp.logPrefix = fmt.Sprintf("%s:%s:%s", sp.DeviceId, sp.UserId, sp.ClientContext)
 	}
 	return sp.logPrefix
 }
@@ -301,7 +301,7 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 }
 
 type DeferPollArgs struct {
-	ClientId      string
+	UserId      string
 	ClientContext string
 	DeviceId      string
 	Timeout       int64
@@ -310,12 +310,12 @@ type DeferPollArgs struct {
 }
 
 func (dp *DeferPollArgs) pollMapKey() string {
-	return fmt.Sprintf("%s--%s--%s", dp.ClientId, dp.ClientContext, dp.DeviceId)
+	return fmt.Sprintf("%s--%s--%s", dp.UserId, dp.ClientContext, dp.DeviceId)
 }
 
 func (dp *DeferPollArgs) getLogPrefix() string {
 	if dp.logPrefix == "" {
-		dp.logPrefix = fmt.Sprintf("%s:%s:%s", dp.DeviceId, dp.ClientId, dp.ClientContext)
+		dp.logPrefix = fmt.Sprintf("%s:%s:%s", dp.DeviceId, dp.UserId, dp.ClientContext)
 	}
 	return dp.logPrefix
 }
@@ -359,7 +359,7 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 }
 
 type FindSessionsArgs struct {
-	ClientId      string
+	UserId      string
 	ClientContext string
 	DeviceId      string
 	MaxSessions   int
@@ -375,7 +375,7 @@ type FindSessionsResponse struct {
 
 func (fs *FindSessionsArgs) getLogPrefix() string {
 	if fs.logPrefix == "" {
-		fs.logPrefix = fmt.Sprintf("%s:%s:%s", fs.DeviceId, fs.ClientId, fs.ClientContext)
+		fs.logPrefix = fmt.Sprintf("%s:%s:%s", fs.DeviceId, fs.UserId, fs.ClientContext)
 	}
 	return fs.logPrefix
 }
@@ -400,10 +400,10 @@ func RPCFindActiveSessions(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMa
 		}
 
 		switch {
-		case args.ClientId == "" && args.ClientContext == "" && args.DeviceId == "":
+		case args.UserId == "" && args.ClientContext == "" && args.DeviceId == "":
 			reply.SessionInfos = append(reply.SessionInfos, *session)
 
-		case args.ClientId != "" && session.ClientId == args.ClientId:
+		case args.UserId != "" && session.UserId == args.UserId:
 			reply.SessionInfos = append(reply.SessionInfos, *session)
 
 		case args.ClientContext != "" && session.ClientContext == args.ClientContext:

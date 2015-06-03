@@ -40,7 +40,7 @@ func main() {
 	var debug bool
 	var verbose bool
 	var configFile string
-	var clientId string
+	var userId string
 	var clientContext string
 	var deviceId string
 	var singleLine bool
@@ -51,7 +51,7 @@ func main() {
 	flag.BoolVar(&help, "h", false, "Help")
 	flag.StringVar(&configFile, "c", "", "The configuration file (overrides the PINGER_CONFIG env-variable).")
 
-	flag.StringVar(&clientId, "client", "", "The Client ID to search for.")
+	flag.StringVar(&userId, "user", "", "The User ID to search for.")
 	flag.StringVar(&clientContext, "context", "", "The Client Context to search for.")
 	flag.StringVar(&deviceId, "device", "", "The Device ID to search for.")
 	flag.BoolVar(&singleLine, "s", false, "Write results on a single line for easier grepping. Field delimiter is ';'")
@@ -97,9 +97,9 @@ func main() {
 	}
 	if debug {
 		fmt.Fprintf(os.Stdout, "Contacting RPC server at %s\n", config.Rpc.String())
-		fmt.Fprintf(os.Stdout, "Arguments: ClientId:%s, ClientContext:%s, DeviceId:%s, maxSessions:%d\n", clientId, clientContext, deviceId, maxSessions)
+		fmt.Fprintf(os.Stdout, "Arguments: UserId:%s, ClientContext:%s, DeviceId:%s, maxSessions:%d\n", userId, clientContext, deviceId, maxSessions)
 	}
-	reply, err := Pinger.FindActiveSessions(&config.Rpc, clientId, clientContext, deviceId, maxSessions)
+	reply, err := Pinger.FindActiveSessions(&config.Rpc, userId, clientContext, deviceId, maxSessions)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not call FindActiveSessions: %s\n", err)
 		os.Exit(1)
@@ -118,7 +118,7 @@ func main() {
 		}
 		if verbose {
 			if singleLine {
-				fmt.Fprintf(os.Stdout, "ClientId;ClientContext;DeviceId;SessionId;Status;Error\n")
+				fmt.Fprintf(os.Stdout, "UserId;ClientContext;DeviceId;SessionId;Status;Error\n")
 			} else {
 				fmt.Fprintf(os.Stdout, "Found %d sessions.\n", len(reply.SessionInfos))
 			}
@@ -126,10 +126,10 @@ func main() {
 		for _, info := range reply.SessionInfos {
 			if singleLine {
 				fmt.Fprintf(os.Stdout, "%s;%s;%s;%s;%s;%s\n",
-					info.Status, info.ClientId, info.ClientContext, info.DeviceId, info.SessionId, info.Error)
+					info.Status, info.UserId, info.ClientContext, info.DeviceId, info.SessionId, info.Error)
 			} else {
-				fmt.Fprintf(os.Stdout, "ClientID:%s\nClientContext:%s\nDeviceId:%s\nSessionId:%s\nStatus:%s\n",
-					info.ClientId, info.ClientContext, info.DeviceId, info.SessionId, info.Status)
+				fmt.Fprintf(os.Stdout, "UserId:%s\nClientContext:%s\nDeviceId:%s\nSessionId:%s\nStatus:%s\n",
+					info.UserId, info.ClientContext, info.DeviceId, info.SessionId, info.Status)
 				if info.Status == Pinger.MailClientStatusError {
 					fmt.Fprintf(os.Stdout, "Error:%s\n", info.Error)
 				}

@@ -82,7 +82,7 @@ func (ah *TestAwsHandler) DeleteEndpointArn(endpointArn string) error {
 func (ah *TestAwsHandler) SendPushNotification(endpointArn, message string) error {
 	return ah.returnPushNotificationError
 }
-func (ah *TestAwsHandler) ValidateCognitoID(clientId string) error {
+func (ah *TestAwsHandler) ValidateCognitoID(userId string) error {
 	return ah.returnValidateCognitoIdError
 }
 func (ah *TestAwsHandler) PutFile(bucket, srcFilePath, destFilePath string) error {

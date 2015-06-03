@@ -88,43 +88,43 @@ func NewTelemetryWriter(config *TelemetryConfiguration, aws AWS.AWSHandler, debu
 
 var deviceClientContextRegexp *regexp.Regexp
 var deviceClientContextProtocolRegexp *regexp.Regexp
-var clientIdRegex *regexp.Regexp
+var userIdRegex *regexp.Regexp
 var deviceIdIdRegex *regexp.Regexp
 
 func init() {
-	commonRegex := "^(?P<device>Ncho[A-Z0-9a-z]+):(?P<client>us-[a-z]+-[0-9]+:[a-z\\-0-9]+):(?P<context>[a-z0-9A-Z]+):(?P<session>[a-z0-9A-Z]+)"
+	commonRegex := "^(?P<device>Ncho[A-Z0-9a-z]+):(?P<user>us-[a-z]+-[0-9]+:[a-z\\-0-9]+):(?P<context>[a-z0-9A-Z]+):(?P<session>[a-z0-9A-Z]+)"
 	deviceClientContextRegexp = regexp.MustCompile(fmt.Sprintf("%s: (?P<message>.*)$", commonRegex))
 	deviceClientContextProtocolRegexp = regexp.MustCompile(fmt.Sprintf("%s/(?P<protocol>[a-zA-z0-9]+): (?P<message>.*)$", commonRegex))
 
-	clientIdRegex = regexp.MustCompile("^.*(?P<client>us-[a-z]+-[0-9]+:[a-z\\-0-9]+).*$")
+	userIdRegex = regexp.MustCompile("^.*(?P<user>us-[a-z]+-[0-9]+:[a-z\\-0-9]+).*$")
 	deviceIdIdRegex = regexp.MustCompile("^.*(?P<device>Ncho[0-9A-Z]{24}).*$")
 }
 
 func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record, hostId string) telemetryLogMsg {
 	message := rec.Message()
-	var client, deviceId, sessionId, context string
+	var user, deviceId, sessionId, context string
 	switch {
 	case deviceClientContextRegexp.MatchString(message):
-		client = deviceClientContextRegexp.ReplaceAllString(message, "${client}")
+		user = deviceClientContextRegexp.ReplaceAllString(message, "${user}")
 		deviceId = deviceClientContextRegexp.ReplaceAllString(message, "${device}")
 		sessionId = deviceClientContextRegexp.ReplaceAllString(message, "${session}")
 		context = deviceClientContextRegexp.ReplaceAllString(message, "${context}")
 		message = deviceClientContextRegexp.ReplaceAllString(message, "${message} (context ${context}, device ${device}, session ${session})")
 
 	case deviceClientContextProtocolRegexp.MatchString(message):
-		client = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${client}")
+		user = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${user}")
 		deviceId = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${device}")
 		sessionId = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${session}")
 		context = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${context}")
 		message = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${message} (protocol ${protocol}, context ${context}, device ${device}, session ${session})")
 	}
-	if client == "" && clientIdRegex.MatchString(message) {
-		client = clientIdRegex.ReplaceAllString(message, "${client}")
+	if user == "" && userIdRegex.MatchString(message) {
+		user = userIdRegex.ReplaceAllString(message, "${user}")
 	}
-	if deviceId == "" && clientIdRegex.MatchString(message) {
+	if deviceId == "" && userIdRegex.MatchString(message) {
 		deviceId = deviceIdIdRegex.ReplaceAllString(message, "${device}")
 	}
-	return NewTelemetryMsg(eventType, rec.Module, client, deviceId, sessionId, context, message, hostId, rec.Time.Round(time.Millisecond).UTC())
+	return NewTelemetryMsg(eventType, rec.Module, user, deviceId, sessionId, context, message, hostId, rec.Time.Round(time.Millisecond).UTC())
 }
 
 // Log Implements the logging Interface so this can be used as a logger backend.

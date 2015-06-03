@@ -22,7 +22,7 @@ type DeviceInfo struct {
 	Id              int64  `db:"id"`
 	Created         int64  `db:"created"`
 	Updated         int64  `db:"updated"`
-	ClientId        string `db:"client_id"` // us-east-1a-XXXXXXXX
+	UserId          string `db:"user_id"` // us-east-1a-XXXXXXXX
 	ClientContext   string `db:"client_context"`
 	DeviceId        string `db:"device_id"` // NCHO348348384384.....
 	SessionId       string `db:"session_id"`
@@ -42,8 +42,8 @@ type DeviceInfo struct {
 }
 
 func (di *DeviceInfo) validate() error {
-	if di.ClientId == "" {
-		return errors.New("ClientID can not be empty")
+	if di.UserId == "" {
+		return errors.New("UserId can not be empty")
 	}
 	if di.ClientContext == "" {
 		return errors.New("ClientContext can not be empty")
@@ -77,7 +77,7 @@ func (di *DeviceInfo) validate() error {
 }
 
 func newDeviceInfo(
-	clientID, clientContext, deviceId,
+	userId, clientContext, deviceId,
 	pushToken, pushService,
 	platform, osVersion,
 	appBuildVersion, appBuildNumber string,
@@ -89,7 +89,7 @@ func newDeviceInfo(
 		panic("session ID needs to be set")
 	}
 	di := &DeviceInfo{
-		ClientId:        clientID,
+		UserId:        userId,
 		ClientContext:   clientContext,
 		DeviceId:        deviceId,
 		SessionId:       sessionId,
@@ -117,7 +117,7 @@ func (di *DeviceInfo) SetLogger(logger *Logging.Logger) {
 
 func (di *DeviceInfo) getLogPrefix() string {
 	if di.logPrefix == "" {
-		di.logPrefix = fmt.Sprintf("%s:%s:%s:%s", di.DeviceId, di.ClientId, di.ClientContext, di.SessionId)
+		di.logPrefix = fmt.Sprintf("%s:%s:%s:%s", di.DeviceId, di.UserId, di.ClientContext, di.SessionId)
 	}
 	return di.logPrefix
 }
@@ -155,7 +155,7 @@ func (di *DeviceInfo) cleanup() {
 	// relying on the garbage collector to clean them up (i.e. assigning "" to them
 	// really just moves the pointer, orphaning the previous string, which the garbage
 	// collector them frees or reuses.
-	di.ClientId = ""
+	di.UserId = ""
 	di.ClientContext = ""
 	di.DeviceId = ""
 	di.PushToken = ""
@@ -167,9 +167,9 @@ func (di *DeviceInfo) cleanup() {
 	di.Id = 0
 }
 
-func getDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, clientId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
+func getDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, userId, clientContext, deviceId, sessionId string, logger *Logging.Logger) (*DeviceInfo, error) {
 	keys := []AWS.DBKeyValue{
-		AWS.DBKeyValue{Key: "clientId", Value: clientId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "userId", Value: userId, Comparison: AWS.KeyComparisonEq},
 		AWS.DBKeyValue{Key: "clientContext", Value: clientContext, Comparison: AWS.KeyComparisonEq},
 		AWS.DBKeyValue{Key: "deviceId", Value: deviceId, Comparison: AWS.KeyComparisonEq},
 		AWS.DBKeyValue{Key: "sessionId", Value: sessionId, Comparison: AWS.KeyComparisonEq},
@@ -308,13 +308,13 @@ func (di *DeviceInfo) getContactInfoObj(insert bool) (*deviceContact, error) {
 	} else {
 		db = newDeviceContactDynamoDbHandler(di.aws)
 	}
-	dc, err := deviceContactGet(db, di.ClientId, di.ClientContext, di.DeviceId)
+	dc, err := deviceContactGet(db, di.UserId, di.ClientContext, di.DeviceId)
 	if err != nil {
 		return nil, err
 	}
 	if dc == nil {
 		if insert {
-			dc = newDeviceContact(db, di.ClientId, di.ClientContext, di.DeviceId)
+			dc = newDeviceContact(db, di.UserId, di.ClientContext, di.DeviceId)
 			err = dc.insert()
 			if err != nil {
 				panic(err)
@@ -386,7 +386,7 @@ func (di *DeviceInfo) Push(message PingerNotification, alert, sound string, cont
 func (di *DeviceInfo) customerData() string {
 	customMap := make(map[string]string)
 	customMap["deviceId"] = di.DeviceId
-	customMap["clientId"] = di.ClientId
+	customMap["userId"] = di.UserId
 	customJson, err := json.Marshal(customMap)
 	if err != nil {
 		return ""
@@ -485,7 +485,7 @@ func (di *DeviceInfo) registerAws() error {
 
 func (di *DeviceInfo) validateClient() error {
 	if strings.EqualFold(di.PushService, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
-		// TODO Can we cache the validation results here? Can they change once a client ID has been invalidated? How do we even invalidate one?
+		// TODO Can we cache the validation results here? Can they change once a userId has been invalidated? How do we even invalidate one?
 		err := di.registerAws()
 		if err != nil {
 			if di.aws.IgnorePushFailures() == false {

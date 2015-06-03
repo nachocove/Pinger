@@ -21,7 +21,7 @@ def register_payload(args):
                    "Protocol": args.protocol,
                    "PushToken": args.push_token,
                    "PushService": args.push_service,
-                   "ClientId": args.client_id,
+                   "UserId": args.user_id,
                    "Platform": args.platform,
                    "HttpHeaders": headers,
                    "HttpRequestData": base64.b64encode(args.request_data.read()) if args.request_data else "",
@@ -36,7 +36,7 @@ def register_payload(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--client-id', help='A client ID (cognito ID)')
+    parser.add_argument('--user-id', help='A User ID (cognito ID)')
     parser.add_argument('--url', help="The host URL")
     parser.add_argument('--username', help="The username")
     parser.add_argument('--password', help="the password")
@@ -54,12 +54,12 @@ def main():
     parser.add_argument('--wait-before-use', type=int, default=30, help='Time (in seconds) to wait before starting to poll')
 
     parser.add_argument('--register-example', choices=('ActiveSync',), help="Create and print out an example payload for register")
-    parser.add_argument('--defer-example', type=str, help="Create and print out an example payload defer. Argument is the client ID")
+    parser.add_argument('--defer-example', type=str, help="Create and print out an example payload defer. Argument is the user ID")
 
     args = parser.parse_args()
     if args.register_example:
         if args.register_example == 'ActiveSync':
-            args.client_id = "us-east-1:0005d365-c8ea-470f-8a61-a7f44f145efb"
+            args.user_id = "us-east-1:0005d365-c8ea-470f-8a61-a7f44f145efb"
             args.url = "https://d2.officeburrito.com/Microsoft-Server-ActiveSync?Cmd=Ping&DeviceId=Ncho12345"
             args.username = "D2\test"
             args.password = "Password1"
@@ -77,7 +77,7 @@ def main():
             args.wait_before_use = 10
             print register_payload(args)
     elif args.defer_example:
-        print json.dumps({'ClientId': args.defer_example})
+        print json.dumps({'UserId': args.defer_example})
     else:
         print register_payload(args)
     

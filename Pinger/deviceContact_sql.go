@@ -18,7 +18,7 @@ const (
 
 func addDeviceContactTable(dbmap *gorp.DbMap) {
 	tMap := dbmap.AddTableWithName(deviceContact{}, deviceContactTableName)
-	if tMap.SetKeys(false, "ClientId", "ClientContext", "DeviceId") == nil {
+	if tMap.SetKeys(false, "UserId", "ClientContext", "DeviceId") == nil {
 		panic(fmt.Sprintf("Could not create key on %s:ID", deviceContactTableName))
 	}
 	tMap.SetVersionCol("Id")
@@ -32,7 +32,7 @@ func addDeviceContactTable(dbmap *gorp.DbMap) {
 	cMap = tMap.ColMap("LastContact")
 	cMap.SetNotNull(true)
 
-	cMap = tMap.ColMap("ClientId")
+	cMap = tMap.ColMap("UserId")
 	cMap.SetNotNull(true)
 
 	cMap = tMap.ColMap("ClientContext")

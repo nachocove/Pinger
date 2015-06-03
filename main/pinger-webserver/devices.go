@@ -16,7 +16,7 @@ func init() {
 	httpsRouter.HandleFunc("/1/stop", stopPolling)
 }
 
-//const SessionVarClientId = "ClientId"
+//const SessionVarUserId = "UserId"
 
 // registerPostCredentials and registerPostData are (currently) mirror images
 // of Pinger.MailPingInformation and Pinger.MailServerCredentials
@@ -24,7 +24,7 @@ func init() {
 // the underlying Pinger code.
 // That being said, there has to be a better way of doing this...
 type registerPostData struct {
-	ClientId              string
+	UserId                string
 	ClientContext         string
 	DeviceId              string
 	Platform              string
@@ -54,7 +54,7 @@ type registerPostData struct {
 
 func (pd *registerPostData) getLogPrefix() string {
 	if pd.logPrefix == "" {
-		pd.logPrefix = fmt.Sprintf("%s:%s:%s", pd.DeviceId, pd.ClientId, pd.ClientContext)
+		pd.logPrefix = fmt.Sprintf("%s:%s:%s", pd.DeviceId, pd.UserId, pd.ClientContext)
 	}
 	return pd.logPrefix
 }
@@ -64,8 +64,8 @@ func (pd *registerPostData) Validate() (bool, []string) {
 	// TODO Enhance this function to do more security validation.
 	ok := true
 	MissingFields := []string{}
-	if pd.ClientId == "" {
-		MissingFields = append(MissingFields, "ClientId")
+	if pd.UserId == "" {
+		MissingFields = append(MissingFields, "UserId")
 		ok = false
 	}
 	if pd.ClientContext == "" {
@@ -98,7 +98,7 @@ func (pd *registerPostData) Validate() (bool, []string) {
 func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInformation {
 	// there's got to be a better way to do this...
 	pi := Pinger.MailPingInformation{}
-	pi.ClientId = pd.ClientId
+	pi.UserId = pd.UserId
 	pi.ClientContext = pd.ClientContext
 	pi.DeviceId = pd.DeviceId
 	pi.Platform = pd.Platform
@@ -176,14 +176,14 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		responseError(w, MissingRequiredData, strings.Join(missingFields, ","))
 		return
 	}
-	token, err := context.Config.Server.CreateAuthToken(postInfo.ClientId, postInfo.ClientContext, postInfo.DeviceId)
+	token, err := context.Config.Server.CreateAuthToken(postInfo.UserId, postInfo.ClientContext, postInfo.DeviceId)
 	if err != nil {
 		context.Logger.Error("%s: error creating token %s", postInfo.getLogPrefix(), err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	//	session.Values[SessionVarClientId] = postInfo.ClientId
+	//	session.Values[SessionVarUserId] = postInfo.UserId
 	sessionId, err := makeSessionId(token)
 	reply, err := Pinger.StartPoll(&context.Config.Rpc, postInfo.AsMailInfo(sessionId))
 	if err != nil {
@@ -234,7 +234,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 }
 
 type deferPost struct {
-	ClientId      string
+	UserId        string
 	ClientContext string
 	DeviceId      string
 	Timeout       int64
@@ -245,7 +245,7 @@ type deferPost struct {
 
 func (dp *deferPost) getLogPrefix() string {
 	if dp.logPrefix == "" {
-		dp.logPrefix = fmt.Sprintf("%s:%s:%s", dp.DeviceId, dp.ClientId, dp.ClientContext)
+		dp.logPrefix = fmt.Sprintf("%s:%s:%s", dp.DeviceId, dp.UserId, dp.ClientContext)
 	}
 	return dp.logPrefix
 }
@@ -279,19 +279,19 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 
 	var reply *Pinger.PollingResponse
 
-	_, err = context.Config.Server.ValidateAuthToken(deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Token)
+	_, err = context.Config.Server.ValidateAuthToken(deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Token)
 	if err != nil {
 		reply = &Pinger.PollingResponse{
 			Code:    Pinger.PollingReplyError,
 			Message: "Token is not valid",
 		}
 	} else {
-		//	if session.Values[SessionVarClientId] != deferData.ClientId {
-		//		context.Logger.Error("Client ID %s does not match session", deferData.ClientId)
+		//	if session.Values[SessionVarUserId] != deferData.UserId {
+		//		context.Logger.Error("Client ID %s does not match session", deferData.UserId)
 		//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 		//		return
 		//	}
-		reply, err = Pinger.DeferPoll(&context.Config.Rpc, deferData.ClientId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout)
+		reply, err = Pinger.DeferPoll(&context.Config.Rpc, deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout)
 		if err != nil {
 			context.Logger.Error("%s: Error deferring poll %s", deferData.getLogPrefix(), err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -330,7 +330,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 }
 
 type stopPost struct {
-	ClientId      string
+	UserId      string
 	ClientContext string
 	DeviceId      string
 	Token         string
@@ -340,7 +340,7 @@ type stopPost struct {
 
 func (sp *stopPost) getLogPrefix() string {
 	if sp.logPrefix == "" {
-		sp.logPrefix = fmt.Sprintf("%s:%s:%s", sp.DeviceId, sp.ClientId, sp.ClientContext)
+		sp.logPrefix = fmt.Sprintf("%s:%s:%s", sp.DeviceId, sp.UserId, sp.ClientContext)
 	}
 	return sp.logPrefix
 }
@@ -374,19 +374,19 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 
 	var reply *Pinger.PollingResponse
 
-	_, err = context.Config.Server.ValidateAuthToken(stopData.ClientId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
+	_, err = context.Config.Server.ValidateAuthToken(stopData.UserId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
 	if err != nil {
 		reply = &Pinger.PollingResponse{
 			Code:    Pinger.PollingReplyError,
 			Message: "Token is not valid",
 		}
 	} else {
-		//	if session.Values[SessionVarClientId] != stopData.ClientId {
-		//		context.Logger.Error("Client ID %s does not match session", stopData.ClientId)
-		//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
+		//	if session.Values[SessionVarUserId] != stopData.UserId {
+		//		context.Logger.Error("User ID %s does not match session", stopData.UserId)
+		//		http.Error(w, "Unknown User ID", http.StatusForbidden)
 		//		return
 		//	}
-		reply, err = Pinger.StopPoll(&context.Config.Rpc, stopData.ClientId, stopData.ClientContext, stopData.DeviceId)
+		reply, err = Pinger.StopPoll(&context.Config.Rpc, stopData.UserId, stopData.ClientContext, stopData.DeviceId)
 		if err != nil {
 			context.Logger.Error("%s: Error stopping poll %s", stopData.getLogPrefix(), err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
