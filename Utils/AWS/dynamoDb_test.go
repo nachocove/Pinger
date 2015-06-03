@@ -62,7 +62,7 @@ func (s *awsDynamoDbTester) doJavaDynamoLocal(readyCh chan int) {
 	if nachoHome == "" {
 		nachoHome = fmt.Sprintf("%s/src/nacho", os.Getenv("HOME"))
 	}
-	cmd.Dir = fmt.Sprintf("%s/dynamodb_local_2013-12-12", nachoHome)
+	cmd.Dir = fmt.Sprintf("%s/dynamodb_local_2015-04-27_1.0", nachoHome)
 	err = cmd.Start()
 	if err != nil {
 		panic(err)
