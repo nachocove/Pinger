@@ -13,7 +13,7 @@ type mailClientTester struct {
 	suite.Suite
 	logger            *Logging.Logger
 	dbmap             *gorp.DbMap
-	testClientId      string
+	testUserId        string
 	testClientContext string
 	testDeviceId      string
 	testPlatform      string
@@ -32,7 +32,7 @@ func (s *mailClientTester) SetupSuite() {
 	if err != nil {
 		panic("Could not create DB")
 	}
-	s.testClientId = "sometestClientId"
+	s.testUserId = "sometestUserId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"
 	s.testPlatform = "ios"
@@ -92,12 +92,12 @@ func (s *mailClientTester) TestMailClient() {
 	client, err := NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
-	s.Equal("ClientID can not be empty", err.Error())
+	s.Equal("UserId can not be empty", err.Error())
 
 	// validity of the device information is tested in the deviceInfo_test.
 	// only bother with things that mailClient is responsible for
 	pi = &MailPingInformation{
-		ClientId:      s.testClientId,
+		UserId:      s.testUserId,
 		ClientContext: s.testClientContext,
 		DeviceId:      s.testDeviceId,
 		Platform:      s.testPlatform,
@@ -108,10 +108,10 @@ func (s *mailClientTester) TestMailClient() {
 	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
-	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testClientId, s.testClientContext, s.sessionId, ""), err.Error())
+	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testUserId, s.testClientContext, s.sessionId, ""), err.Error())
 
 	pi = &MailPingInformation{
-		ClientId:      s.testClientId,
+		UserId:      s.testUserId,
 		ClientContext: s.testClientContext,
 		DeviceId:      s.testDeviceId,
 		Platform:      s.testPlatform,
@@ -124,9 +124,9 @@ func (s *mailClientTester) TestMailClient() {
 	s.Nil(client)
 	s.Error(err)
 
-	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testClientId, s.testClientContext, s.sessionId, "Foo"), err.Error())
+	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testUserId, s.testClientContext, s.sessionId, "Foo"), err.Error())
 	pi = &MailPingInformation{
-		ClientId:      s.testClientId,
+		UserId:      s.testUserId,
 		ClientContext: s.testClientContext,
 		DeviceId:      s.testDeviceId,
 		Platform:      s.testPlatform,

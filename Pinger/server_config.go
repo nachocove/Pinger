@@ -103,12 +103,12 @@ func (cfg *ServerConfiguration) CheckToken(token string) bool {
 	return foundMatch
 }
 
-func (cfg *ServerConfiguration) CreateAuthToken(clientId, clientContext, deviceId string) (string, error) {
+func (cfg *ServerConfiguration) CreateAuthToken(userId, clientContext, deviceId string) (string, error) {
 	block, err := aes.NewCipher([]byte(cfg.TokenAuthKey))
 	if err != nil {
 		return "", err
 	}
-	str := fmt.Sprintf("%d::%s::%s::%s", time.Now().UTC().Unix(), clientId, clientContext, deviceId)
+	str := fmt.Sprintf("%d::%s::%s::%s", time.Now().UTC().Unix(), userId, clientContext, deviceId)
 	ciphertext := make([]byte, aes.BlockSize+len(str))
 	iv := ciphertext[:aes.BlockSize]
 	// TODO Check the RNG algorithm
@@ -122,7 +122,7 @@ func (cfg *ServerConfiguration) CreateAuthToken(clientId, clientContext, deviceI
 	return b64, nil
 }
 
-func (cfg *ServerConfiguration) ValidateAuthToken(clientId, clientContext, deviceId, token string) (time.Time, error) {
+func (cfg *ServerConfiguration) ValidateAuthToken(userId, clientContext, deviceId, token string) (time.Time, error) {
 	// TODO Check length on token so base64 decoding doesn't blow up
 	errTime := time.Time{}
 	block, err := aes.NewCipher([]byte(cfg.TokenAuthKey))
@@ -162,7 +162,7 @@ func (cfg *ServerConfiguration) ValidateAuthToken(clientId, clientContext, devic
 		return errTime, fmt.Errorf("time is empty")
 	}
 	if parts[1] == "" {
-		return errTime, fmt.Errorf("clientID is empty")
+		return errTime, fmt.Errorf("userId is empty")
 	}
 	if parts[2] == "" {
 		return errTime, fmt.Errorf("context is empty")
@@ -170,7 +170,7 @@ func (cfg *ServerConfiguration) ValidateAuthToken(clientId, clientContext, devic
 	if parts[3] == "" {
 		return errTime, fmt.Errorf("deviceId is empty")
 	}
-	if parts[1] != clientId || parts[2] != clientContext || parts[3] != deviceId {
+	if parts[1] != userId || parts[2] != clientContext || parts[3] != deviceId {
 		return errTime, fmt.Errorf("device info doesn't match token")
 	}
 	return time.Unix(timestamp, 0), nil

@@ -12,12 +12,12 @@ func (ah *AWSHandle) getCognitoIdentitySession() (*cognitoidentity.CognitoIdenti
 	return cognitoSession, nil
 }
 
-func (ah *AWSHandle) ValidateCognitoID(clientId string) error {
+func (ah *AWSHandle) ValidateCognitoID(userId string) error {
 	cognitoSession, err := ah.getCognitoIdentitySession()
 	if err != nil {
 		return err
 	}
-	input := cognitoidentity.DescribeIdentityInput{IdentityID: aws.StringValue(&clientId)}
+	input := cognitoidentity.DescribeIdentityInput{IdentityID: aws.StringValue(&userId)}
 	response, err := cognitoSession.DescribeIdentity(&input)
 	if err != nil {
 		return err

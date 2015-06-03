@@ -35,7 +35,7 @@ type MailClientContext struct {
 	lastError       error
 	stats           *Utils.StatLogger
 	di              *DeviceInfo
-	ClientId        string
+	UserId          string
 	ClientContext   string
 	DeviceId        string
 	Protocol        string
@@ -54,7 +54,7 @@ type MailClientContext struct {
 
 func (client *MailClientContext) getLogPrefix() string {
 	if client.logPrefix == "" {
-		client.logPrefix = fmt.Sprintf("%s:%s:%s:%s", client.DeviceId, client.ClientId, client.ClientContext, client.sessionId)
+		client.logPrefix = fmt.Sprintf("%s:%s:%s:%s", client.DeviceId, client.UserId, client.ClientContext, client.sessionId)
 	}
 	return client.logPrefix
 }
@@ -127,7 +127,7 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 		command:         make(chan PingerCommand, 10),
 		stats:           nil,
 		status:          MailClientStatusInitialized,
-		ClientId:        pi.ClientId,
+		UserId:          pi.UserId,
 		ClientContext:   pi.ClientContext,
 		DeviceId:        pi.DeviceId,
 		Protocol:        pi.Protocol,
@@ -136,9 +136,9 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 		ResponseTimeout: pi.ResponseTimeout,
 		sessionId:       pi.SessionId,
 	}
-	err := aws.ValidateCognitoID(pi.ClientId)
+	err := aws.ValidateCognitoID(pi.UserId)
 	if err != nil {
-		client.Error("Could not validate client ID: %s", err.Error())
+		client.Error("Could not validate UserId: %s", err.Error())
 		return nil, err
 	}
 
@@ -534,7 +534,7 @@ func (client *MailClientContext) updateLastContact() error {
 }
 
 type ClientSessionInfo struct {
-	ClientId      string
+	UserId      string
 	ClientContext string
 	DeviceId      string
 	SessionId     string
@@ -545,7 +545,7 @@ type ClientSessionInfo struct {
 func (client *MailClientContext) sessionInfo() *ClientSessionInfo {
 	status, err := client.Status()
 	info := ClientSessionInfo{
-		ClientId:      client.ClientId,
+		UserId:      client.UserId,
 		ClientContext: client.ClientContext,
 		DeviceId:      client.DeviceId,
 		SessionId:     client.sessionId,
@@ -562,7 +562,7 @@ func (client *MailClientContext) getSessionInfo() (*ClientSessionInfo, error) {
 	case client.mailClient == nil:
 		return nil, fmt.Errorf("Entry has no active client")
 
-	case client.ClientId == "" || client.ClientContext == "" || client.DeviceId == "":
+	case client.UserId == "" || client.ClientContext == "" || client.DeviceId == "":
 		return nil, fmt.Errorf("entry has been cleaned up.")
 	}
 	return client.sessionInfo(), nil

@@ -11,7 +11,7 @@ import (
 
 // MailPingInformation the bag of information we get from the client. None of this is saved in the DB.
 type MailPingInformation struct {
-	ClientId              string
+	UserId                string
 	ClientContext         string
 	DeviceId              string
 	Platform              string
@@ -52,7 +52,7 @@ func (pi *MailPingInformation) cleanup() {
 	// relying on the garbage collector to clean them up (i.e. assigning "" to them
 	// really just moves the pointer, orphaning the previous string, which the garbage
 	// collector them frees or reuses.
-	pi.ClientId = ""
+	pi.UserId = ""
 	pi.ClientContext = ""
 	pi.DeviceId = ""
 	pi.Platform = ""
@@ -79,7 +79,7 @@ func (pi *MailPingInformation) cleanup() {
 func (pi *MailPingInformation) Validate() bool {
 	// TODO more checking of all fields, since this is all 'user input', including URL for sanity
 	// TODO Check the sanity of the Expected replies. Perhaps use some 'reasonable' max?
-	if pi.ClientId == "" || pi.MailServerUrl == "" {
+	if pi.UserId == "" || pi.MailServerUrl == "" {
 		return false
 	}
 	switch {
@@ -100,20 +100,20 @@ func (pi *MailPingInformation) Validate() bool {
 
 func (pi *MailPingInformation) getLogPrefix() string {
 	if pi.logPrefix == "" {
-		pi.logPrefix = fmt.Sprintf("%s:%s:%s:%s", pi.DeviceId, pi.ClientId, pi.ClientContext, pi.SessionId)
+		pi.logPrefix = fmt.Sprintf("%s:%s:%s:%s", pi.DeviceId, pi.UserId, pi.ClientContext, pi.SessionId)
 	}
 	return pi.logPrefix
 }
 
 func (pi *MailPingInformation) newDeviceInfo(db DeviceInfoDbHandler, aws AWS.AWSHandler, logger *Logging.Logger) (*DeviceInfo, error) {
 	var err error
-	di, err := getDeviceInfo(db, aws, pi.ClientId, pi.ClientContext, pi.DeviceId, pi.SessionId, logger)
+	di, err := getDeviceInfo(db, aws, pi.UserId, pi.ClientContext, pi.DeviceId, pi.SessionId, logger)
 	if err != nil {
 		return nil, err
 	}
 	if di == nil {
 		di, err = newDeviceInfo(
-			pi.ClientId,
+			pi.UserId,
 			pi.ClientContext,
 			pi.DeviceId,
 			pi.PushToken,

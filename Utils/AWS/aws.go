@@ -14,7 +14,7 @@ type AWSHandler interface {
 	SetEndpointAttributes(endpointArn string, attributes map[string]string) error
 	DeleteEndpointArn(endpointArn string) error
 	SendPushNotification(endpointArn, message string) error
-	ValidateCognitoID(clientId string) error
+	ValidateCognitoID(userId string) error
 	PutFile(bucket, srcFilePath, destFilePath string) error
 	IgnorePushFailures() bool
 	GetDynamoDbSession() *DynamoDb

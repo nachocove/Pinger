@@ -15,7 +15,7 @@ type deviceContactTester struct {
 	aws               *AWS.TestAwsHandler
 	db                DeviceContactDbHandler
 	logger            *Logging.Logger
-	testClientId      string
+	testUserId      string
 	testClientContext string
 	testDeviceId      string
 }
@@ -29,7 +29,7 @@ func (s *deviceContactTester) SetupSuite() {
 		panic("Could not create DB")
 	}
 	s.db = newDeviceContactSqlDbHandler(s.dbm)
-	s.testClientId = "sometestClientId"
+	s.testUserId = "sometestUserId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"
 }
@@ -48,22 +48,22 @@ func TestDeviceContact(t *testing.T) {
 }
 
 func (s *deviceContactTester) TestDeviceContactCreate() {
-	dc := newDeviceContact(s.db, s.testClientId, s.testClientContext, s.testDeviceId)
+	dc := newDeviceContact(s.db, s.testUserId, s.testClientContext, s.testDeviceId)
 	require.NotNil(s.T(), dc)
 	err := dc.insert()
 	s.NoError(err)
 
-	dc1, err := deviceContactGet(s.db, s.testClientId, s.testClientContext, s.testDeviceId)
+	dc1, err := deviceContactGet(s.db, s.testUserId, s.testClientContext, s.testDeviceId)
 	s.NoError(err)
 	require.NotNil(s.T(), dc1)
 
-	s.Equal(dc.ClientId, dc1.ClientId)
+	s.Equal(dc.UserId, dc1.UserId)
 	s.Equal(dc.ClientContext, dc1.ClientContext)
 	s.Equal(dc.DeviceId, dc1.DeviceId)
 }
 
 func (s *deviceContactTester) TestDeviceContactUpdate() {
-	dc := newDeviceContact(s.db, s.testClientId, s.testClientContext, s.testDeviceId)
+	dc := newDeviceContact(s.db, s.testUserId, s.testClientContext, s.testDeviceId)
 	require.NotNil(s.T(), dc)
 	err := dc.insert()
 	s.NoError(err)
@@ -75,7 +75,7 @@ func (s *deviceContactTester) TestDeviceContactUpdate() {
 	s.True(dc.Created < dc.LastContact)
 	s.Equal(0, dc.LastContactRequest)
 
-	dc1, err := deviceContactGet(s.db, s.testClientId, s.testClientContext, s.testDeviceId)
+	dc1, err := deviceContactGet(s.db, s.testUserId, s.testClientContext, s.testDeviceId)
 	s.NoError(err)
 	require.NotNil(s.T(), dc1)
 
@@ -85,7 +85,7 @@ func (s *deviceContactTester) TestDeviceContactUpdate() {
 	s.NoError(err)
 	s.NotEqual(0, dc.LastContactRequest)
 
-	dc1, err = deviceContactGet(s.db, s.testClientId, s.testClientContext, s.testDeviceId)
+	dc1, err = deviceContactGet(s.db, s.testUserId, s.testClientContext, s.testDeviceId)
 	s.NoError(err)
 	require.NotNil(s.T(), dc1)
 

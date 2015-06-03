@@ -18,20 +18,20 @@ type deviceContact struct {
 	Updated            int64  `db:"updated"`
 	LastContact        int64  `db:"last_contact"`
 	LastContactRequest int64  `db:"last_contact_request"`
-	ClientId           string `db:"client_id"` // us-east-1a-XXXXXXXX
+	UserId             string `db:"user_id"` // us-east-1a-XXXXXXXX
 	ClientContext      string `db:"client_context"`
 	DeviceId           string `db:"device_id"` // NCHO348348384384.....
 
 	db DeviceContactDbHandler `db:"-"`
 }
 
-func deviceContactGet(db DeviceContactDbHandler, clientId, clientContext, deviceId string) (*deviceContact, error) {
+func deviceContactGet(db DeviceContactDbHandler, userId, clientContext, deviceId string) (*deviceContact, error) {
 	keys := []AWS.DBKeyValue{
 		// TODO Need to look into the struct for the db tags to get the column names
 		// Note these are really only relevant to the dynamoDB sql handler. for gorp,
 		// the keys should be in order they are in the struct, so we need to make sure
 		// the order is correct here, as well as the values, but don't care about the column name.
-		AWS.DBKeyValue{Key: "client_id", Value: clientId, Comparison: AWS.KeyComparisonEq},
+		AWS.DBKeyValue{Key: "user_id", Value: userId, Comparison: AWS.KeyComparisonEq},
 		AWS.DBKeyValue{Key: "client_context", Value: clientContext, Comparison: AWS.KeyComparisonEq},
 		AWS.DBKeyValue{Key: "device_id", Value: deviceId, Comparison: AWS.KeyComparisonEq},
 	}
@@ -42,9 +42,9 @@ func deviceContactGet(db DeviceContactDbHandler, clientId, clientContext, device
 	return dc, nil
 }
 
-func newDeviceContact(db DeviceContactDbHandler, clientId, clientContext, deviceId string) *deviceContact {
+func newDeviceContact(db DeviceContactDbHandler, userId, clientContext, deviceId string) *deviceContact {
 	dc := deviceContact{
-		ClientId:      clientId,
+		UserId:      userId,
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
 	}

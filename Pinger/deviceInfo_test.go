@@ -15,7 +15,7 @@ type deviceInfoTester struct {
 	dbm               *gorp.DbMap
 	db                DeviceInfoDbHandler
 	logger            *Logging.Logger
-	testClientId      string
+	testUserId        string
 	testClientContext string
 	testDeviceId      string
 	testPushToken     string
@@ -38,7 +38,7 @@ func (s *deviceInfoTester) SetupSuite() {
 		panic("Could not create DB")
 	}
 	s.db = newDeviceInfoSqlHandler(s.dbm)
-	s.testClientId = "sometestClientId"
+	s.testUserId = "sometestUserId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"
 	s.testPushToken = "AEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEF"
@@ -70,7 +70,7 @@ func (s *deviceInfoTester) TestDeviceInfoValidate() {
 	var err error
 
 	di, err := newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		s.testClientContext,
 		s.testDeviceId,
 		s.testPushToken,
@@ -89,10 +89,10 @@ func (s *deviceInfoTester) TestDeviceInfoValidate() {
 	err = di.validate()
 	s.NoError(err)
 
-	di.ClientId = ""
+	di.UserId = ""
 	err = di.validate()
-	s.EqualError(err, "ClientID can not be empty")
-	di.ClientId = s.testClientId
+	s.EqualError(err, "UserId can not be empty")
+	di.UserId = s.testUserId
 
 	di.ClientContext = ""
 	err = di.validate()
@@ -126,7 +126,7 @@ func (s *deviceInfoTester) TestDeviceInfoValidate() {
 func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 	var err error
 	di, err := newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		s.testClientContext,
 		s.testDeviceId,
 		s.testPushToken,
@@ -145,7 +145,7 @@ func (s *deviceInfoTester) TestDeviceInfoCleanup() {
 	di.insert(nil)
 
 	di.cleanup()
-	s.Equal("", di.ClientId)
+	s.Equal("", di.UserId)
 	s.Equal("", di.ClientContext)
 	s.Equal("", di.DeviceId)
 	s.Equal("", di.PushToken)
@@ -163,7 +163,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.Equal(len(deviceList), 0)
 
 	di, err := newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		"",
 		s.testDeviceId,
 		s.testPushToken,
@@ -180,7 +180,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.Nil(di)
 
 	di, err = newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		s.testClientContext,
 		s.testDeviceId,
 		s.testPushToken,
@@ -196,7 +196,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	s.NoError(err)
 	require.NotNil(s.T(), di)
 
-	s.Equal(s.testClientId, di.ClientId)
+	s.Equal(s.testUserId, di.UserId)
 	s.Equal(s.testClientContext, di.ClientContext)
 	s.Equal(s.testDeviceId, di.DeviceId)
 	s.Equal(s.testPushToken, di.PushToken)
@@ -221,7 +221,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 	deviceList, err = getAllMyDeviceInfo(s.db, s.aws, s.logger)
 	s.Equal(0, len(deviceList))
 
-	diInDb, err := getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	diInDb, err := getDeviceInfo(s.db, s.aws, s.testUserId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.Nil(diInDb)
 
@@ -240,7 +240,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 
 	s.Equal(pingerHostId, di.Pinger)
 
-	diInDb, err = getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	diInDb, err = getDeviceInfo(s.db, s.aws, s.testUserId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(diInDb)
 	s.Equal(di.Id, diInDb.Id)
@@ -253,7 +253,7 @@ func (s *deviceInfoTester) TestDeviceInfoCreate() {
 
 func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 	di, err := newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		s.testClientContext,
 		s.testDeviceId,
 		s.testPushToken,
@@ -272,11 +272,11 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 	err = di.insert(nil)
 	s.NoError(err)
 
-	di, err = getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	di, err = getDeviceInfo(s.db, s.aws, s.testUserId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(di)
 
-	di2, err := getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	di2, err := getDeviceInfo(s.db, s.aws, s.testUserId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(di2)
 	s.Equal(di.Id, di2.Id)
@@ -343,7 +343,7 @@ func (s *deviceInfoTester) TestDeviceInfoUpdate() {
 
 func (s *deviceInfoTester) TestDeviceInfoUpdateContact() {
 	di, err := newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		s.testClientContext,
 		s.testDeviceId,
 		s.testPushToken,
@@ -387,7 +387,7 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 	var err error
 
 	di, err := newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		s.testClientContext,
 		s.testDeviceId,
 		s.testPushToken,
@@ -405,7 +405,7 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 
 	err = di.insert(nil)
 	s.NoError(err)
-	di, err = getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	di, err = getDeviceInfo(s.db, s.aws, s.testUserId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.NotNil(di)
 
@@ -413,14 +413,14 @@ func (s *deviceInfoTester) TestDeviceInfoDelete() {
 
 	di = nil
 
-	di, err = getDeviceInfo(s.db, s.aws, s.testClientId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
+	di, err = getDeviceInfo(s.db, s.aws, s.testUserId, s.testClientContext, s.testDeviceId, s.sessionId, s.logger)
 	s.NoError(err)
 	s.Nil(di)
 }
 
 func (s *deviceInfoTester) TestRegisterAWS() {
 	di, err := newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		s.testClientContext,
 		s.testDeviceId,
 		s.testPushToken,
@@ -454,7 +454,7 @@ func (s *deviceInfoTester) TestRegisterAWS() {
 
 func (s *deviceInfoTester) TestSendToAll() {
 	di, err := newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		s.testClientContext,
 		s.testDeviceId,
 		s.testPushToken,
@@ -473,7 +473,7 @@ func (s *deviceInfoTester) TestSendToAll() {
 	di.insert(nil)
 
 	di, err = newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		s.testClientContext,
 		s.testDeviceId,
 		s.testPushToken,
@@ -500,7 +500,7 @@ func (s *deviceInfoTester) TestSendToAll() {
 
 func (s *deviceInfoTester) TestPingerStealing() {
 	di, err := newDeviceInfo(
-		s.testClientId,
+		s.testUserId,
 		s.testClientContext,
 		s.testDeviceId,
 		s.testPushToken,
@@ -521,7 +521,7 @@ func (s *deviceInfoTester) TestPingerStealing() {
 
 	pingerHostId = "12345"
 
-	d1, err := getDeviceInfo(s.db, s.aws, di.ClientId, di.ClientContext, di.DeviceId, di.SessionId, s.logger)
+	d1, err := getDeviceInfo(s.db, s.aws, di.UserId, di.ClientContext, di.DeviceId, di.SessionId, s.logger)
 	s.NoError(err)
 	require.NotNil(s.T(), d1)
 

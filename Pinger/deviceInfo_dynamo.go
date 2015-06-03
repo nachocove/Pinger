@@ -37,8 +37,8 @@ func fromDeviceInfoMap(dcMap *map[string]interface{}) *deviceContact {
 		switch v := v.(type) {
 		case string:
 			switch k {
-			case "client":
-				dc.ClientId = v
+			case "user":
+				dc.UserId = v
 
 			case "device":
 				dc.DeviceId = v
@@ -80,7 +80,7 @@ func fromDeviceInfoMap(dcMap *map[string]interface{}) *deviceContact {
 }
 func (dc *deviceContact) toMap() map[string]interface{} {
 	dcMap := make(map[string]interface{})
-	dcMap["client"] = dc.ClientId
+	dcMap["user"] = dc.UserId
 	dcMap["context"] = dc.ClientContext
 	dcMap["device"] = dc.DeviceId
 	dcMap["created"] = dc.Created

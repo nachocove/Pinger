@@ -14,7 +14,7 @@ type RPCServerTester struct {
 	backend           *TestingBackend
 	logger            *Logging.Logger
 	dbmap             *gorp.DbMap
-	testClientId      string
+	testUserId        string
 	testClientContext string
 	testDeviceId      string
 	testPlatform      string
@@ -45,7 +45,7 @@ func (s *RPCServerTester) SetupSuite() {
 		pollMap:     nil,
 	}}
 	s.backend = testingBackend
-	s.testClientId = "sometestClientId"
+	s.testUserId = "sometestUserId"
 	s.testClientContext = "sometestclientContext"
 	s.testDeviceId = "NCHOXfherekgrgr"
 	s.testPlatform = "ios"
@@ -53,7 +53,7 @@ func (s *RPCServerTester) SetupSuite() {
 	s.sessionId = "12345678"
 	s.aws = AWS.NewTestAwsHandler()
 	s.mailInfo = &MailPingInformation{
-		ClientId:      s.testClientId,
+		UserId:      s.testUserId,
 		ClientContext: s.testClientContext,
 		DeviceId:      s.testDeviceId,
 		Platform:      s.testPlatform,
@@ -113,7 +113,7 @@ func (s *RPCServerTester) TestPollMap() {
 		MailInfo: s.mailInfo,
 	}
 
-	s.Equal(fmt.Sprintf("%s--%s--%s", s.mailInfo.ClientId, s.mailInfo.ClientContext, s.mailInfo.DeviceId), args.pollMapKey())
+	s.Equal(fmt.Sprintf("%s--%s--%s", s.mailInfo.UserId, s.mailInfo.ClientContext, s.mailInfo.DeviceId), args.pollMapKey())
 }
 
 func (s *RPCServerTester) TestStartPoll() {
@@ -173,7 +173,7 @@ func (s *RPCServerTester) TestStartPoll() {
 func (s *RPCServerTester) TestDeferPoll() {
 	reply := PollingResponse{}
 	args := DeferPollArgs{
-		ClientId:      s.mailInfo.ClientId,
+		UserId:      s.mailInfo.UserId,
 		ClientContext: s.mailInfo.ClientContext,
 		DeviceId:      s.mailInfo.DeviceId,
 		Timeout:       30000,
@@ -201,7 +201,7 @@ func (s *RPCServerTester) TestDeferPoll() {
 func (s *RPCServerTester) TestStopPoll() {
 	reply := PollingResponse{}
 	args := StopPollArgs{
-		ClientId:      s.mailInfo.ClientId,
+		UserId:      s.mailInfo.UserId,
 		ClientContext: s.mailInfo.ClientContext,
 		DeviceId:      s.mailInfo.DeviceId,
 	}

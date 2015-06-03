@@ -28,7 +28,7 @@ func StartPoll(rpcConfig *RPCServerConfiguration, pi *MailPingInformation) (*Sta
 	return &reply, nil
 }
 
-func StopPoll(rpcConfig *RPCServerConfiguration, clientId, clientContext, deviceId string) (*PollingResponse, error) {
+func StopPoll(rpcConfig *RPCServerConfiguration, userId, clientContext, deviceId string) (*PollingResponse, error) {
 	rpcClient, err := getRpcClient(rpcConfig)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func StopPoll(rpcConfig *RPCServerConfiguration, clientId, clientContext, device
 	defer rpcClient.Close()
 	var reply PollingResponse
 	args := StopPollArgs{
-		ClientId:      clientId,
+		UserId:      userId,
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
 	}
@@ -47,7 +47,7 @@ func StopPoll(rpcConfig *RPCServerConfiguration, clientId, clientContext, device
 	return &reply, nil
 }
 
-func DeferPoll(rpcConfig *RPCServerConfiguration, clientId, clientContext, deviceId string, timeout int64) (*PollingResponse, error) {
+func DeferPoll(rpcConfig *RPCServerConfiguration, userId, clientContext, deviceId string, timeout int64) (*PollingResponse, error) {
 	rpcClient, err := getRpcClient(rpcConfig)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func DeferPoll(rpcConfig *RPCServerConfiguration, clientId, clientContext, devic
 	defer rpcClient.Close()
 	var reply PollingResponse
 	args := DeferPollArgs{
-		ClientId:      clientId,
+		UserId:      userId,
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
 		Timeout:       timeout,
@@ -67,7 +67,7 @@ func DeferPoll(rpcConfig *RPCServerConfiguration, clientId, clientContext, devic
 	return &reply, nil
 }
 
-func FindActiveSessions(rpcConfig *RPCServerConfiguration, clientId, clientContext, deviceId string, maxSessions int) (*FindSessionsResponse, error) {
+func FindActiveSessions(rpcConfig *RPCServerConfiguration, userId, clientContext, deviceId string, maxSessions int) (*FindSessionsResponse, error) {
 	rpcClient, err := getRpcClient(rpcConfig)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func FindActiveSessions(rpcConfig *RPCServerConfiguration, clientId, clientConte
 	defer rpcClient.Close()
 	var reply FindSessionsResponse
 	args := FindSessionsArgs{
-		ClientId:      clientId,
+		UserId:      userId,
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
 		MaxSessions:   maxSessions,

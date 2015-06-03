@@ -71,7 +71,7 @@ const (
 
 func addDeviceInfoTable(dbmap *gorp.DbMap) {
 	tMap := dbmap.AddTableWithName(DeviceInfo{}, deviceTableName)
-	if tMap.SetKeys(false, "ClientId", "ClientContext", "DeviceId", "SessionId") == nil {
+	if tMap.SetKeys(false, "UserId", "ClientContext", "DeviceId", "SessionId") == nil {
 		panic(fmt.Sprintf("Could not create key on %s:ID", deviceTableName))
 	}
 	tMap.SetVersionCol("Id")
@@ -82,7 +82,7 @@ func addDeviceInfoTable(dbmap *gorp.DbMap) {
 	cMap = tMap.ColMap("Updated")
 	cMap.SetNotNull(true)
 
-	cMap = tMap.ColMap("ClientId")
+	cMap = tMap.ColMap("UserId")
 	cMap.SetNotNull(true)
 
 	cMap = tMap.ColMap("ClientContext")
