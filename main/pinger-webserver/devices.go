@@ -67,8 +67,8 @@ func (pd *registerPostData) Validate(context *Context) (bool, []string) {
 	MissingFields := []string{}
 	if pd.UserId == "" {
 		if pd.ClientId != "" { // old client
-			context.Logger.Info("Old client using ClientId (%s) instead of UserId.", pd.ClientId)
 			pd.UserId = pd.ClientId
+			context.Logger.Info("%s: Old client using ClientId (%s) instead of UserId.", pd.getLogPrefix(), pd.ClientId)
 		} else {
 			MissingFields = append(MissingFields, "UserId")
 			ok = false
@@ -286,8 +286,8 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 
 	var reply *Pinger.PollingResponse
 	if deferData.UserId == "" && deferData.ClientId != "" { // old client
-		context.Logger.Info("Old client using ClientId (%s) instead of UserId.", deferData.ClientId)
 		deferData.UserId = deferData.ClientId
+		context.Logger.Info("%s: Old client using ClientId (%s) instead of UserId.", deferData.getLogPrefix(), deferData.ClientId)
 	}
 	_, err = context.Config.Server.ValidateAuthToken(deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Token)
 	if err != nil {
@@ -385,8 +385,8 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 
 	var reply *Pinger.PollingResponse
 	if stopData.UserId == "" && stopData.ClientId != "" { // old client
-		context.Logger.Info("Old client using ClientId (%s) instead of UserId.", stopData.ClientId)
 		stopData.UserId = stopData.ClientId
+		context.Logger.Info("%s: Old client using ClientId (%s) instead of UserId.", stopData.getLogPrefix(), stopData.ClientId)
 	}
 	_, err = context.Config.Server.ValidateAuthToken(stopData.UserId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
 	if err != nil {
