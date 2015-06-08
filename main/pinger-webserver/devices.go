@@ -61,12 +61,13 @@ func (pd *registerPostData) getLogPrefix() string {
 }
 
 // Validate validate the structure/information to make sure required information exists.
-func (pd *registerPostData) Validate() (bool, []string) {
+func (pd *registerPostData) Validate(context *Context) (bool, []string) {
 	// TODO Enhance this function to do more security validation.
 	ok := true
 	MissingFields := []string{}
 	if pd.UserId == "" {
 		if pd.ClientId != "" { // old client
+			context.Logger.Info("Old client using ClientId (%s) instead of UserId.", pd.ClientId)
 			pd.UserId = pd.ClientId
 		} else {
 			MissingFields = append(MissingFields, "UserId")
@@ -175,7 +176,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
 		return
 	}
-	ok, missingFields := postInfo.Validate()
+	ok, missingFields := postInfo.Validate(context)
 	if ok == false {
 		context.Logger.Warning("%s: Missing non-optional data: %s", postInfo.getLogPrefix(), strings.Join(missingFields, ","))
 		responseError(w, MissingRequiredData, strings.Join(missingFields, ","))
@@ -239,6 +240,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 }
 
 type deferPost struct {
+	ClientId      string
 	UserId        string
 	ClientContext string
 	DeviceId      string
@@ -283,7 +285,10 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var reply *Pinger.PollingResponse
-
+	if deferData.UserId == "" && deferData.ClientId != "" { // old client
+		context.Logger.Info("Old client using ClientId (%s) instead of UserId.", deferData.ClientId)
+		deferData.UserId = deferData.ClientId
+	}
 	_, err = context.Config.Server.ValidateAuthToken(deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Token)
 	if err != nil {
 		reply = &Pinger.PollingResponse{
@@ -335,7 +340,8 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 }
 
 type stopPost struct {
-	UserId      string
+	ClientId      string
+	UserId        string
 	ClientContext string
 	DeviceId      string
 	Token         string
@@ -378,7 +384,10 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var reply *Pinger.PollingResponse
-
+	if stopData.UserId == "" && stopData.ClientId != "" { // old client
+		context.Logger.Info("Old client using ClientId (%s) instead of UserId.", stopData.ClientId)
+		stopData.UserId = stopData.ClientId
+	}
 	_, err = context.Config.Server.ValidateAuthToken(stopData.UserId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
 	if err != nil {
 		reply = &Pinger.PollingResponse{
