@@ -24,6 +24,7 @@ func init() {
 // the underlying Pinger code.
 // That being said, there has to be a better way of doing this...
 type registerPostData struct {
+	ClientId              string
 	UserId                string
 	ClientContext         string
 	DeviceId              string
@@ -65,8 +66,12 @@ func (pd *registerPostData) Validate() (bool, []string) {
 	ok := true
 	MissingFields := []string{}
 	if pd.UserId == "" {
-		MissingFields = append(MissingFields, "UserId")
-		ok = false
+		if pd.ClientId != "" { // old client
+			pd.UserId = pd.ClientId
+		} else {
+			MissingFields = append(MissingFields, "UserId")
+			ok = false
+		}
 	}
 	if pd.ClientContext == "" {
 		MissingFields = append(MissingFields, "ClientContext")
