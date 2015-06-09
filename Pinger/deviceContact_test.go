@@ -15,7 +15,7 @@ type deviceContactTester struct {
 	aws               *AWS.TestAwsHandler
 	db                DeviceContactDbHandler
 	logger            *Logging.Logger
-	testUserId      string
+	testUserId        string
 	testClientContext string
 	testDeviceId      string
 }

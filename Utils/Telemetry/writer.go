@@ -2,6 +2,7 @@
 package Telemetry
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -246,48 +247,58 @@ func (writer *TelemetryWriter) createFilesAndUpload() error {
 	return nil
 }
 
-func (writer *TelemetryWriter) createFilesFromMessages(messages *[]telemetryLogMsg) (string, error) {
-	var teleFile string
+func (writer *TelemetryWriter) createFilesFromMessages(messages *[]telemetryLogMsg) error {
+	var buffer bytes.Buffer
 	if len(*messages) > 0 {
-		var startTime, endTime time.Time
-		var msgArray []telemetryLogMsgMap
+		var prevTime time.Time
 		for _, msg := range *messages {
-			switch {
-			case startTime.IsZero() || msg.Timestamp.Before(startTime):
-				startTime = msg.Timestamp
-
-			case endTime.IsZero() || msg.Timestamp.After(endTime):
-				endTime = msg.Timestamp
+			if prevTime.IsZero() {
+				prevTime = msg.Timestamp
+			} else if prevTime.Day() != msg.Timestamp.Day() {
+				writer.logger.Printf("Date changed. Writing out collected messages at : %s", prevTime)
+				err := writer.writeOutFile(buffer, prevTime)
+				if err != nil {
+					return err
+				}
+				buffer.Reset()
 			}
-			msgArray = append(msgArray, msg.toMap())
+			prevTime = msg.Timestamp
+			jsonString, err := json.Marshal(msg.toMap())
+			if err != nil {
+				return err
+			}
+			buffer.Write(jsonString)
+			buffer.WriteString("\n")
 		}
-		if endTime.IsZero() {
-			endTime = startTime
-		}
-		jsonString, err := json.Marshal(msgArray)
+		err := writer.writeOutFile(buffer, prevTime)
 		if err != nil {
-			return "", err
-		}
-		teleFile = fmt.Sprintf("%s/log--%s--%s.json.gz",
-			writer.fileLocationPrefix,
-			startTime.Format(TelemetryTimeZFormat),
-			endTime.Format(TelemetryTimeZFormat))
-		if writer.debug {
-			writer.logger.Printf("Creating file: %s", teleFile)
-		}
-		fp, err := os.OpenFile(teleFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
-		if err != nil {
-			return "", err
-		}
-		w := gzip.NewWriter(fp)
-		_, err = w.Write(jsonString)
-		w.Close()
-		fp.Close()
-		if err != nil {
-			return "", err
+			return err
 		}
 	}
-	return teleFile, nil
+	return nil
+}
+
+func (writer *TelemetryWriter) writeOutFile(fileString bytes.Buffer, endTime time.Time) error {
+	var teleFile string
+	dateString := strings.Replace(endTime.Format("20060102150405.999"), ".", "", 1)
+	teleFile = fmt.Sprintf("%s/plog-%s.gz",
+		writer.fileLocationPrefix,
+		dateString)
+	if writer.debug {
+		writer.logger.Printf("Creating file: %s", teleFile)
+	}
+	fp, err := os.OpenFile(teleFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
+	defer fp.Close()
+	if err != nil {
+		return err
+	}
+	w := gzip.NewWriter(fp)
+	defer w.Close()
+	_, err = fileString.WriteTo(w)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // createFiles responsible for pulling data out of the DB and writing it to files.
@@ -313,16 +324,14 @@ func (writer *TelemetryWriter) createFiles() error {
 	if err != nil {
 		return err
 	}
-	fileName, err := writer.createFilesFromMessages(&messages)
+	err = writer.createFilesFromMessages(&messages)
 	if err != nil {
 		return err
 	}
-	if fileName != "" {
-		for _, msg := range messages {
-			_, err = writer.dbmap.Delete(&msg)
-			if err != nil {
-				return err
-			}
+	for _, msg := range messages {
+		_, err = writer.dbmap.Delete(&msg)
+		if err != nil {
+			return err
 		}
 	}
 	rollback = false
@@ -342,7 +351,7 @@ func (writer *TelemetryWriter) upload() error {
 				continue
 			}
 			name := entry.Name()
-			if strings.HasSuffix(name, ".json.gz") || strings.HasSuffix(name, ".json") {
+			if strings.HasPrefix(name, "plog-") {
 				err := writer.pushToS3(name)
 				if err != nil {
 					return err

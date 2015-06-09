@@ -44,7 +44,7 @@ func deviceContactGet(db DeviceContactDbHandler, userId, clientContext, deviceId
 
 func newDeviceContact(db DeviceContactDbHandler, userId, clientContext, deviceId string) *deviceContact {
 	dc := deviceContact{
-		UserId:      userId,
+		UserId:        userId,
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
 	}

@@ -63,8 +63,8 @@ func init() {
 	if ok == false {
 		panic("Could not get EventType Field information")
 	}
-	getAllMessagesSQLwithType = fmt.Sprintf("select * from %s where %s=? and %s>?", telemetryLogTableName, eventTypeField.Tag.Get("db"), timestampField.Tag.Get("db"))
-	getAllMessagesSQL = fmt.Sprintf("select * from %s where %s>?", telemetryLogTableName, timestampField.Tag.Get("db"))
+	getAllMessagesSQLwithType = fmt.Sprintf("select * from %s where %s=? and %s>? order by %s", telemetryLogTableName, eventTypeField.Tag.Get("db"), timestampField.Tag.Get("db"), timestampField.Tag.Get("db"))
+	getAllMessagesSQL = fmt.Sprintf("select * from %s where %s>? order by %s", telemetryLogTableName, timestampField.Tag.Get("db"), timestampField.Tag.Get("db"))
 }
 
 func (writer *TelemetryWriter) getAllMessagesSince(t time.Time, eventType telemetryLogEventType) ([]telemetryLogMsg, error) {

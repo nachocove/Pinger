@@ -36,7 +36,7 @@ func StopPoll(rpcConfig *RPCServerConfiguration, userId, clientContext, deviceId
 	defer rpcClient.Close()
 	var reply PollingResponse
 	args := StopPollArgs{
-		UserId:      userId,
+		UserId:        userId,
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
 	}
@@ -55,7 +55,7 @@ func DeferPoll(rpcConfig *RPCServerConfiguration, userId, clientContext, deviceI
 	defer rpcClient.Close()
 	var reply PollingResponse
 	args := DeferPollArgs{
-		UserId:      userId,
+		UserId:        userId,
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
 		Timeout:       timeout,
@@ -78,7 +78,7 @@ func FindActiveSessions(rpcConfig *RPCServerConfiguration, userId, clientContext
 	defer rpcClient.Close()
 	var reply FindSessionsResponse
 	args := FindSessionsArgs{
-		UserId:      userId,
+		UserId:        userId,
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
 		MaxSessions:   maxSessions,
