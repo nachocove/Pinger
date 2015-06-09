@@ -280,21 +280,21 @@ func (writer *TelemetryWriter) createFilesFromMessages(messages *[]telemetryLogM
 
 func (writer *TelemetryWriter) writeOutFile(fileString bytes.Buffer, endTime time.Time) error {
 	var teleFile string
-	dateString := endTime.Format("20060102150405.999")
+	dateString := strings.Replace(endTime.Format("20060102150405.999"), ".", "", 1)
 	teleFile = fmt.Sprintf("%s/plog-%s.gz",
 		writer.fileLocationPrefix,
-		strings.Replace(dateString, ".", "", 1))
+		dateString)
 	if writer.debug {
 		writer.logger.Printf("Creating file: %s", teleFile)
 	}
 	fp, err := os.OpenFile(teleFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
+	defer fp.Close()
 	if err != nil {
 		return err
 	}
 	w := gzip.NewWriter(fp)
+	defer w.Close()
 	_, err = fileString.WriteTo(w)
-	w.Close()
-	fp.Close()
 	if err != nil {
 		return err
 	}

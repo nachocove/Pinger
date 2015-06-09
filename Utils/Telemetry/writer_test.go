@@ -48,9 +48,8 @@ func (s *writerTester) TestFileCreation() {
 	s.NotNil(writer)
 
 	messages := make([]telemetryLogMsg, 0)
-	fileName, err := writer.createFilesFromMessages(&messages)
+	err = writer.createFilesFromMessages(&messages)
 	s.NoError(err)
-	s.Empty(fileName)
 
 	messages = make([]telemetryLogMsg, 1)
 	msg := NewTelemetryMsg(
@@ -65,16 +64,8 @@ func (s *writerTester) TestFileCreation() {
 		time.Now().Round(time.Millisecond).UTC(),
 	)
 	messages[0] = msg
-	fileName, err = writer.createFilesFromMessages(&messages)
+	err = writer.createFilesFromMessages(&messages)
 	s.NoError(err)
-	s.NotEmpty(fileName)
-	shouldFileName := fmt.Sprintf("%s/log--%s--%s.json.gz",
-		writer.fileLocationPrefix,
-		messages[0].Timestamp.Format(TelemetryTimeZFormat),
-		messages[0].Timestamp.Format(TelemetryTimeZFormat))
-
-	s.Equal(shouldFileName, fileName)
-
 	messages = make([]telemetryLogMsg, 2)
 	msg = NewTelemetryMsg(
 		telemetryLogEventInfo,
@@ -100,16 +91,8 @@ func (s *writerTester) TestFileCreation() {
 		time.Now().Round(time.Millisecond).UTC(),
 	)
 	messages[1] = msg
-	fileName, err = writer.createFilesFromMessages(&messages)
+	err = writer.createFilesFromMessages(&messages)
 	s.NoError(err)
-	s.NotEmpty(fileName)
-	shouldFileName = fmt.Sprintf("%s/log--%s--%s.json.gz",
-		writer.fileLocationPrefix,
-		messages[0].Timestamp.Format(TelemetryTimeZFormat),
-		messages[1].Timestamp.Format(TelemetryTimeZFormat))
-
-	s.Equal(shouldFileName, fileName)
-
 	messages = make([]telemetryLogMsg, 3)
 	msg = NewTelemetryMsg(
 		telemetryLogEventInfo,
@@ -147,15 +130,8 @@ func (s *writerTester) TestFileCreation() {
 		time.Now().Round(time.Millisecond).UTC(),
 	)
 	messages[2] = msg
-	fileName, err = writer.createFilesFromMessages(&messages)
+	err = writer.createFilesFromMessages(&messages)
 	s.NoError(err)
-	s.NotEmpty(fileName)
-	shouldFileName = fmt.Sprintf("%s/log--%s--%s.json.gz",
-		writer.fileLocationPrefix,
-		messages[0].Timestamp.Format(TelemetryTimeZFormat),
-		messages[2].Timestamp.Format(TelemetryTimeZFormat))
-
-	s.Equal(shouldFileName, fileName)
 }
 
 func (s *writerTester) TestUserRegex() {
