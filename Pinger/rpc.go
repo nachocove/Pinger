@@ -243,7 +243,7 @@ func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey st
 }
 
 type StopPollArgs struct {
-	UserId      string
+	UserId        string
 	ClientContext string
 	DeviceId      string
 
@@ -301,7 +301,7 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 }
 
 type DeferPollArgs struct {
-	UserId      string
+	UserId        string
 	ClientContext string
 	DeviceId      string
 	Timeout       int64
@@ -359,7 +359,7 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 }
 
 type FindSessionsArgs struct {
-	UserId      string
+	UserId        string
 	ClientContext string
 	DeviceId      string
 	MaxSessions   int

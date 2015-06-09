@@ -534,7 +534,7 @@ func (client *MailClientContext) updateLastContact() error {
 }
 
 type ClientSessionInfo struct {
-	UserId      string
+	UserId        string
 	ClientContext string
 	DeviceId      string
 	SessionId     string
@@ -545,7 +545,7 @@ type ClientSessionInfo struct {
 func (client *MailClientContext) sessionInfo() *ClientSessionInfo {
 	status, err := client.Status()
 	info := ClientSessionInfo{
-		UserId:      client.UserId,
+		UserId:        client.UserId,
 		ClientContext: client.ClientContext,
 		DeviceId:      client.DeviceId,
 		SessionId:     client.sessionId,

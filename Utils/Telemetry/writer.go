@@ -2,6 +2,7 @@
 package Telemetry
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -19,7 +20,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-    "bytes"
 )
 
 // TelemetryWriter The telemetry writer functionality. Comprises a few goroutines for writing to the DB,
@@ -247,14 +247,14 @@ func (writer *TelemetryWriter) createFilesAndUpload() error {
 	return nil
 }
 
-func (writer *TelemetryWriter) createFilesFromMessages(messages *[]telemetryLogMsg) (error) {
-    var buffer bytes.Buffer
+func (writer *TelemetryWriter) createFilesFromMessages(messages *[]telemetryLogMsg) error {
+	var buffer bytes.Buffer
 	if len(*messages) > 0 {
 		var prevTime time.Time
 		for _, msg := range *messages {
 			if prevTime.IsZero() {
 				prevTime = msg.Timestamp
-			} else if (prevTime.Day() != msg.Timestamp.Day()) {
+			} else if prevTime.Day() != msg.Timestamp.Day() {
 				writer.logger.Printf("Date changed. Writing out collected messages at : %s", prevTime)
 				err := writer.writeOutFile(buffer, prevTime)
 				if err != nil {
@@ -278,12 +278,12 @@ func (writer *TelemetryWriter) createFilesFromMessages(messages *[]telemetryLogM
 	return nil
 }
 
-func (writer *TelemetryWriter) writeOutFile(fileString bytes.Buffer, endTime time.Time) (error) {
+func (writer *TelemetryWriter) writeOutFile(fileString bytes.Buffer, endTime time.Time) error {
 	var teleFile string
 	dateString := endTime.Format("20060102150405.999")
 	teleFile = fmt.Sprintf("%s/plog-%s.gz",
-			writer.fileLocationPrefix,
-			strings.Replace(dateString, ".", "", 1))
+		writer.fileLocationPrefix,
+		strings.Replace(dateString, ".", "", 1))
 	if writer.debug {
 		writer.logger.Printf("Creating file: %s", teleFile)
 	}

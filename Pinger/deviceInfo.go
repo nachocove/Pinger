@@ -89,7 +89,7 @@ func newDeviceInfo(
 		panic("session ID needs to be set")
 	}
 	di := &DeviceInfo{
-		UserId:        userId,
+		UserId:          userId,
 		ClientContext:   clientContext,
 		DeviceId:        deviceId,
 		SessionId:       sessionId,

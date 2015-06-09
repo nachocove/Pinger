@@ -53,7 +53,7 @@ func (s *RPCServerTester) SetupSuite() {
 	s.sessionId = "12345678"
 	s.aws = AWS.NewTestAwsHandler()
 	s.mailInfo = &MailPingInformation{
-		UserId:      s.testUserId,
+		UserId:        s.testUserId,
 		ClientContext: s.testClientContext,
 		DeviceId:      s.testDeviceId,
 		Platform:      s.testPlatform,
@@ -173,7 +173,7 @@ func (s *RPCServerTester) TestStartPoll() {
 func (s *RPCServerTester) TestDeferPoll() {
 	reply := PollingResponse{}
 	args := DeferPollArgs{
-		UserId:      s.mailInfo.UserId,
+		UserId:        s.mailInfo.UserId,
 		ClientContext: s.mailInfo.ClientContext,
 		DeviceId:      s.mailInfo.DeviceId,
 		Timeout:       30000,
@@ -201,7 +201,7 @@ func (s *RPCServerTester) TestDeferPoll() {
 func (s *RPCServerTester) TestStopPoll() {
 	reply := PollingResponse{}
 	args := StopPollArgs{
-		UserId:      s.mailInfo.UserId,
+		UserId:        s.mailInfo.UserId,
 		ClientContext: s.mailInfo.ClientContext,
 		DeviceId:      s.mailInfo.DeviceId,
 	}

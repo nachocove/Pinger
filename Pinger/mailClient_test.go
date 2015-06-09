@@ -97,7 +97,7 @@ func (s *mailClientTester) TestMailClient() {
 	// validity of the device information is tested in the deviceInfo_test.
 	// only bother with things that mailClient is responsible for
 	pi = &MailPingInformation{
-		UserId:      s.testUserId,
+		UserId:        s.testUserId,
 		ClientContext: s.testClientContext,
 		DeviceId:      s.testDeviceId,
 		Platform:      s.testPlatform,
@@ -111,7 +111,7 @@ func (s *mailClientTester) TestMailClient() {
 	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testUserId, s.testClientContext, s.sessionId, ""), err.Error())
 
 	pi = &MailPingInformation{
-		UserId:      s.testUserId,
+		UserId:        s.testUserId,
 		ClientContext: s.testClientContext,
 		DeviceId:      s.testDeviceId,
 		Platform:      s.testPlatform,
@@ -126,7 +126,7 @@ func (s *mailClientTester) TestMailClient() {
 
 	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testUserId, s.testClientContext, s.sessionId, "Foo"), err.Error())
 	pi = &MailPingInformation{
-		UserId:      s.testUserId,
+		UserId:        s.testUserId,
 		ClientContext: s.testClientContext,
 		DeviceId:      s.testDeviceId,
 		Platform:      s.testPlatform,
