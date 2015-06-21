@@ -52,8 +52,8 @@ func (msg *telemetryLogMsg) toMap() telemetryLogMsgMap {
 	msgMap := make(telemetryLogMsgMap)
 	msgMap["id"] = msg.Id
 	msgMap["event_type"] = string(msg.EventType)
-	msgMap["timestamp"] = telemetryTimefromTime(msg.Timestamp)
-	msgMap["uploaded_at"] = telemetryTimefromTime(msg.UploadedAt)
+	msgMap["timestamp"] = msg.Timestamp.Format("2006-01-02 15:04:05.999")
+	msgMap["uploaded_at"] = msg.UploadedAt.Format("2006-01-02 15:04:05.999")
 	msgMap["client"] = msg.Client
 	msgMap["device"] = msg.DeviceId
 	msgMap["session"] = msg.SessionId
