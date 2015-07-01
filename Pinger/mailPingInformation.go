@@ -37,10 +37,10 @@ type MailPingInformation struct {
 	AppBuildNumber         string
 	SessionId              string
 	IMAPAuthenticationBlob string
-    IMAPFolderName		   string
-    IMAPSupportsIdle	   bool
-    IMAPSupportsExpunge    bool
-    IMAPEXISTSCount		   int
+	IMAPFolderName         string
+	IMAPSupportsIdle       bool
+	IMAPSupportsExpunge    bool
+	IMAPEXISTSCount        int
 
 	logPrefix string
 }

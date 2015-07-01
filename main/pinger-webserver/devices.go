@@ -50,11 +50,11 @@ type registerPostData struct {
 	AppBuildNumber         string
 	AppBuildVersion        string
 	IMAPAuthenticationBlob string
-    IMAPFolderName		   string
-    IMAPSupportsIdle	   bool
-    IMAPSupportsExpunge    bool
-    IMAPEXISTSCount		   int
-	logPrefix string
+	IMAPFolderName         string
+	IMAPSupportsIdle       bool
+	IMAPSupportsExpunge    bool
+	IMAPEXISTSCount        int
+	logPrefix              string
 }
 
 func (pd *registerPostData) getLogPrefix() string {
