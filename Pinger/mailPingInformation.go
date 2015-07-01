@@ -36,6 +36,11 @@ type MailPingInformation struct {
 	AppBuildVersion        string
 	AppBuildNumber         string
 	SessionId              string
+	IMAPAuthenticationBlob string
+    IMAPFolderName		   string
+    IMAPSupportsIdle	   bool
+    IMAPSupportsExpunge    bool
+    IMAPEXISTSCount		   int
 
 	logPrefix string
 }
@@ -88,8 +93,7 @@ func (pi *MailPingInformation) Validate() bool {
 			return false
 		}
 	case pi.Protocol == MailClientIMAP:
-		// not yet supported
-		return false
+		return true
 
 	default:
 		// unknown protocols are never supported

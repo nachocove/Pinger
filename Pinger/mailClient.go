@@ -168,7 +168,7 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 		if err != nil {
 			return nil, err
 		}
-		//	case strings.EqualFold(client.Protocol, MailClientIMAP):
+	case strings.EqualFold(client.Protocol, MailClientIMAP):
 		//		mailclient, err = NewIMAPClient(pi, &client.wg, debug, logger)
 		//		if err != nil {
 		//			return nil, err
