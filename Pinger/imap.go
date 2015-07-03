@@ -20,6 +20,7 @@ import (
 // IMAP Commands
 const (
 	IMAP_EXISTS string = "EXISTS"
+	IMAP_EXPUNGE string = "EXPUNGE"
 	IMAP_EXAMINE string = "EXAMINE"
 	IMAP_IDLE string = "IDLE"
 	IMAP_DONE string = "DONE"
@@ -185,25 +186,24 @@ func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
 	return true, nil
 }
 
-func (imap *IMAPClient) parseExists(response string) (existsCount int, isExists bool) {
+func (imap *IMAPClient) parseIDLEResponse(response string) (value int, token string) {
 	tokens := strings.Split(response, " ")
-	if (tokens[0] == "*") && (tokens[2] == IMAP_EXISTS) {
-        existsCount, err := strconv.Atoi(tokens[1])
+	if tokens[0] == "*" && (tokens[2] == IMAP_EXISTS || tokens[2] == IMAP_EXPUNGE) {
+        value, err := strconv.Atoi(tokens[1])
         if err != nil {
-            imap.logger.Warning("Cannot parse EXISTS mail count value from %s", tokens[1])
-	        return 0, false
+            imap.logger.Warning("Cannot parse value from %s", response)
         } else {
-			return existsCount, true
+			return value, tokens[2]
 		}
 	}
-	return 0, false
+	return 0, ""
 }
 
 func (imap *IMAPClient) hasNewMail(responses []string) bool {
 	for _, r := range responses {
-		existsCount, isExists := imap.parseExists(r)
-		if isExists && existsCount != imap.pi.IMAPEXISTSCount {
-			imap.logger.Debug("Current EXISTS Count %d is different from Client EXISTS Count %d", existsCount, imap.pi.IMAPEXISTSCount)
+		count, token := imap.parseIDLEResponse(r)
+		if token == IMAP_EXISTS && count != imap.pi.IMAPEXISTSCount {
+			imap.logger.Debug("Current EXISTS Count %d is different from Client EXISTS Count %d", count, imap.pi.IMAPEXISTSCount)
 			return true
 		}
 	}
@@ -252,14 +252,20 @@ func (imap *IMAPClient) doIMAPCommand(command string, waitTime int64) ([]string,
 	return responses, err
 }
 
-func (imap *IMAPClient) processResponsesForNewMail(command string, responses []string) {
+func (imap *IMAPClient) processResponseForNewMail(command string, response string) {
 	commandTokens := strings.Split(command, " ")
 	if len(commandTokens) > 1 {
 		commandName := commandTokens[1]
 		switch {
 			case commandName == "IDLE":
-				if imap.hasNewMail(responses) {
-					imap.Debug("Got new mail. Stopping IDLE..")
+				count, token := imap.parseIDLEResponse(response)
+				if token == IMAP_EXPUNGE {
+					imap.pi.IMAPEXISTSCount -= 1
+					imap.Debug("%s received. Decrementing IMAPEXISTSCount to %d", IMAP_EXPUNGE, imap.pi.IMAPEXISTSCount)
+
+				} else if token == IMAP_EXISTS && count != imap.pi.IMAPEXISTSCount {
+					imap.logger.Debug("Current EXISTS Count %d is different from Client EXISTS Count %d", count, imap.pi.IMAPEXISTSCount)
+					imap.logger.Debug("Got new mail. Stopping IDLE..")
 					err := imap.sendIMAPCommand(IMAP_DONE)
 					if err != nil {
 						imap.Error("Error sending IMAP Command %s: %s", IMAP_DONE, err)
@@ -289,11 +295,12 @@ func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]st
 		if err != nil {
 			return responses, err
 		} else {
+			imap.logger.Debug(response)
 			responses = append(responses, response)
-			imap.processResponsesForNewMail(command, responses)
+			imap.processResponseForNewMail(command, response)
 			if imap.isFinalResponse(command, response) {
-				for _, r := range responses {
-					imap.logger.Debug(r)
+				for i, r := range responses {
+					imap.logger.Debug("%d: %s", i, r)
 				}
 				break
 			}
@@ -377,6 +384,7 @@ func (imap *IMAPClient) setupConn() error {
 }
 
 func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan error) {
+	imap.logger.Debug("Starting LongPoll")
 	defer Utils.RecoverCrash(imap.logger)
 	askedToStop := false
 	defer func() {
