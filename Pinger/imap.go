@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"strings"
 )
 
 // Timeout values for the Dial functions.
@@ -143,7 +144,6 @@ func (imap *IMAPClient) setupScanner() {
 }
 
 func (imap *IMAPClient) handleGreeting() error {
-	imap.logger.Debug("Handle the greeting...")
 	response, err := imap.getServerResponse(0)
 	if err == nil {
 		imap.logger.Info("Connected to %s (Tag=%s)", imap.url.Host, imap.tag.id)
@@ -168,25 +168,28 @@ func (imap *IMAPClient) doImapAuth() error {
 	if err != nil {
 		return err
 	}
-	response := responses[len(responses)]
-	if response[0:1] != "+ " {
-		err = fmt.Errorf("Did not get proper response from imap server: %s", response)
+	response := responses[len(responses)-1]
+	tokens := strings.Split(response, " ")
+	if (tokens[1] != "OK") {
+		err = fmt.Errorf("Did not authenticate successfully: %s", response)
 		return err
 	}
+	return nil
+}
 
-	userPassBytes := []byte(fmt.Sprintf("\000%s\000%s",
-		imap.pi.MailServerCredentials.Username,
-		imap.pi.MailServerCredentials.Password))
-	buf := make([]byte, base64.StdEncoding.EncodedLen(len(userPassBytes)))
-	base64.StdEncoding.Encode(buf, userPassBytes)
-
-	responses, err = imap.doIMAPCommand(buf, 0)
+func (imap *IMAPClient) doExamine() error {
+	imap.logger.Debug("Folder %s", imap.pi.IMAPFolderName)
+	command := []byte(fmt.Sprintf("%s EXAMINE %s", imap.tag.Next(), imap.pi.IMAPFolderName))
+	responses, err := imap.doIMAPCommand(command, 0)
 	if err != nil {
 		return err
 	}
-	//if bytes.HasPrefix(response, []byte(fmt.Sprintf("%s OK AUTHENTICATE", imap.pi.ClientContext))) == false {
-	//	return fmt.Errorf("Auth failed: %s", response)
-	//}
+	response := responses[len(responses)-1]
+	tokens := strings.Split(response, " ")
+	if (tokens[1] != "OK") {
+		err = fmt.Errorf("Error running command %s: %s", command, response)
+		return err
+	}
 	return nil
 }
 
@@ -227,6 +230,7 @@ func (imap *IMAPClient) getServerResponses(command []byte, waitTime int64) ([]st
 		if err != nil {
 			return responses, err
 		} else {
+			imap.logger.Debug(response)
 			responses = append(responses, response)
 			if imap.isFinalResponse(command, response) == true {
 				for _, r := range responses {
@@ -253,7 +257,6 @@ func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 		return "", err
 	}
 	response := imap.scanner.Text()
-	//imap.logger.Debug("Response from server:[%s]", response)
 	return response, nil
 }
 
@@ -275,7 +278,7 @@ func defaultPort(addr, port string) string {
 	return addr
 }
 
-func (imap *IMAPClient) setupConn() error {
+func (imap *IMAPClient) setupConnAndAuthenticate() error {
 	imap.logger.Debug("Setting up TLS connection...")
 	if imap.tlsConn != nil {
 		imap.tlsConn.Close()
@@ -340,24 +343,30 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 		}
 		sleepTime = 1 // default sleeptime on retry. Error cases can override it.
 		if imap.tlsConn == nil {
-			err := imap.setupConn()
+			err := imap.setupConnAndAuthenticate()
 			if err != nil {
-				imap.Error("Conn setup error: %v", err)
+				imap.Error("Connection setup error: %v", err)
 				return
 			}
 		}
-
+		err := imap.doExamine()
+		if err != nil {
+			imap.Error("%v", err)
+			return
+		}
 		reqTimeout := imap.pi.ResponseTimeout
 		reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 		requestTimer := time.NewTimer(time.Duration(reqTimeout) * time.Millisecond)
 		responseCh := make(chan []string)
-		go imap.doRequestResponse(imap.pi.RequestData, responseCh, errCh)
+		command := []byte(fmt.Sprintf("%s IDLE", imap.tag.Next()))
+		imap.logger.Debug("command %s", command)
+		go imap.doRequestResponse(command, responseCh, errCh)
 		select {
 		case <-requestTimer.C:
 			// request timed out. Start over.
 			requestTimer.Stop()
 			imap.tlsConn.Close()
-			err := imap.setupConn()
+			err := imap.setupConnAndAuthenticate()
 			if err != nil {
 				imap.sendError(errCh, err)
 				return
