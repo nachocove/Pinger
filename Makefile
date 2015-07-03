@@ -35,6 +35,9 @@ docker: nachobase
 nachobase:
 	(cd nachobase ; docker build -t nachocove/nachobase:v1 .)
 
+curl-imap-register-jan:
+	curl -c /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/janIMAP.json $(PINGER_HOST)/$(PINGER_VERSION)/register
+
 curl-imap-register:
 	curl -c /tmp/cookiejar -v -k -H "Content-Type: application/json" --data-binary @examples/$(PINGER_IMAP_EXAMPLE).json $(PINGER_HOST)/$(PINGER_VERSION)/register
 

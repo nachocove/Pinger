@@ -8,45 +8,115 @@ import (
 	"fmt"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
+	"math/rand"
+	"net"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 )
+
+// Timeout values for the Dial functions.
+const (
+	netTimeout    = 30 * time.Second // Time to establish a TCP connection
+	clientTimeout = 60 * time.Second // Time to receive greeting and capabilities
+)
+
+type cmdTag struct {
+	id  []byte
+	seq uint64
+}
 
 type IMAPClient struct {
 	debug     bool
 	logger    *Logging.Logger
 	pi        *MailPingInformation
-	di        *DeviceInfo
 	wg        *sync.WaitGroup
-	errCh     chan error
-	exitCh    chan int
+	mutex     *sync.Mutex
+	cancelled bool
 	url       *url.URL
 	tlsConfig *tls.Config
-	conn      *tls.Conn
+	tlsConn   *tls.Conn
 	scanner   *bufio.Scanner
+	tag       *cmdTag
 }
 
 func (imap *IMAPClient) getLogPrefix() (prefix string) {
-	prefix = imap.di.getLogPrefix() + "/IMAP"
+	prefix = imap.pi.getLogPrefix() + "/IMAP"
 	return
 }
 
-func NewIMAPClient(di *DeviceInfo, pi *MailPingInformation, wg *sync.WaitGroup, errCh chan error, exitCh chan int, debug bool, logger *Logging.Logger) (*IMAPClient, error) {
+func (imap *IMAPClient) Debug(format string, args ...interface{}) {
+	imap.logger.Debug(fmt.Sprintf("%s: %s", imap.getLogPrefix(), format), args...)
+}
+
+func (imap *IMAPClient) Info(format string, args ...interface{}) {
+	imap.logger.Info(fmt.Sprintf("%s: %s", imap.getLogPrefix(), format), args...)
+}
+
+func (imap *IMAPClient) Error(format string, args ...interface{}) {
+	imap.logger.Error(fmt.Sprintf("%s: %s", imap.getLogPrefix(), format), args...)
+}
+
+func (imap *IMAPClient) Warning(format string, args ...interface{}) {
+	imap.logger.Warning(fmt.Sprintf("%s: %s", imap.getLogPrefix(), format), args...)
+}
+
+func NewIMAPClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, logger *Logging.Logger) (*IMAPClient, error) {
 	imap := IMAPClient{
-		debug:  debug,
-		logger: logger.Copy(),
-		pi:     pi,
-		di:     di,
-		wg:     wg,
-		errCh:  errCh,
-		exitCh: exitCh,
+		debug:     debug,
+		logger:    logger.Copy(),
+		pi:        pi,
+		wg:        wg,
+		mutex:     &sync.Mutex{},
+		cancelled: false,
+		tag:       genNewCmdTag(0),
 	}
+	imap.logger.SetCallDepth(0)
+	imap.logger.Debug("Created new IMAP Client %s", imap.getLogPrefix())
 	return &imap, nil
 }
 
-func (imap *IMAPClient) sendError(err error) {
-	sendError(imap.errCh, err, imap.logger)
+func (imap *IMAPClient) sendError(errCh chan error, err error) {
+	logError(err, imap.logger)
+	errCh <- err
+}
+
+var prng = rand.New(&prngSource{src: rand.NewSource(time.Now().UnixNano())})
+
+// prngSource is a goroutine-safe implementation of rand.Source.
+type prngSource struct {
+	mu  sync.Mutex
+	src rand.Source
+}
+
+func (r *prngSource) Int63() (n int64) {
+	r.mu.Lock()
+	n = r.src.Int63()
+	r.mu.Unlock()
+	return
+}
+
+func (r *prngSource) Seed(seed int64) {
+	r.mu.Lock()
+	r.src.Seed(seed)
+	r.mu.Unlock()
+}
+
+func genNewCmdTag(n int) *cmdTag {
+	if n < 1 || 26 < n {
+		n = 5
+	}
+	id := make([]byte, n, n+20)
+	for i, v := range prng.Perm(26)[:n] {
+		id[i] = 'A' + byte(v)
+	}
+	return &cmdTag{id, 0}
+}
+
+func (t *cmdTag) Next() string {
+	t.seq++
+	return string(strconv.AppendUint(t.id, t.seq, 10))
 }
 
 func (imap *IMAPClient) ScanIMAPTerminator(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -63,21 +133,43 @@ func (imap *IMAPClient) ScanIMAPTerminator(data []byte, atEOF bool) (advance int
 
 func (imap *IMAPClient) setupScanner() {
 	if len(imap.pi.CommandTerminator) <= 0 {
-		imap.pi.CommandTerminator = []byte("\n")
+		imap.pi.CommandTerminator = []byte("\r\n")
 	}
 	if len(imap.pi.CommandAcknowledgement) <= 0 {
-		imap.pi.CommandAcknowledgement = []byte("\n")
+		imap.pi.CommandAcknowledgement = []byte("\r\n")
 	}
-	imap.scanner = bufio.NewScanner(imap.conn)
+	imap.scanner = bufio.NewScanner(imap.tlsConn)
 	imap.scanner.Split(imap.ScanIMAPTerminator)
 }
 
+func (imap *IMAPClient) handleGreeting() error {
+	imap.logger.Debug("Handle the greeting...")
+	response, err := imap.getServerResponse(0)
+	if err == nil {
+		imap.logger.Info("Connected to %s (Tag=%s)", imap.url.Host, imap.tag.id)
+		if response[0:4] != "* OK" {
+			err = fmt.Errorf("Did not get proper response from imap server: %s", response)
+			return err
+		}
+		imap.logger.Info("Greetings from server: %s", response)
+	}
+	return err
+}
+
 func (imap *IMAPClient) doImapAuth() error {
-	response, err := imap.doIMAPCommand([]byte(fmt.Sprintf("%s AUTHENTICATE PLAIN", imap.pi.ClientContext)), 0)
+	imap.logger.Debug("authblob %s", imap.pi.IMAPAuthenticationBlob)
+	decodedBlob, err := base64.StdEncoding.DecodeString(imap.pi.IMAPAuthenticationBlob)
+	if err != nil {
+		imap.logger.Error("Error decoding AuthBlob")
+	}
+	imap.logger.Debug("authblob %s", decodedBlob)
+
+	responses, err := imap.doIMAPCommand([]byte(fmt.Sprintf("%s %s", imap.tag.Next(), decodedBlob)), 0)
 	if err != nil {
 		return err
 	}
-	if bytes.Compare(response, []byte("+")) != 0 {
+	response := responses[len(responses)]
+	if response[0:1] != "+ " {
 		err = fmt.Errorf("Did not get proper response from imap server: %s", response)
 		return err
 	}
@@ -88,58 +180,105 @@ func (imap *IMAPClient) doImapAuth() error {
 	buf := make([]byte, base64.StdEncoding.EncodedLen(len(userPassBytes)))
 	base64.StdEncoding.Encode(buf, userPassBytes)
 
-	response, err = imap.doIMAPCommand(buf, 0)
+	responses, err = imap.doIMAPCommand(buf, 0)
 	if err != nil {
 		return err
 	}
-	if bytes.HasPrefix(response, []byte(fmt.Sprintf("%s OK AUTHENTICATE", imap.pi.ClientContext))) == false {
-		return fmt.Errorf("Auth failed: %s", response)
-	}
+	//if bytes.HasPrefix(response, []byte(fmt.Sprintf("%s OK AUTHENTICATE", imap.pi.ClientContext))) == false {
+	//	return fmt.Errorf("Auth failed: %s", response)
+	//}
 	return nil
 }
 
-func (imap *IMAPClient) doIMAPCommand(command []byte, waitTime int64) ([]byte, error) {
-	_, err := imap.conn.Write(command)
-	if err != nil {
-		return nil, err
+func (imap *IMAPClient) doIMAPCommand(command []byte, waitTime int64) ([]string, error) {
+	imap.logger.Debug("Sending IMAP Command to server:[%s]", command)
+
+	if len(command) > 0 {
+		_, err := imap.tlsConn.Write(command)
+		if err != nil {
+			return nil, err
+		}
+		_, err = imap.tlsConn.Write(imap.pi.CommandTerminator)
+		if err != nil {
+			return nil, err
+		}
 	}
-	_, err = imap.conn.Write(imap.pi.CommandTerminator)
-	if err != nil {
-		return nil, err
+	responses, err := imap.getServerResponses(command, waitTime)
+	return responses, err
+}
+
+func (imap *IMAPClient) isFinalResponse(command []byte, response string) bool {
+	tokens := bytes.Split(command, []byte(" "))
+	if len(tokens) > 0 {
+		token := string(tokens[0])
+		if token == response[0:len(token)] {
+			return true
+		}
 	}
+	return false
+}
+
+func (imap *IMAPClient) getServerResponses(command []byte, waitTime int64) ([]string, error) {
+	completed := false
+	responses := make([]string, 0)
+
+	for completed == false {
+		response, err := imap.getServerResponse(waitTime)
+		if err != nil {
+			return responses, err
+		} else {
+			responses = append(responses, response)
+			if imap.isFinalResponse(command, response) == true {
+				for _, r := range responses {
+					imap.logger.Debug(r)
+				}
+				break
+			}
+		}
+	}
+	return responses, nil
+}
+
+func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 	if waitTime > 0 {
 		waitUntil := time.Now().Add(time.Duration(waitTime) * time.Millisecond)
-		imap.conn.SetReadDeadline(waitUntil)
-		defer imap.conn.SetReadDeadline(time.Time{})
+		imap.tlsConn.SetReadDeadline(waitUntil)
+		defer imap.tlsConn.SetReadDeadline(time.Time{})
 	}
 	if ok := imap.scanner.Scan(); ok == false {
 		err := imap.scanner.Err()
 		if err == nil {
 			err = fmt.Errorf("Could not scan connection")
 		}
-		return nil, err
+		return "", err
 	}
 	response := imap.scanner.Text()
-	if response != "+" {
-		err = fmt.Errorf("Did not get proper response from imap server: %s", response)
-		return nil, err
-	}
-	return []byte(response), nil
+	//imap.logger.Debug("Response from server:[%s]", response)
+	return response, nil
 }
 
-func (imap *IMAPClient) doRequestResponse(request []byte, responseCh chan []byte, errCh chan error) {
-	response, err := imap.doIMAPCommand(request, 0)
+func (imap *IMAPClient) doRequestResponse(request []byte, responseCh chan []string, errCh chan error) {
+	responses, err := imap.doIMAPCommand(request, 0)
 	if err != nil {
 		errCh <- err
 		return
 	}
-	responseCh <- response
+	responseCh <- responses
 	return
 }
 
+func defaultPort(addr, port string) string {
+	_, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		addr = net.JoinHostPort(addr, port)
+	}
+	return addr
+}
+
 func (imap *IMAPClient) setupConn() error {
-	if imap.conn != nil {
-		imap.conn.Close()
+	imap.logger.Debug("Setting up TLS connection...")
+	if imap.tlsConn != nil {
+		imap.tlsConn.Close()
 	}
 	if imap.url == nil {
 		imapUrl, err := url.Parse(imap.pi.MailServerUrl)
@@ -148,32 +287,47 @@ func (imap *IMAPClient) setupConn() error {
 		}
 		imap.url = imapUrl
 	}
+	host, _, _ := net.SplitHostPort(imap.url.Host)
 	if imap.tlsConfig == nil {
-		imap.tlsConfig = &tls.Config{}
+		imap.tlsConfig = &tls.Config{ServerName: host}
 	}
-	conn, err := tls.Dial("tcp", imap.url.Host, imap.tlsConfig)
+	conn, err := net.DialTimeout("tcp", imap.url.Host, netTimeout)
+	if err == nil {
+		imap.tlsConn = tls.Client(conn, imap.tlsConfig)
+		//if c, err = NewClient(tlsConn, host, clientTimeout); err != nil {
+		if imap.tlsConn == nil {
+			conn.Close()
+			return fmt.Errorf("Cannot create TLS Connection")
+		}
+	}
+	if err != nil {
+		imap.logger.Debug("err %s", err)
+
+		return err
+	}
+	imap.setupScanner()
+
+	err = imap.handleGreeting()
 	if err != nil {
 		return err
 	}
-	imap.conn = conn
-	imap.setupScanner()
-
 	err = imap.doImapAuth()
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (imap *IMAPClient) LongPoll(stopCh, exitCh chan int) {
+
+func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan error) {
 	defer Utils.RecoverCrash(imap.logger)
 	askedToStop := false
 	defer func() {
-		if imap.conn != nil {
-			imap.conn.Close()
+		if imap.tlsConn != nil {
+			imap.tlsConn.Close()
 		}
 		if askedToStop == false {
 			imap.logger.Debug("%s: Stopping", imap.getLogPrefix())
-			exitCh <- 1 // tell the parent we've exited.
+			stopPollCh <- 1 // tell the parent we've exited.
 		}
 	}()
 
@@ -185,10 +339,10 @@ func (imap *IMAPClient) LongPoll(stopCh, exitCh chan int) {
 			time.Sleep(s)
 		}
 		sleepTime = 1 // default sleeptime on retry. Error cases can override it.
-		if imap.conn == nil {
+		if imap.tlsConn == nil {
 			err := imap.setupConn()
 			if err != nil {
-				imap.sendError(err)
+				imap.Error("Conn setup error: %v", err)
 				return
 			}
 		}
@@ -196,42 +350,54 @@ func (imap *IMAPClient) LongPoll(stopCh, exitCh chan int) {
 		reqTimeout := imap.pi.ResponseTimeout
 		reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 		requestTimer := time.NewTimer(time.Duration(reqTimeout) * time.Millisecond)
-		errCh := make(chan error)
-		responseCh := make(chan []byte)
+		responseCh := make(chan []string)
 		go imap.doRequestResponse(imap.pi.RequestData, responseCh, errCh)
 		select {
 		case <-requestTimer.C:
 			// request timed out. Start over.
 			requestTimer.Stop()
-			imap.conn.Close()
+			imap.tlsConn.Close()
 			err := imap.setupConn()
 			if err != nil {
-				imap.sendError(err)
+				imap.sendError(errCh, err)
 				return
 			}
 
 		case err := <-errCh:
-			imap.sendError(err)
+			imap.sendError(errCh, err)
 			return
 
-		case response := <-responseCh:
+		case responses := <-responseCh:
 			requestTimer.Stop()
 			switch {
-			case imap.pi.NoChangeReply != nil && bytes.Compare(response, imap.pi.NoChangeReply) == 0:
+			case imap.pi.NoChangeReply != nil && bytes.Compare([]byte(responses[0]), imap.pi.NoChangeReply) == 0:
 				// go back to polling
 
-			case imap.pi.ExpectedReply == nil || bytes.Compare(response, imap.pi.ExpectedReply) == 0:
+			case imap.pi.ExpectedReply == nil || bytes.Compare([]byte(responses[0]), imap.pi.ExpectedReply) == 0:
 				// got mail! Send push.
 			}
 
-		case <-imap.exitCh: // parent will close this, at which point this will trigger.
+		case <-stopPollCh: // parent will close this, at which point this will trigger.
+			imap.Debug("Was told to stop. Stopping")
 			return
 
-		case <-stopCh:
+		case <-stopAllCh: // parent will close this, at which point this will trigger.
 			askedToStop = true
+			imap.Debug("Was told to stop (allStop). Stopping")
 			return
 		}
 	}
+}
+
+func (imap *IMAPClient) cancel() {
+	imap.mutex.Lock()
+	imap.cancelled = true
+	//if imap.request != nil {
+	imap.Info("Cancelling outstanding request")
+	//imap.transport.CancelRequest(ex.request)
+	//}
+	imap.mutex.Unlock()
+	//imap.transport.CloseIdleConnections()
 }
 
 func (imap *IMAPClient) Cleanup() {
