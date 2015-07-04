@@ -54,6 +54,7 @@ type registerPostData struct {
 	IMAPSupportsIdle       bool
 	IMAPSupportsExpunge    bool
 	IMAPEXISTSCount        int
+	IMAPUIDNEXT            int
 	logPrefix              string
 }
 
@@ -116,6 +117,10 @@ func (pd *registerPostData) Validate(context *Context) (bool, []string) {
 			MissingFields = append(MissingFields, "IMAPEXISTSCount")
 			ok = false
 		}
+		if pd.IMAPUIDNEXT < 0 {
+			MissingFields = append(MissingFields, "IMAPUIDNEXT")
+			ok = false
+		}
 	} else {
 		MissingFields = append(MissingFields, "Protocol")
 		ok = false
@@ -157,6 +162,7 @@ func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInforma
 	pi.IMAPSupportsIdle = pd.IMAPSupportsIdle
 	pi.IMAPSupportsExpunge = pd.IMAPSupportsExpunge
 	pi.IMAPEXISTSCount = pd.IMAPEXISTSCount
+	pi.IMAPUIDNEXT = pd.IMAPUIDNEXT
 
 	pi.SessionId = sessionId
 

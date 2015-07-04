@@ -41,6 +41,7 @@ type MailPingInformation struct {
 	IMAPSupportsIdle       bool
 	IMAPSupportsExpunge    bool
 	IMAPEXISTSCount        int
+	IMAPUIDNEXT            int
 
 	logPrefix string
 }
@@ -83,6 +84,7 @@ func (pi *MailPingInformation) cleanup() {
 	pi.IMAPSupportsIdle = false
 	pi.IMAPSupportsExpunge = false
 	pi.IMAPEXISTSCount = 0
+	pi.IMAPUIDNEXT = 0
 }
 
 // Validate validate the structure/information to make sure required information exists.
