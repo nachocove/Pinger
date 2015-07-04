@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,13 +20,15 @@ import (
 
 // IMAP Commands
 const (
-	IMAP_EXISTS  string = "EXISTS"
-	IMAP_EXPUNGE string = "EXPUNGE"
-	IMAP_EXAMINE string = "EXAMINE"
-	IMAP_IDLE    string = "IDLE"
-	IMAP_DONE    string = "DONE"
-	IMAP_NOOP    string = "NOOP"
-	IMAP_UIDNEXT string = "[UIDNEXT"
+	IMAP_EXISTS       string = "EXISTS"
+	IMAP_EXPUNGE      string = "EXPUNGE"
+	IMAP_EXAMINE      string = "EXAMINE"
+	IMAP_IDLE         string = "IDLE"
+	IMAP_DONE         string = "DONE"
+	IMAP_NOOP         string = "NOOP"
+	IMAP_UIDNEXT      string = "[UIDNEXT"
+	IMAP_STATUS       string = "STATUS"
+	IMAP_STATUS_QUERY string = "(MESSAGES UIDNEXT)"
 )
 
 // Timeout values for the Dial functions.
@@ -40,18 +43,19 @@ type cmdTag struct {
 }
 
 type IMAPClient struct {
-	debug     bool
-	logger    *Logging.Logger
-	pi        *MailPingInformation
-	wg        *sync.WaitGroup
-	mutex     *sync.Mutex
-	cancelled bool
-	url       *url.URL
-	tlsConfig *tls.Config
-	tlsConn   *tls.Conn
-	scanner   *bufio.Scanner
-	tag       *cmdTag
-	isPolling bool
+	debug      bool
+	logger     *Logging.Logger
+	pi         *MailPingInformation
+	wg         *sync.WaitGroup
+	mutex      *sync.Mutex
+	cancelled  bool
+	url        *url.URL
+	tlsConfig  *tls.Config
+	tlsConn    *tls.Conn
+	scanner    *bufio.Scanner
+	tag        *cmdTag
+	isPolling  bool
+	isNewEmail bool
 }
 
 func (imap *IMAPClient) getLogPrefix() (prefix string) {
@@ -207,6 +211,30 @@ func (imap *IMAPClient) parseEXAMINEResponse(response string) (value int, token 
 	return 0, ""
 }
 
+//* STATUS "INBOX" (MESSAGES 18 UIDNEXT 41)
+func (imap *IMAPClient) parseSTATUSResponse(response string) (int, int) {
+	re := regexp.MustCompile(".*(MESSAGES (?P<messageCount>[0-9]+) UIDNEXT (?P<UIDNext>[0-9]+))")
+	r2 := re.FindStringSubmatch(response)
+	if len(r2) == 0 {
+		return 0, 0
+	}
+	messageCountStr := r2[2]
+	UIDNextStr := r2[3]
+	imap.Debug("mc %s uidnext %s", messageCountStr, UIDNextStr)
+	messageCount, err := strconv.Atoi(messageCountStr)
+	if err != nil {
+		imap.Warning("Cannot parse value from %s", messageCountStr)
+		messageCount = 0
+	}
+	UIDNext, err := strconv.Atoi(UIDNextStr)
+	if err != nil {
+		imap.Warning("Cannot parse value from %s", UIDNextStr)
+		UIDNext = 0
+	}
+	imap.Debug("mc %d uidnext %d", messageCount, UIDNext)
+	return messageCount, UIDNext
+}
+
 func (imap *IMAPClient) parseIDLEResponse(response string) (value int, token string) {
 	tokens := strings.Split(response, " ")
 	if tokens[0] == "*" && (tokens[2] == IMAP_EXISTS || tokens[2] == IMAP_EXPUNGE) {
@@ -288,6 +316,7 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 			} else if token == IMAP_EXISTS && count != imap.pi.IMAPEXISTSCount {
 				imap.Debug("Current EXISTS count %d is different from starting EXISTS count %d", count, imap.pi.IMAPEXISTSCount)
 				imap.Debug("Got new mail. Stopping IDLE..")
+				imap.isNewEmail = true
 				err := imap.sendIMAPCommand(IMAP_DONE)
 				if err != nil {
 					imap.Error("Error sending IMAP Command %s: %s", IMAP_DONE, err)
@@ -302,6 +331,15 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 			} else if token == IMAP_UIDNEXT {
 				imap.Debug("Setting PI.IMAPUIDNEXT to %d", count)
 				imap.pi.IMAPUIDNEXT = count
+			}
+		case commandName == "STATUS":
+			imap.Debug("Processing STATUS Response: %s", response)
+			_, UIDNext := imap.parseSTATUSResponse(response)
+			// TODO : can UIDNEXT ever be 0
+			if UIDNext != 0 && UIDNext != imap.pi.IMAPUIDNEXT {
+				imap.Debug("UIDNext %d is different from starting UIDNext  %d", UIDNext, imap.pi.IMAPUIDNEXT)
+				imap.Debug("Got new mail.")
+				imap.isNewEmail = true
 			}
 		}
 	}
@@ -500,9 +538,11 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 		responseCh := make(chan []string)
 		command := IMAP_NOOP
 		if imap.pi.IMAPSupportsIdle {
+			imap.Debug("supporting idle")
 			command = fmt.Sprintf("%s %s", imap.tag.Next(), IMAP_IDLE)
 		} else {
-			command = fmt.Sprintf("%s %s", imap.tag.Next(), IMAP_IDLE)
+			//STATUS INBOX (MESSAGES UIDNEXT)
+			command = fmt.Sprintf("%s %s %s %s", imap.tag.Next(), IMAP_STATUS, imap.pi.IMAPFolderName, IMAP_STATUS_QUERY)
 		}
 		imap.Debug("command %s", command)
 		imap.wg.Add(1)
@@ -522,12 +562,15 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			imap.sendError(errCh, err)
 			return
 
-		case responses := <-responseCh:
+		case <-responseCh:
 			requestTimer.Stop()
-			if imap.hasNewMail(responses) {
+			if imap.isNewEmail {
 				imap.Debug("Got mail. Setting LongPollNewMail")
 				errCh <- LongPollNewMail
 				break
+			} else {
+				imap.Debug("%s: Sleeping %s before retry STATUS", imap.getLogPrefix(), 5*time.Second)
+				time.Sleep(5 * time.Second)
 			}
 
 		case <-stopPollCh: // parent will close this, at which point this will trigger.
