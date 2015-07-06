@@ -43,20 +43,21 @@ type cmdTag struct {
 }
 
 type IMAPClient struct {
-	debug      bool
-	logger     *Logging.Logger
-	pi         *MailPingInformation
-	wg         *sync.WaitGroup
-	mutex      *sync.Mutex
-	cancelled  bool
-	url        *url.URL
-	tlsConfig  *tls.Config
-	tlsConn    *tls.Conn
-	scanner    *bufio.Scanner
-	tag        *cmdTag
-	isPolling  bool
+	debug       bool
+	logger      *Logging.Logger
+	pi          *MailPingInformation
+	wg          *sync.WaitGroup
+	mutex       *sync.Mutex
+	cancelled   bool
+	url         *url.URL
+	tlsConfig   *tls.Config
+	tlsConn     *tls.Conn
+	scanner     *bufio.Scanner
+	tag         *cmdTag
+	isPolling   bool
 	hasNewEmail bool
 }
+
 var prng *rand.Rand
 
 func init() {
@@ -179,13 +180,12 @@ func (imap *IMAPClient) handleGreeting() error {
 }
 
 func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
-	imap.Debug("Authenticating with authblob %s", imap.pi.IMAPAuthenticationBlob)
+	imap.Debug("Authenticating with authblob...")
 	decodedBlob, err := base64.StdEncoding.DecodeString(imap.pi.IMAPAuthenticationBlob)
 	if err != nil {
 		imap.Error("Error decoding AuthBlob")
-		return err
+		return false, err
 	}
-	imap.Debug("authblob %s", decodedBlob)
 
 	responses, err := imap.doIMAPCommand(fmt.Sprintf("%s %s", imap.tag.Next(), decodedBlob), 0)
 	if err != nil {
@@ -270,7 +270,12 @@ func (imap *IMAPClient) doExamine() error {
 }
 
 func (imap *IMAPClient) sendIMAPCommand(command string) error {
-	imap.Debug("Sending IMAP Command to server:[%s]", command)
+	commandTokens := strings.Split(command, " ")
+	if commandTokens[1] == "LOGIN" || commandTokens[1] == "AUTHENTICATE" {
+		imap.Debug("Sending IMAP %s Command to server", commandTokens[1])
+	} else {
+		imap.Debug("Sending IMAP Command to server:[%s]", command)
+	}
 	if len(command) > 0 {
 		_, err := imap.tlsConn.Write([]byte(command))
 		if err != nil {
