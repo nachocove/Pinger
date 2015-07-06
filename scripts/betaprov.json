@@ -123,6 +123,12 @@
                 "from_port": 80,
                 "to_port": 80,
                 "cidr_ip": "0.0.0.0/0"
+              },
+              {
+                "protocol": "tcp",
+                "from_port": 993,
+                "to_port": 993,
+                "cidr_ip": "0.0.0.0/0"
               }
             ]
         }
