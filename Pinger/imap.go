@@ -57,9 +57,14 @@ type IMAPClient struct {
 	isPolling  bool
 	hasNewEmail bool
 }
+var prng *rand.Rand
+
+func init() {
+	prng = rand.New(&prngSource{src: rand.NewSource(time.Now().UnixNano())})
+}
 
 func (imap *IMAPClient) getLogPrefix() (prefix string) {
-	prefix = imap.pi.getLogPrefix() + ":" + string(strconv.AppendUint(imap.tag.id, imap.tag.seq, 10)) + "/IMAP"
+	prefix = imap.pi.getLogPrefix() + ":" + imap.tag.String() + "/IMAP"
 	return
 }
 
@@ -99,9 +104,6 @@ func (imap *IMAPClient) sendError(errCh chan error, err error) {
 	errCh <- err
 }
 
-var prng = rand.New(&prngSource{src: rand.NewSource(time.Now().UnixNano())})
-
-// prngSource is a goroutine-safe implementation of rand.Source.
 type prngSource struct {
 	mu  sync.Mutex
 	src rand.Source
@@ -134,6 +136,10 @@ func genNewCmdTag(n int) *cmdTag {
 func (t *cmdTag) Next() string {
 	t.seq++
 	return string(strconv.AppendUint(t.id, t.seq, 10))
+}
+
+func (t *cmdTag) String() string {
+	return fmt.Sprintf("%s%d", t.id, t.seq)
 }
 
 func (imap *IMAPClient) ScanIMAPTerminator(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -177,6 +183,7 @@ func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
 	decodedBlob, err := base64.StdEncoding.DecodeString(imap.pi.IMAPAuthenticationBlob)
 	if err != nil {
 		imap.Error("Error decoding AuthBlob")
+		return err
 	}
 	imap.Debug("authblob %s", decodedBlob)
 
@@ -321,7 +328,6 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 		case commandName == "STATUS":
 			imap.Debug("Processing STATUS Response: %s", response)
 			_, UIDNext := imap.parseSTATUSResponse(response)
-			// TODO : can UIDNEXT ever be really 0?
 			if UIDNext != 0 {
 				if UIDNext != imap.pi.IMAPUIDNEXT {
 					imap.Debug("UIDNext %d is different from starting UIDNext %d. Resetting UIDNext", UIDNext, imap.pi.IMAPUIDNEXT)
