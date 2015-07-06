@@ -36,6 +36,12 @@ type MailPingInformation struct {
 	AppBuildVersion        string
 	AppBuildNumber         string
 	SessionId              string
+	IMAPAuthenticationBlob string
+	IMAPFolderName         string
+	IMAPSupportsIdle       bool
+	IMAPSupportsExpunge    bool
+	IMAPEXISTSCount        int
+	IMAPUIDNEXT            int
 
 	logPrefix string
 }
@@ -48,7 +54,7 @@ func (pi *MailPingInformation) String() string {
 }
 
 func (pi *MailPingInformation) cleanup() {
-	// TODO investigte if there's a way to memset(0x0) these fields, instead of
+	// TODO investigate if there's a way to memset(0x0) these fields, instead of
 	// relying on the garbage collector to clean them up (i.e. assigning "" to them
 	// really just moves the pointer, orphaning the previous string, which the garbage
 	// collector them frees or reuses.
@@ -73,6 +79,12 @@ func (pi *MailPingInformation) cleanup() {
 	pi.OSVersion = ""
 	pi.AppBuildNumber = ""
 	pi.AppBuildVersion = ""
+	pi.IMAPAuthenticationBlob = ""
+	pi.IMAPFolderName = ""
+	pi.IMAPSupportsIdle = false
+	pi.IMAPSupportsExpunge = false
+	pi.IMAPEXISTSCount = 0
+	pi.IMAPUIDNEXT = 0
 }
 
 // Validate validate the structure/information to make sure required information exists.
@@ -88,8 +100,10 @@ func (pi *MailPingInformation) Validate() bool {
 			return false
 		}
 	case pi.Protocol == MailClientIMAP:
-		// not yet supported
-		return false
+		if len(pi.IMAPAuthenticationBlob) <= 0 || len(pi.IMAPFolderName) <= 0 {
+			return false
+		}
+		return true
 
 	default:
 		// unknown protocols are never supported

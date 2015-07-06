@@ -1,0 +1,22 @@
+{
+    "AppBuildNumber": "[dev]azimo@nachocove.com",
+    "AppBuildVersion": "0.9",
+    "ClientContext": "12345",
+    "ClientId": "NchoDC28E565X072CX46B1XBF205",
+    "DeviceId": "NchoDC28E565X072CX46B1XBF205",
+    "ExpectedReply": "",
+    "MailServerUrl": "imap.gmail.com:993",
+    "OSVersion": "8.1",
+    "Platform": "ios",
+    "Protocol": "IMAP",
+    "PushService": "APNS",
+    "PushToken": "AEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEF",
+    "ResponseTimeout": 600000,
+    "UserId": "us-east-1:44211d8c-caf6-4b17-80cf-72febe0ebb2d",
+    "WaitBeforeUse": 3000,
+    "IMAPAuthenticationBlob": "SSSSS",
+	"IMAPFolderName": "INBOX",
+	"IMAPSupportsIdle": true,
+	"IMAPSupportsExpunge": true,
+	"IMAPEXISTSCount": 200
+}

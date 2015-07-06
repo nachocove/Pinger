@@ -49,8 +49,13 @@ type registerPostData struct {
 	OSVersion              string
 	AppBuildNumber         string
 	AppBuildVersion        string
-
-	logPrefix string
+	IMAPAuthenticationBlob string
+	IMAPFolderName         string
+	IMAPSupportsIdle       bool
+	IMAPSupportsExpunge    bool
+	IMAPEXISTSCount        int
+	IMAPUIDNEXT            int
+	logPrefix              string
 }
 
 func (pd *registerPostData) getLogPrefix() string {
@@ -86,16 +91,38 @@ func (pd *registerPostData) Validate(context *Context) (bool, []string) {
 		MissingFields = append(MissingFields, "MailServerUrl")
 		ok = false
 	}
-	if len(pd.RequestData) <= 0 {
-		MissingFields = append(MissingFields, "RequestData")
-		ok = false
-	}
-	if len(pd.NoChangeReply) <= 0 {
-		MissingFields = append(MissingFields, "NoChangeReply")
-		ok = false
-	}
 	if pd.ClientContext == "" {
 		MissingFields = append(MissingFields, "ClientContext")
+		ok = false
+	}
+	if pd.Protocol == Pinger.MailClientActiveSync {
+		if len(pd.RequestData) <= 0 {
+			MissingFields = append(MissingFields, "RequestData")
+			ok = false
+		}
+		if len(pd.NoChangeReply) <= 0 {
+			MissingFields = append(MissingFields, "NoChangeReply")
+			ok = false
+		}
+	} else if pd.Protocol == Pinger.MailClientIMAP {
+		if len(pd.IMAPAuthenticationBlob) <= 0 {
+			MissingFields = append(MissingFields, "IMAPAuthenticationBlob")
+			ok = false
+		}
+		if len(pd.IMAPFolderName) <= 0 {
+			MissingFields = append(MissingFields, "IMAPFolderName")
+			ok = false
+		}
+		if pd.IMAPEXISTSCount < 0 {
+			MissingFields = append(MissingFields, "IMAPEXISTSCount")
+			ok = false
+		}
+		if pd.IMAPUIDNEXT < 0 {
+			MissingFields = append(MissingFields, "IMAPUIDNEXT")
+			ok = false
+		}
+	} else {
+		MissingFields = append(MissingFields, "Protocol")
 		ok = false
 	}
 	return ok, MissingFields
@@ -130,7 +157,15 @@ func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInforma
 	pi.OSVersion = pd.OSVersion
 	pi.AppBuildNumber = pd.AppBuildNumber
 	pi.AppBuildVersion = pd.AppBuildVersion
+	pi.IMAPAuthenticationBlob = pd.IMAPAuthenticationBlob
+	pi.IMAPFolderName = pd.IMAPFolderName
+	pi.IMAPSupportsIdle = pd.IMAPSupportsIdle
+	pi.IMAPSupportsExpunge = pd.IMAPSupportsExpunge
+	pi.IMAPEXISTSCount = pd.IMAPEXISTSCount
+	pi.IMAPUIDNEXT = pd.IMAPUIDNEXT
+
 	pi.SessionId = sessionId
+
 	return &pi
 }
 

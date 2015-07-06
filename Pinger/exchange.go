@@ -141,7 +141,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	if globals.config.DumpRequests {
 		requestBytes, err := httputil.DumpRequestOut(req, true)
 		if err != nil {
-			ex.Error("DumpRequest error; %v", err)
+			ex.Error("DumpRequest error: %v", err)
 		} else {
 			ex.Debug("sending request:\n%s", requestBytes)
 		}
