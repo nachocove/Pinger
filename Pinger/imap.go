@@ -54,7 +54,7 @@ type IMAPClient struct {
 	tlsConn     *tls.Conn
 	scanner     *bufio.Scanner
 	tag         *cmdTag
-	isIdling   bool
+	isIdling    bool
 	hasNewEmail bool
 }
 
@@ -271,12 +271,12 @@ func (imap *IMAPClient) doExamine() error {
 
 func (imap *IMAPClient) sendIMAPCommand(command string) error {
 	commandTokens := strings.Split(command, " ")
-	if len(commandTokens) >1 && (commandTokens[1] == "LOGIN" || commandTokens[1] == "AUTHENTICATE") {
+	if len(commandTokens) > 1 && (commandTokens[1] == "LOGIN" || commandTokens[1] == "AUTHENTICATE") {
 		imap.Debug("Sending IMAP %s Command to server", commandTokens[1])
 	} else {
 		imap.Debug("Sending IMAP Command to server:[%s]", command)
 	}
-	if len(commandTokens) >1 && commandTokens[1] == "IDLE" {
+	if len(commandTokens) > 1 && commandTokens[1] == "IDLE" {
 		imap.Debug("Setting isIdling to true.")
 		imap.isIdling = true
 	}
@@ -384,7 +384,7 @@ func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]st
 			imap.processResponse(command, response)
 			if imap.isFinalResponse(command, response) {
 				commandTokens := strings.Split(command, " ")
-				if len(commandTokens) >1 && commandTokens[1] == "IDLE" {
+				if len(commandTokens) > 1 && commandTokens[1] == "IDLE" {
 					imap.Debug("Setting isIdling to false.")
 					imap.isIdling = false
 				}
