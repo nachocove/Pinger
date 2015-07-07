@@ -270,13 +270,13 @@ func (imap *IMAPClient) doExamine() error {
 }
 
 func (imap *IMAPClient) sendIMAPCommand(command string) error {
-	commandTokens := strings.Split(command, " ")
-	if len(commandTokens) > 1 && (commandTokens[1] == "LOGIN" || commandTokens[1] == "AUTHENTICATE") {
-		imap.Debug("Sending IMAP %s Command to server", commandTokens[1])
+	commandName := imap.getNameFromCommand(command)
+	if commandName == "LOGIN" || commandName == "AUTHENTICATE" {
+		imap.Debug("Sending IMAP %s Command to server:[%s]", commandName, command)
 	} else {
 		imap.Debug("Sending IMAP Command to server:[%s]", command)
 	}
-	if len(commandTokens) > 1 && commandTokens[1] == "IDLE" {
+	if commandName == "IDLE" {
 		imap.Debug("Setting isIdling to true.")
 		imap.isIdling = true
 	}
@@ -311,7 +311,7 @@ func (imap *IMAPClient) doIMAPCommand(command string, waitTime int64) ([]string,
 func (imap *IMAPClient) processResponse(command string, response string) {
 	commandTokens := strings.Split(command, " ")
 	if len(commandTokens) > 1 {
-		commandName := commandTokens[1]
+		commandName := imap.getNameFromCommand(command)
 		switch {
 		case commandName == "IDLE":
 			imap.Debug("Processing IDLE Response: %s", response)
@@ -361,11 +361,19 @@ func (imap *IMAPClient) isFinalResponse(command string, response string) bool {
 	tokens := strings.Split(command, " ")
 	if len(tokens) > 0 {
 		token := tokens[0]
-		if token == response[0:len(token)] {
+		if len(response) >= len(token) && token == response[0:len(token)] {
 			return true
 		}
 	}
 	return false
+}
+
+func (imap *IMAPClient) getNameFromCommand(command string) string {
+	commandTokens := strings.Split(command, " ")
+	if len(commandTokens) > 1 {
+		return commandTokens[1]
+	}
+	return ""
 }
 
 func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]string, error) {
@@ -383,8 +391,7 @@ func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]st
 			responses = append(responses, response)
 			imap.processResponse(command, response)
 			if imap.isFinalResponse(command, response) {
-				commandTokens := strings.Split(command, " ")
-				if len(commandTokens) > 1 && commandTokens[1] == "IDLE" {
+				if imap.getNameFromCommand(command) == "IDLE" {
 					imap.Debug("Setting isIdling to false.")
 					imap.isIdling = false
 				}
@@ -504,11 +511,16 @@ func (imap *IMAPClient) setupConn() error {
 
 func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan error) {
 	imap.Debug("Starting LongPoll")
+	if imap.isIdling {
+		imap.Info("Already idling. Returning.")
+		return
+	}
 	imap.wg.Add(1)
 	defer imap.wg.Done()
 	defer Utils.RecoverCrash(imap.logger)
 	defer func() {
 		imap.Debug("Stopping...")
+		imap.cancel()
 	}()
 	sleepTime := 0
 	for {
@@ -539,6 +551,9 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 				return
 			}
 		}
+		reqTimeout := imap.pi.ResponseTimeout
+		reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
+		requestTimer := time.NewTimer(time.Duration(reqTimeout) * time.Millisecond)
 		responseCh := make(chan []string)
 		command := IMAP_NOOP
 		if imap.pi.IMAPSupportsIdle {
@@ -551,6 +566,12 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 		imap.wg.Add(1)
 		go imap.doRequestResponse(command, responseCh, errCh)
 		select {
+		case <-requestTimer.C:
+			// request timed out. Start over.
+			imap.Debug("Request timed out. Starting over.")
+			requestTimer.Stop()
+			imap.cancelIDLE()
+
 		case err := <-errCh:
 			imap.sendError(errCh, err)
 			return
@@ -565,23 +586,16 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 
 		case <-stopPollCh: // parent will close this, at which point this will trigger.
 			imap.Debug("Was told to stop. Stopping")
-			imap.cancel()
 			return
 
 		case <-stopAllCh: // parent will close this, at which point this will trigger.
 			imap.Debug("Was told to stop (allStop). Stopping")
-			imap.cancel()
 			return
 		}
 	}
 }
 
-func (imap *IMAPClient) cancel() {
-	imap.Info("Cancel called")
-	imap.mutex.Lock()
-	imap.cancelled = true
-	imap.Info("IsIdling %t", imap.isIdling)
-
+func (imap *IMAPClient) cancelIDLE() {
 	if imap.isIdling {
 		imap.Info("Cancelling outstanding request")
 		err := imap.sendIMAPCommand(IMAP_DONE)
@@ -589,6 +603,13 @@ func (imap *IMAPClient) cancel() {
 			imap.Error("Error sending IMAP Command %s: %s", IMAP_DONE, err)
 		}
 	}
+}
+func (imap *IMAPClient) cancel() {
+	imap.Info("Cancel called")
+	imap.mutex.Lock()
+	imap.cancelled = true
+	imap.Info("IsIdling %t", imap.isIdling)
+	imap.cancelIDLE()
 	imap.mutex.Unlock()
 	imap.cancelled = false
 }
