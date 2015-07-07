@@ -68,7 +68,7 @@ var LongPollReRegister error
 var LongPollNewMail error
 
 func init() {
-	LongPollReRegister = fmt.Errorf("Need Registger")
+	LongPollReRegister = fmt.Errorf("Need Register")
 	LongPollNewMail = fmt.Errorf("New Mail")
 }
 
@@ -298,10 +298,12 @@ func (client *MailClientContext) enterPinging(e *fsm.Event) {
 	client.stopPollCh = make(chan int)
 	errCh := e.Args[0].(chan error)
 	client.setStatus(MailClientStatusPinging, nil)
+	client.Debug("Enter pinging. starting long poll. %+v",client.mailClient)
 	go client.mailClient.LongPoll(client.stopPollCh, client.stopAllCh, errCh)
 }
 
 func (client *MailClientContext) exitPinging(e *fsm.Event) {
+	client.Debug("Exit Pinging")
 	close(client.stopPollCh)
 }
 
