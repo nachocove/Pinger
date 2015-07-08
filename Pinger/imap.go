@@ -33,8 +33,9 @@ const (
 
 // Timeout values for the Dial functions.
 const (
-	netTimeout    = 30 * time.Second // Time to establish a TCP connection
-	clientTimeout = 60 * time.Second // Time to receive greeting and capabilities
+	netTimeout       = 30 * time.Second // Time to establish a TCP connection
+	clientTimeout    = 60 * time.Second // Time to receive greeting and capabilities
+	POLLING_INTERVAL = 30
 )
 
 type cmdTag struct {
@@ -166,39 +167,52 @@ func (imap *IMAPClient) setupScanner() {
 	imap.scanner.Split(imap.ScanIMAPTerminator)
 }
 
+func (imap *IMAPClient) isContinueResponse(response string) bool {
+	if response == "+" {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (imap *IMAPClient) isOKResponse(response string) bool {
+	tokens := strings.Split(response, " ")
+	if len(tokens) >= 2 || tokens[1] == "OK" {
+		return true
+	} else {
+		return false
+	}
+}
+
 func (imap *IMAPClient) handleGreeting() error {
 	response, err := imap.getServerResponse(0)
 	if err == nil {
 		imap.Info("Connected to %s (Tag=%s)", imap.url.Host, imap.tag.id)
-		if response[0:4] != "* OK" {
-			err = fmt.Errorf("Did not get proper response from imap server: %s", response)
+		if imap.isOKResponse(response) {
+			imap.Info("Greetings from server: %s", response)
+			return nil
+		} else {
+			err := fmt.Errorf("Did not get proper response from imap server: %s", response)
 			return err
 		}
-		imap.Info("Greetings from server: %s", response)
 	}
 	return err
 }
 
 func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
-	imap.Debug("Authenticating with authblob...")
+	imap.Debug("Authenticating with authblob")
 	decodedBlob, err := base64.StdEncoding.DecodeString(imap.pi.IMAPAuthenticationBlob)
 	if err != nil {
 		imap.Error("Error decoding AuthBlob")
 		return false, err
 	}
-
-	responses, err := imap.doIMAPCommand(fmt.Sprintf("%s %s", imap.tag.Next(), decodedBlob), 0)
+	_, err = imap.doIMAPCommand(fmt.Sprintf("%s %s", imap.tag.Next(), decodedBlob), 0)
 	if err != nil {
-		return false, err
-	}
-	response := responses[len(responses)-1]
-	tokens := strings.Split(response, " ")
-	if tokens[1] != "OK" {
-		err = fmt.Errorf("%s", response)
 		return false, err
 	}
 	return true, nil
 }
+
 func (imap *IMAPClient) parseEXAMINEResponse(response string) (value int, token string) {
 	tokens := strings.Split(response, " ")
 	valueToken := ""
@@ -256,26 +270,14 @@ func (imap *IMAPClient) parseIDLEResponse(response string) (value int, token str
 func (imap *IMAPClient) doExamine() error {
 	imap.Debug("Folder %s", imap.pi.IMAPFolderName)
 	command := fmt.Sprintf("%s %s %s", imap.tag.Next(), IMAP_EXAMINE, imap.pi.IMAPFolderName)
-	responses, err := imap.doIMAPCommand(command, 0)
-	if err != nil {
-		return err
-	}
-	response := responses[len(responses)-1]
-	tokens := strings.Split(response, " ")
-	if tokens[1] != "OK" {
-		err = fmt.Errorf("Error running command %s: %s", command, response)
-		return err
-	}
-	return nil
+	_, err := imap.doIMAPCommand(command, 0)
+	return err
 }
 
 func (imap *IMAPClient) sendIMAPCommand(command string) error {
 	commandName := imap.getNameFromCommand(command)
-	if commandName == "LOGIN" || commandName == "AUTHENTICATE" {
-		imap.Debug("Sending IMAP %s Command to server:[%s]", commandName, command)
-	} else {
-		imap.Debug("Sending IMAP Command to server:[%s]", command)
-	}
+	imap.Debug("Sending IMAP %s Command to server", commandName)
+	//imap.Debug("Sending IMAP Command to server:[%s]", command)
 	if commandName == "IDLE" {
 		imap.Debug("Setting isIdling to true.")
 		imap.isIdling = true
@@ -294,18 +296,43 @@ func (imap *IMAPClient) sendIMAPCommand(command string) error {
 }
 
 func (imap *IMAPClient) doIMAPCommand(command string, waitTime int64) ([]string, error) {
-	err := imap.sendIMAPCommand(command)
-	if err != nil {
-		imap.Debug("%s", err)
-		return nil, err
+	commandLines := strings.Split(command, "\n")
+	var allResponses []string
+	var err error
+	for _, commandLine := range commandLines {
+		err := imap.sendIMAPCommand(commandLine)
+		if err != nil {
+			imap.Debug("%s", err)
+			return nil, err
+		}
+		if imap.cancelled == true {
+			imap.Debug("Request cancelled. Exiting...")
+			err = fmt.Errorf("Request cancelled")
+			return nil, err
+		}
+		responses, err := imap.getServerResponses(command, waitTime)
+		if err != nil {
+			return nil, err
+		}
+		if allResponses == nil {
+			allResponses = responses
+		} else {
+			allResponses = append(allResponses, responses...)
+		}
+		if len(responses) > 0 {
+			lastResponse := responses[len(responses)-1]
+			if !imap.isOKResponse(lastResponse) && !imap.isContinueResponse(lastResponse) {
+				err := fmt.Errorf("Did not get proper response from imap server: %s", lastResponse)
+				imap.Debug("%s", err)
+				return allResponses, err
+			}
+		} else {
+			err := fmt.Errorf("Did not get any response from imap server.")
+			imap.Debug("%s", err)
+			return allResponses, err
+		}
 	}
-	if imap.cancelled == true {
-		imap.Debug("Request cancelled. Exiting...")
-		err = fmt.Errorf("Request cancelled")
-		return nil, err
-	}
-	responses, err := imap.getServerResponses(command, waitTime)
-	return responses, err
+	return allResponses, err
 }
 
 func (imap *IMAPClient) processResponse(command string, response string) {
@@ -344,7 +371,10 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 			imap.Debug("Processing STATUS Response: %s", response)
 			_, UIDNext := imap.parseSTATUSResponse(response)
 			if UIDNext != 0 {
-				if UIDNext != imap.pi.IMAPUIDNEXT {
+				if imap.pi.IMAPUIDNEXT == 0 {
+					imap.Debug("Setting PI.IMAPUIDNEXT to %d", UIDNext)
+					imap.pi.IMAPUIDNEXT = UIDNext
+				} else if UIDNext != imap.pi.IMAPUIDNEXT {
 					imap.Debug("UIDNext %d is different from starting UIDNext %d. Resetting UIDNext", UIDNext, imap.pi.IMAPUIDNEXT)
 					imap.Debug("Got new mail.")
 					imap.hasNewEmail = true
@@ -359,7 +389,9 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 
 func (imap *IMAPClient) isFinalResponse(command string, response string) bool {
 	tokens := strings.Split(command, " ")
-	if len(tokens) > 0 {
+	if len(response) >= 1 && response[0:1] == "+" {
+		return true
+	} else if len(tokens) > 0 {
 		token := tokens[0]
 		if len(response) >= len(token) && token == response[0:len(token)] {
 			return true
@@ -529,7 +561,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			imap.Debug("Sleeping %s before retry", s)
 			time.Sleep(s)
 		}
-		sleepTime = 5
+		sleepTime = POLLING_INTERVAL
 		if imap.tlsConn == nil {
 			err := imap.setupConn()
 			if err != nil {
@@ -545,10 +577,12 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 				imap.Warning("Authentication failed. Telling client to re-register")
 				errCh <- LongPollReRegister
 			}
-			err = imap.doExamine()
-			if err != nil {
-				imap.Error("%v", err)
-				return
+			if imap.pi.IMAPSupportsIdle {
+				err = imap.doExamine()
+				if err != nil {
+					imap.Error("%v", err)
+					return
+				}
 			}
 		}
 		reqTimeout := imap.pi.ResponseTimeout
