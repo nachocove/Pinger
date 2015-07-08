@@ -27,7 +27,6 @@ vet:
 install: git-update
 	godep restore
 	go install ./...
-	sh scripts/webserver-capabilities.sh
 
 docker: nachobase
 	docker build -t nachocove/pinger:v1 .

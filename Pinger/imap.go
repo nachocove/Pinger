@@ -336,52 +336,49 @@ func (imap *IMAPClient) doIMAPCommand(command string, waitTime int64) ([]string,
 }
 
 func (imap *IMAPClient) processResponse(command string, response string) {
-	commandTokens := strings.Split(command, " ")
-	if len(commandTokens) > 1 {
-		commandName := imap.getNameFromCommand(command)
-		switch {
-		case commandName == "IDLE":
-			imap.Debug("Processing IDLE Response: [%s]", response)
-			count, token := imap.parseIDLEResponse(response)
-			if token == IMAP_EXPUNGE {
-				imap.pi.IMAPEXISTSCount -= 1
-				imap.Debug("%s received. Decrementing IMAPEXISTSCount to %d", IMAP_EXPUNGE, imap.pi.IMAPEXISTSCount)
+	commandName := imap.getNameFromCommand(command)
+	switch commandName {
+	case "IDLE":
+		imap.Debug("Processing IDLE Response: [%s]", response)
+		count, token := imap.parseIDLEResponse(response)
+		if token == IMAP_EXPUNGE {
+			imap.pi.IMAPEXISTSCount -= 1
+			imap.Debug("%s received. Decrementing IMAPEXISTSCount to %d", IMAP_EXPUNGE, imap.pi.IMAPEXISTSCount)
 
-			} else if token == IMAP_EXISTS && count != imap.pi.IMAPEXISTSCount {
-				imap.Debug("Current EXISTS count %d is different from starting EXISTS count %d. Resetting count...", count, imap.pi.IMAPEXISTSCount)
-				imap.Debug("Got new mail. Stopping IDLE..")
+		} else if token == IMAP_EXISTS && count != imap.pi.IMAPEXISTSCount {
+			imap.Debug("Current EXISTS count %d is different from starting EXISTS count %d. Resetting count...", count, imap.pi.IMAPEXISTSCount)
+			imap.Debug("Got new mail. Stopping IDLE..")
+			imap.hasNewEmail = true
+			imap.pi.IMAPEXISTSCount = count
+			err := imap.sendIMAPCommand(IMAP_DONE)
+			if err != nil {
+				imap.Error("Error sending IMAP Command %s: %s", IMAP_DONE, err)
+			}
+		}
+	case "EXAMINE":
+		imap.Debug("Processing EXAMINE Response: [%s]", response)
+		count, token := imap.parseEXAMINEResponse(response)
+		if token == IMAP_EXISTS {
+			imap.Debug("Setting PI.IMAPEXISTSCount to %d", count)
+			imap.pi.IMAPEXISTSCount = count
+		} else if token == IMAP_UIDNEXT {
+			imap.Debug("Setting PI.IMAPUIDNEXT to %d", count)
+			imap.pi.IMAPUIDNEXT = count
+		}
+	case "STATUS":
+		imap.Debug("Processing STATUS Response: [%s]", response)
+		_, UIDNext := imap.parseSTATUSResponse(response)
+		if UIDNext != 0 {
+			if imap.pi.IMAPUIDNEXT == 0 {
+				imap.Debug("Setting PI.IMAPUIDNEXT to %d", UIDNext)
+				imap.pi.IMAPUIDNEXT = UIDNext
+			} else if UIDNext != imap.pi.IMAPUIDNEXT {
+				imap.Debug("UIDNext %d is different from starting UIDNext %d. Resetting UIDNext", UIDNext, imap.pi.IMAPUIDNEXT)
+				imap.Debug("Got new mail.")
 				imap.hasNewEmail = true
-				imap.pi.IMAPEXISTSCount = count
-				err := imap.sendIMAPCommand(IMAP_DONE)
-				if err != nil {
-					imap.Error("Error sending IMAP Command %s: %s", IMAP_DONE, err)
-				}
-			}
-		case commandName == "EXAMINE":
-			imap.Debug("Processing EXAMINE Response: [%s]", response)
-			count, token := imap.parseEXAMINEResponse(response)
-			if token == IMAP_EXISTS {
-				imap.Debug("Setting PI.IMAPEXISTSCount to %d", count)
-				imap.pi.IMAPEXISTSCount = count
-			} else if token == IMAP_UIDNEXT {
-				imap.Debug("Setting PI.IMAPUIDNEXT to %d", count)
-				imap.pi.IMAPUIDNEXT = count
-			}
-		case commandName == "STATUS":
-			imap.Debug("Processing STATUS Response: [%s]", response)
-			_, UIDNext := imap.parseSTATUSResponse(response)
-			if UIDNext != 0 {
-				if imap.pi.IMAPUIDNEXT == 0 {
-					imap.Debug("Setting PI.IMAPUIDNEXT to %d", UIDNext)
-					imap.pi.IMAPUIDNEXT = UIDNext
-				} else if UIDNext != imap.pi.IMAPUIDNEXT {
-					imap.Debug("UIDNext %d is different from starting UIDNext %d. Resetting UIDNext", UIDNext, imap.pi.IMAPUIDNEXT)
-					imap.Debug("Got new mail.")
-					imap.hasNewEmail = true
-					imap.pi.IMAPUIDNEXT = UIDNext
-				} else {
-					imap.Debug("STATUS UIDNext %d is the same as starting UIDNext %d", UIDNext, imap.pi.IMAPUIDNEXT)
-				}
+				imap.pi.IMAPUIDNEXT = UIDNext
+			} else {
+				imap.Debug("STATUS UIDNext %d is the same as starting UIDNext %d", UIDNext, imap.pi.IMAPUIDNEXT)
 			}
 		}
 	}
