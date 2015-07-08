@@ -574,17 +574,17 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 				imap.Warning("Authentication failed. Telling client to re-register")
 				errCh <- LongPollReRegister
 			}
-			if imap.pi.IMAPSupportsIdle {
-				imap.Debug("Supporting idle")
-				err = imap.doExamine()
-				if err != nil {
-					imap.Error("%v", err)
-					return
-				}
-			} else {
-				imap.Debug("Resetting PI.IMAPUIDNEXT to 0")
-				imap.pi.IMAPUIDNEXT = 0
+		}
+		if imap.pi.IMAPSupportsIdle {
+			imap.Debug("Supporting idle")
+			err := imap.doExamine()
+			if err != nil {
+				imap.Error("%v", err)
+				return
 			}
+		} else {
+			imap.Debug("Resetting PI.IMAPUIDNEXT to 0")
+			imap.pi.IMAPUIDNEXT = 0
 		}
 		reqTimeout := imap.pi.ResponseTimeout
 		reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
