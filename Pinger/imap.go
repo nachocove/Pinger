@@ -341,7 +341,7 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 		commandName := imap.getNameFromCommand(command)
 		switch {
 		case commandName == "IDLE":
-			imap.Debug("Processing IDLE Response: %s", response)
+			imap.Debug("Processing IDLE Response: [%s]", response)
 			count, token := imap.parseIDLEResponse(response)
 			if token == IMAP_EXPUNGE {
 				imap.pi.IMAPEXISTSCount -= 1
@@ -358,7 +358,7 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 				}
 			}
 		case commandName == "EXAMINE":
-			imap.Debug("Processing EXAMINE Response: %s", response)
+			imap.Debug("Processing EXAMINE Response: [%s]", response)
 			count, token := imap.parseEXAMINEResponse(response)
 			if token == IMAP_EXISTS {
 				imap.Debug("Setting PI.IMAPEXISTSCount to %d", count)
@@ -368,7 +368,7 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 				imap.pi.IMAPUIDNEXT = count
 			}
 		case commandName == "STATUS":
-			imap.Debug("Processing STATUS Response: %s", response)
+			imap.Debug("Processing STATUS Response: [%s]", response)
 			_, UIDNext := imap.parseSTATUSResponse(response)
 			if UIDNext != 0 {
 				if imap.pi.IMAPUIDNEXT == 0 {
@@ -389,7 +389,7 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 
 func (imap *IMAPClient) isFinalResponse(command string, response string) bool {
 	tokens := strings.Split(command, " ")
-	if len(response) >= 1 && response[0:1] == "+" {
+	if len(response) >= 1 && response == "+ " {
 		return true
 	} else if len(tokens) > 0 {
 		token := tokens[0]
