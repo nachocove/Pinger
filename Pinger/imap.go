@@ -575,11 +575,15 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 				errCh <- LongPollReRegister
 			}
 			if imap.pi.IMAPSupportsIdle {
+				imap.Debug("Supporting idle")
 				err = imap.doExamine()
 				if err != nil {
 					imap.Error("%v", err)
 					return
 				}
+			} else {
+				imap.Debug("Resetting PI.IMAPUIDNEXT to 0")
+				imap.pi.IMAPUIDNEXT = 0
 			}
 		}
 		reqTimeout := imap.pi.ResponseTimeout
@@ -588,7 +592,6 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 		responseCh := make(chan []string)
 		command := IMAP_NOOP
 		if imap.pi.IMAPSupportsIdle {
-			imap.Debug("Supporting idle")
 			command = fmt.Sprintf("%s %s", imap.tag.Next(), IMAP_IDLE)
 		} else {
 			command = fmt.Sprintf("%s %s %s %s", imap.tag.Next(), IMAP_STATUS, imap.pi.IMAPFolderName, IMAP_STATUS_QUERY)
