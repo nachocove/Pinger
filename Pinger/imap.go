@@ -164,7 +164,8 @@ func (imap *IMAPClient) setupScanner() {
 		imap.pi.CommandAcknowledgement = []byte("\r\n")
 	}
 	imap.scanner = bufio.NewScanner(imap.tlsConn)
-	imap.scanner.Split(imap.ScanIMAPTerminator)
+	//imap.scanner.Split(imap.ScanIMAPTerminator)
+	imap.scanner.Split(bufio.ScanLines)
 }
 
 func (imap *IMAPClient) isContinueResponse(response string) bool {
@@ -185,6 +186,7 @@ func (imap *IMAPClient) isOKResponse(response string) bool {
 }
 
 func (imap *IMAPClient) handleGreeting() error {
+	imap.Debug("Handle first greeting...")
 	response, err := imap.getServerResponse(0)
 	if err == nil {
 		imap.Info("Connected to %s (Tag=%s)", imap.url.Host, imap.tag.id)
@@ -406,7 +408,6 @@ func (imap *IMAPClient) getNameFromCommand(command string) string {
 }
 
 func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]string, error) {
-	imap.Debug("getting Server Responses")
 	completed := false
 	responses := make([]string, 0)
 
@@ -440,12 +441,20 @@ func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 		imap.tlsConn.SetReadDeadline(waitUntil)
 		defer imap.tlsConn.SetReadDeadline(time.Time{})
 	}
-	if ok := imap.scanner.Scan(); ok == false {
+	for i := 0; ; i++ {
+		ok := imap.scanner.Scan()
 		err := imap.scanner.Err()
-		if err == nil {
-			err = fmt.Errorf("Could not scan connection")
+		if ok {
+			break
+		} else if err != nil {
+			if i < 3 { // try three times
+				imap.Info("Error scanning for server response: %s. Will retry...", err)
+				time.Sleep(time.Duration(1) * time.Second)
+			} else {
+				imap.Error("Error scanning for server response: %s. Giving up...", err)
+				return "", err
+			}
 		}
-		return "", err
 	}
 	response := imap.scanner.Text()
 	return response, nil
@@ -483,7 +492,11 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 		return
 	}
 	if err != nil {
-		errCh <- err
+		if imap.isIdling {
+			imap.isIdling = false
+		}
+		imap.Debug("Got error %s. Sending back LongPollReRegister", err)
+		errCh <- LongPollReRegister // erroring out... ask for reregister
 		return
 	}
 	responseCh <- responses
@@ -607,7 +620,8 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			imap.cancelIDLE()
 
 		case err := <-errCh:
-			imap.sendError(errCh, err)
+			imap.Debug("Got error %s. Sending back LongPollReRegister", err)
+			errCh <- LongPollReRegister // erroring out... ask for reregister
 			return
 
 		case <-responseCh:
