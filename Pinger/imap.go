@@ -443,10 +443,9 @@ func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 	}
 	for i := 0; ; i++ {
 		ok := imap.scanner.Scan()
-		err := imap.scanner.Err()
 		if ok {
 			break
-		} else if err != nil {
+		} else if err := imap.scanner.Err(); err != nil {
 			if i < 3 { // try three times
 				imap.Info("Error scanning for server response: %s. Will retry...", err)
 				time.Sleep(time.Duration(1) * time.Second)
