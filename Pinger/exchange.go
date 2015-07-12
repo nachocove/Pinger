@@ -108,7 +108,8 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		return
 	}
 	if ex.request != nil {
-		panic("Doing doRequestResponse with an active request in process!!")
+		ex.Warning("Doing doRequestResponse with an active request in process!!")
+		return
 	}
 	requestBody := bytes.NewReader(ex.pi.RequestData)
 	ex.Debug("request WBXML %s", base64.StdEncoding.EncodeToString(ex.pi.RequestData))
@@ -193,13 +194,14 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	}
 	responseBytes = make([]byte, toRead)
 	if len(responseBytes) != toRead {
-		panic("len of response is not what we expected")
+		ex.Error("len of response is not what we expected")
+		return
 	}
 	// TODO Do I need to loop here to make sure I get the number of bytes I expect? i.e. like unix sockets returning less than you expected.
 	n, err := response.Body.Read(responseBytes)
 	if err != nil {
 		if err != io.EOF {
-			ex.Error("Failed ro read response: %s", err.Error())
+			ex.Error("Failed to read response: %s", err.Error())
 		} else {
 			ex.Debug("EOF from body read")
 		}
@@ -376,7 +378,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 			case ex.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.pi.NoChangeReply) == 0:
 				// go back to polling
 				if time.Since(timeSent) <= tooFastResponse {
-					ex.Warning("NoChangeReply was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
+					ex.Info("NoChangeReply was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
 					sleepTime = ex.exponentialBackoff(sleepTime)
 				} else {
 					ex.Info("NoChangeReply after %s. Back to polling", time.Since(timeSent))
