@@ -553,7 +553,7 @@ func (imap *IMAPClient) setupConn() error {
 func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan error) {
 	imap.Debug("Starting LongPoll")
 	if imap.isIdling {
-		imap.Info("Already idling. Returning.")
+		imap.Error("Already idling. Returning.")
 		return
 	}
 	imap.wg.Add(1)
