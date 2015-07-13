@@ -108,7 +108,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		return
 	}
 	if ex.request != nil {
-		ex.Warning("Doing doRequestResponse with an active request in process!!")
+		ex.Error("Doing doRequestResponse with an active request in process!!")
 		return
 	}
 	requestBody := bytes.NewReader(ex.pi.RequestData)
@@ -378,7 +378,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 			case ex.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.pi.NoChangeReply) == 0:
 				// go back to polling
 				if time.Since(timeSent) <= tooFastResponse {
-					ex.Info("NoChangeReply was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
+					ex.Warning("NoChangeReply was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
 					sleepTime = ex.exponentialBackoff(sleepTime)
 				} else {
 					ex.Info("NoChangeReply after %s. Back to polling", time.Since(timeSent))
