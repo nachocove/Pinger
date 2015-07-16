@@ -382,7 +382,7 @@ def create_nacho_init_sh(config):
         " -DSECRET_KEY_CW=" + config["iam_config"][cw_user_name + "_access_key"]["secret_access_key"] + \
         " -DBUCKET=" + config["s3_config"]["s3_bucket"] + " -DPREFIX=" + config["s3_config"]["bucket_prefix_key"] + \
         " -DPINGER_CFG=" + config["vpc_config"]["name"] + "-pingerv2.cfg" + \
-        " -DPINGER_NAME=" + config["vpc_config"]["name"] + \
+        " -DLOG_GROUP_NAME=" + config["vpc_config"]["log_group_name"] + \
         " " + CREATE_NACHO_INIT_SH
         init_sh = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
         config["autoscale_config"]["user_data"] = init_sh

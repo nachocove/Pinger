@@ -5,6 +5,7 @@
     },
     "vpc_config": {
         "name": "TestAlphaPingerVPC",
+        "log_group_name": "AlphaPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
         "availability_zone": "us-west-2a",
