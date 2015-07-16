@@ -305,7 +305,7 @@ def create_autoscaler(region_name, vpc, elb, subnet, sg, name, aws_config, as_co
         asg = AutoScalingGroup(group_name=name, load_balancers=[elb.name],
             availability_zones=aws_config["zones"],
             launch_config=lc, min_size=as_config["min_size"], max_size=as_config["max_size"],
-            vpc_zone_identifier = [subnet.id],
+            vpc_zone_identifier = [subnet.id], health_check_type="ELB", health_check_period="300",
             tags=[tag],
             connection=conn)
         conn.create_auto_scaling_group(asg)
