@@ -18,6 +18,7 @@ from boto.ec2.autoscale import AutoScalingGroup
 import boto.iam
 from boto.s3.key import Key
 from boto.vpc import VPCConnection
+from boto.ec2.elb.attributes import AccessLogAttribute
 import configparser
 import StringIO
 import pem
@@ -356,6 +357,12 @@ def create_elb(region_name, vpc, subnet, sg, name, config, cert):
         sp_name = "Sticky-%s" % elb.name
         conn.create_lb_cookie_stickiness_policy(None, elb.name, sp_name)
         conn.set_lb_policies_of_listener(elb.name, config["elb_port"], sp_name)
+        access_log = AccessLogAttribute()
+        access_log.enabled = True
+        access_log.s3_bucket_name = config["accesslog_bucket_name"]
+        access_log.s3_bucket_prefix = ''
+        access_log.emit_interval = 5
+        conn.modify_lb_attribute(elb.name, "AccessLog", access_log)
         print "Created Elastic Load Balancer (%s) for VPC(%s)" % (elb.name, vpc.id)
     else:
         elb = elb_list[0]
