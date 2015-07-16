@@ -122,7 +122,8 @@
         },
       "elb_port": 443,
       "backend_port": 8443,
-        "sg_config": {
+      "accesslog_bucket_name": "elblogs-alpha",
+      "sg_config": {
             "name" : "ELB",
             "description": "The SG for Alpha Pinger ELB",
             "ingress-rules": [
