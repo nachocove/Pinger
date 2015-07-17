@@ -79,12 +79,28 @@ func APNSpushMessage(token string, alert, sound string, contentAvailable int, tt
 	if contentAvailable > 0 {
 		payload["content-available"] = contentAvailable
 	}
-
 	pn.Set("aps", payload)
-
 	pn.Set("pinger", pingerMap)
 
 	msg, _ := pn.PayloadString()
+	if len(msg) >= 256 && majorVersion < 8 {
+		var contextsMap map[string]map[string]string
+		contextsMap = pingerMap["ctxs"].(map[string]map[string]string)
+		ctxCount := len(contextsMap)
+
+		for key, value := range contextsMap {
+			logger.Debug("Deleting Key:%s Value %s", key, value)
+			delete(contextsMap, key)
+			ctxCount--
+			if ctxCount == 1 {
+				break
+			}
+		}
+		pingerMap["ctxs"] = contextsMap
+		pn.Set("pinger", pingerMap)
+		msg, _ = pn.PayloadString()
+	}
+
 	if len(msg) >= 256 && majorVersion < 8 {
 		logger.Error("Push message for device (%s) to APNS exceeds 256 bytes: pushToken: %s %s", OSVersion, token, msg)
 		return APNSMessageTooLarge

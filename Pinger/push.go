@@ -81,33 +81,27 @@ func newSessionContextMessage(message PingerNotification, context, session strin
 	return &sessionContextMessage{message, context, session}
 }
 
-func pingerPushMessageMapV2(contexts [](*sessionContextMessage), OSVersion string) map[string]interface{} {
+func pingerPushMessageMapV2(contexts [](*sessionContextMessage)) map[string]interface{} {
 	//"contexts": {"context1": { "command": "new" | "register", "session": "abc123"},  ... ]\}
 	//"metadata": {"timestamp": "2015-04-10T09:30:00Z, ...}
 	pingerMap := make(map[string]interface{})
 	metadataMap := make(map[string]string)
 	metadataMap["time"] = fmt.Sprintf("%d", time.Now().UTC().Unix())
 	pingerMap["meta"] = metadataMap
-	majorVersion := getMajorVersion(OSVersion)
 
-	// if majorVersion less than 8, we can only fit 4 contexts in the message
 	if len(contexts) > 0 {
 		contextsMap := make(map[string]map[string]string)
-		count := 0
 		for _, context := range contexts {
-			if count == 4 && majorVersion < 8 {
-				break
-			}
 			ctxMap := make(map[string]string)
 			ctxMap["cmd"] = string(context.message)
 			if context.session != "" {
 				ctxMap["ses"] = context.session
 			}
 			contextsMap[context.context] = ctxMap
-			count++
 		}
 		pingerMap["ctxs"] = contextsMap
 	}
+
 	return pingerMap
 }
 
@@ -199,7 +193,7 @@ func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger
 		for _, c := range contexts {
 			sessionContexts = append(sessionContexts, newSessionContextMessage(PingerNotificationRegister, c, ""))
 		}
-		pingerMap := pingerPushMessageMapV2(sessionContexts, serviceAndToken.OSVersion)
+		pingerMap := pingerPushMessageMapV2(sessionContexts)
 		err = Push(aws, serviceAndToken.Platform, serviceAndToken.PushService, serviceAndToken.PushToken, serviceAndToken.AWSEndpointArn,
 			alert, globals.config.APNSSound, globals.config.APNSContentAvailable, globals.config.APNSExpirationSeconds, pingerMap, serviceAndToken.OSVersion, logger)
 		if err != nil {

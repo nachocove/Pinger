@@ -92,7 +92,7 @@ func (s *pushTester) TestDevicePushMessageCreateV2() {
 	context := "context1234567"
 	session := "sessionid1234"
 	sessionContext := newSessionContextMessage(PingerNotificationRegister, context, session)
-	pingerMessage := pingerPushMessageMapV2([](*sessionContextMessage){sessionContext}, "7.1")
+	pingerMessage := pingerPushMessageMapV2([](*sessionContextMessage){sessionContext})
 	s.NotEmpty(pingerMessage)
 	_, ok := pingerMessage["meta"]
 	require.True(s.T(), ok, "meta not in pinger message")
