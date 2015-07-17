@@ -139,7 +139,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-75171745",
+        "ami_id": "ami-8d9c9ebd",
         "key_pair": "AlphaPinger",
         "instance_type": "t2.micro",
         "instance_monitoring": false,
