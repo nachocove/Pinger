@@ -65,7 +65,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-75142745",
+        "ami_id": "ami-8d9c9ebd",
         "key_pair": "BetaPinger",
         "instance_type": "m3.medium",
         "instance_monitoring": false,
