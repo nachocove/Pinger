@@ -126,29 +126,33 @@ func init() {
 	}
 	pushServiceField, ok := deviceInfoReflection.FieldByName("PushService")
 	if ok == false {
-		panic("Could not get Pinger Field information")
+		panic("Could not get PushService Field information")
 	}
 	pushTokenField, ok := deviceInfoReflection.FieldByName("PushToken")
 	if ok == false {
-		panic("Could not get Pinger Field information")
+		panic("Could not get PushToken Field information")
 	}
 	platformField, ok := deviceInfoReflection.FieldByName("Platform")
 	if ok == false {
-		panic("Could not get Pinger Field information")
+		panic("Could not get Platform Field information")
+	}
+	OSVersionField, ok := deviceInfoReflection.FieldByName("OSVersion")
+	if ok == false {
+		panic("Could not get OsVersion Field information")
 	}
 	awsEndpointField, ok := deviceInfoReflection.FieldByName("AWSEndpointArn")
 	if ok == false {
-		panic("Could not get Pinger Field information")
+		panic("Could not get AWSEndpointArn Field information")
 	}
 	clientContextField, ok := deviceInfoReflection.FieldByName("ClientContext")
 	if ok == false {
-		panic("Could not get Pinger Field information")
+		panic("Could not get ClientContext Field information")
 	}
 	getAllMyDeviceInfoSql = fmt.Sprintf("select * from %s where %s=?",
 		deviceTableName,
 		pingerField.Tag.Get("db"))
-	distinctPushServiceTokenSql = fmt.Sprintf("select distinct %s, %s, %s, %s from %s where %s=?",
-		pushServiceField.Tag.Get("db"), pushTokenField.Tag.Get("db"), platformField.Tag.Get("db"), awsEndpointField.Tag.Get("db"),
+	distinctPushServiceTokenSql = fmt.Sprintf("select distinct %s, %s, %s, %s, %s from %s where %s=?",
+		pushServiceField.Tag.Get("db"), pushTokenField.Tag.Get("db"), OSVersionField.Tag.Get("db"), platformField.Tag.Get("db"), awsEndpointField.Tag.Get("db"),
 		deviceTableName,
 		pingerField.Tag.Get("db"),
 	)

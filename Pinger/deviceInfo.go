@@ -7,6 +7,7 @@ import (
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -374,9 +375,9 @@ func (di *DeviceInfo) PushNewMail() error {
 }
 
 func (di *DeviceInfo) Push(message PingerNotification, alert, sound string, contentAvailable int) error {
-	pingerMap := pingerPushMessageMapV2([](*sessionContextMessage){newSessionContextMessage(message, di.ClientContext, di.SessionId)})
+	pingerMap := pingerPushMessageMapV2([](*sessionContextMessage){newSessionContextMessage(message, di.ClientContext, di.SessionId)}, di.OSVersion)
 	ttl := globals.config.APNSExpirationSeconds
-	err := Push(di.aws, di.Platform, di.PushService, di.PushToken, di.AWSEndpointArn, alert, sound, contentAvailable, ttl, pingerMap, di.logger)
+	err := Push(di.aws, di.Platform, di.PushService, di.PushToken, di.AWSEndpointArn, alert, sound, contentAvailable, ttl, pingerMap, di.OSVersion, di.logger)
 	if err == nil {
 		err = di.updateLastContactRequest()
 	}
@@ -481,6 +482,17 @@ func (di *DeviceInfo) registerAws() error {
 		di.update()
 	}
 	return nil
+}
+
+func getMajorVersion(OSVersion string) int {
+	versions := strings.Split(OSVersion, ".")
+	if len(versions) > 0 {
+		majorVersion, err := strconv.Atoi(versions[0])
+		if err == nil {
+			return majorVersion
+		}
+	}
+	return 0
 }
 
 func (di *DeviceInfo) validateClient() error {

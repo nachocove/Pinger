@@ -49,7 +49,7 @@ func FeedbackListener(logger *Logging.Logger) {
 	}
 }
 
-func APNSpushMessage(token string, alert, sound string, contentAvailable int, ttl int64, pingerMap map[string]interface{}, logger *Logging.Logger) error {
+func APNSpushMessage(token string, alert, sound string, contentAvailable int, ttl int64, pingerMap map[string]interface{}, OSVersion string, logger *Logging.Logger) error {
 	if globals.config.APNSCertFile == "" {
 		panic("No apns cert set. Can not push to APNS")
 	}
@@ -68,7 +68,7 @@ func APNSpushMessage(token string, alert, sound string, contentAvailable int, tt
 		logger.Debug("Setting push expiration to %s (unix utc %d)", expiration, expiration.Unix())
 		pn.Expiry = uint32(expiration.UTC().Unix())
 	}
-
+	majorVersion := getMajorVersion(OSVersion)
 	payload := make(map[string]interface{})
 	if alert != "" {
 		payload["alert"] = alert
@@ -85,8 +85,11 @@ func APNSpushMessage(token string, alert, sound string, contentAvailable int, tt
 	pn.Set("pinger", pingerMap)
 
 	msg, _ := pn.PayloadString()
-	if len(msg) >= 256 {
-		logger.Error("Push message to APNS exceeds 256 bytes: pushToken: %s %s", token, msg)
+	if len(msg) >= 256 && majorVersion < 8 {
+		logger.Error("Push message for device (%s) to APNS exceeds 256 bytes: pushToken: %s %s", OSVersion, token, msg)
+		return APNSMessageTooLarge
+	} else if len(msg) >= 2048 && majorVersion >= 8 {
+		logger.Error("Push message for device (%s) to APNS exceeds 2048 bytes: pushToken: %s %s", OSVersion, token, msg)
 		return APNSMessageTooLarge
 	}
 	logger.Debug("Sending push message to APNS: pushToken: %s %s", token, msg)
