@@ -21,7 +21,7 @@ func init() {
 	APNSInvalidToken = fmt.Errorf("APNS message used an invalid token")
 }
 
-func Push(aws AWS.AWSHandler, platform, service, token, endpointArn, alert, sound string, contentAvailable int, ttl int64, pingerMap map[string]interface{}, logger *Logging.Logger) error {
+func Push(aws AWS.AWSHandler, platform, service, token, endpointArn, alert, sound string, contentAvailable int, ttl int64, pingerMap map[string]interface{}, OSVersion string, logger *Logging.Logger) error {
 	var err error
 	retryInterval := time.Duration(1) * time.Second
 	for i := 0; i < 10; i++ {
@@ -36,7 +36,7 @@ func Push(aws AWS.AWSHandler, platform, service, token, endpointArn, alert, soun
 				err = aws.SendPushNotification(endpointArn, pushMessage)
 			}
 		} else {
-			err = APNSpushMessage(token, alert, sound, contentAvailable, ttl, pingerMap, logger)
+			err = APNSpushMessage(token, alert, sound, contentAvailable, ttl, pingerMap, OSVersion, logger)
 		}
 		if err != nil {
 			// TODO: if the error is APNSMessageTooLarge, then split up the message if possible and try again
@@ -101,6 +101,7 @@ func pingerPushMessageMapV2(contexts [](*sessionContextMessage)) map[string]inte
 		}
 		pingerMap["ctxs"] = contextsMap
 	}
+
 	return pingerMap
 }
 
@@ -194,7 +195,7 @@ func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger
 		}
 		pingerMap := pingerPushMessageMapV2(sessionContexts)
 		err = Push(aws, serviceAndToken.Platform, serviceAndToken.PushService, serviceAndToken.PushToken, serviceAndToken.AWSEndpointArn,
-			alert, globals.config.APNSSound, globals.config.APNSContentAvailable, globals.config.APNSExpirationSeconds, pingerMap, logger)
+			alert, globals.config.APNSSound, globals.config.APNSContentAvailable, globals.config.APNSExpirationSeconds, pingerMap, serviceAndToken.OSVersion, logger)
 		if err != nil {
 			logger.Error("Could not send push: %s", err.Error())
 		} else {
