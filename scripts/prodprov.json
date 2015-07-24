@@ -48,7 +48,7 @@
         },
       "elb_port": 443,
       "backend_port": 8443,
-      "accesslog_bucket_name": "elblogs-prod",
+      "accesslog_bucket_name": "elblogs-nm-prod",
       "sg_config": {
             "name" : "ELB",
             "description": "The SG for Prod Pinger ELB",
