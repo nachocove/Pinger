@@ -164,7 +164,6 @@ func (imap *IMAPClient) setupScanner() {
 		imap.pi.CommandAcknowledgement = []byte("\r\n")
 	}
 	imap.scanner = bufio.NewScanner(imap.tlsConn)
-	//imap.scanner.Split(imap.ScanIMAPTerminator)
 	imap.scanner.Split(bufio.ScanLines)
 }
 
@@ -417,7 +416,12 @@ func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]st
 			imap.Debug("%s", err)
 			return responses, err
 		} else {
-			imap.Debug(response)
+			if imap.getNameFromCommand(command) == "AUTHENTICATE" {
+				imap.Debug("<%s command response redacted>", imap.getNameFromCommand(command))
+			} else {
+				imap.Debug(response)
+			}
+
 			responses = append(responses, response)
 			imap.processResponse(command, response)
 			if imap.isFinalResponse(command, response) {
@@ -426,7 +430,11 @@ func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]st
 					imap.isIdling = false
 				}
 				for i, r := range responses {
-					imap.Debug("%d: %s", i, r)
+					if imap.getNameFromCommand(command) == "AUTHENTICATE" {
+						imap.Debug("%d: <%s command response redacted>", i, imap.getNameFromCommand(command))
+					} else {
+						imap.Debug("%d: %s", i, r)
+					}
 				}
 				break
 			}
