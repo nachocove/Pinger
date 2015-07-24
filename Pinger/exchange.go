@@ -46,6 +46,7 @@ func NewExchangeClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, 
 		cancelled: false,
 	}
 	ex.logger.SetCallDepth(1)
+	ex.Debug("Created new Exchange Client %s", ex.getLogPrefix())
 	return ex, nil
 }
 
@@ -144,7 +145,8 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		if err != nil {
 			ex.Error("DumpRequest error: %v", err)
 		} else {
-			ex.Debug("sending request:\n%s", requestBytes)
+			requestBytes = []byte("<redacted>")
+			ex.Debug("Sending request:%s\n", requestBytes) // don't dump requestBytes
 		}
 	}
 
@@ -311,7 +313,9 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 		}
 		ex.httpClient.Jar = cookieJar
 	}
-	ex.Debug("New HTTP Client with timeout %s %s", ex.transport.ResponseHeaderTimeout, ex.pi.MailServerUrl)
+	redactedUrl := strings.Split(ex.pi.MailServerUrl, "?")[0]
+
+	ex.Debug("New HTTP Client with timeout %s %s<redacted>", ex.transport.ResponseHeaderTimeout, redactedUrl)
 	sleepTime := 0
 	tooFastResponse := (time.Duration(ex.pi.ResponseTimeout) * time.Millisecond) / 4
 	ex.Debug("TooFast timeout set to %s", tooFastResponse)
