@@ -141,7 +141,7 @@
     "autoscale_config": {
         "ami_id": "ami-8d9c9ebd",
         "key_pair": "AlphaPinger",
-        "instance_type": "t2.micro",
+        "instance_type": "m3.medium",
         "instance_monitoring": false,
         "min_size": 1,
         "max_size": 1,
