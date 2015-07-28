@@ -15,6 +15,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -86,6 +87,11 @@ var retryResponse *http.Response
 
 func init() {
 	retryResponse = &http.Response{}
+}
+
+func redactEmailFromError(message string) string {
+	r := regexp.MustCompile("User=.*@")
+	return r.ReplaceAllString(message, "User=<redacted>@")
 }
 
 // doRequestResponse is used as a go-routine to do the actual send/receive (blocking) of the exchange messages.
@@ -175,7 +181,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		// TODO Can 'err.Error()' be data from the remote endpoint? Do we need to protect against it?
 		// TODO Perhaps limit the length we log here.
 		if strings.Contains(err.Error(), "use of closed network connection") == false {
-			ex.Warning("httpClient.Do failed: %s", err.Error())
+			ex.Warning("httpClient.Do failed: %s", redactEmailFromError(err.Error()))
 		} else {
 			ex.Debug("%s", err.Error())
 		}
