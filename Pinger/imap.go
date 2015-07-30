@@ -34,8 +34,7 @@ const (
 // Timeout values for the Dial functions.
 const (
 	netTimeout       = 30 * time.Second // Time to establish a TCP connection
-	clientTimeout    = 60 * time.Second // Time to receive greeting and capabilities
-	POLLING_INTERVAL = 30
+	POLLING_INTERVAL = 300
 )
 
 type cmdTag struct {
@@ -97,7 +96,7 @@ func NewIMAPClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, logg
 		tag:       genNewCmdTag(0),
 	}
 	imap.logger.SetCallDepth(1)
-	imap.Debug("Created new IMAP Client %s", imap.getLogPrefix())
+	imap.Info("Created new IMAP Client %s", imap.getLogPrefix())
 	return &imap, nil
 }
 
@@ -201,7 +200,7 @@ func (imap *IMAPClient) handleGreeting() error {
 }
 
 func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
-	imap.Debug("Authenticating with authblob")
+	imap.Info("Authenticating with authblob")
 	decodedBlob, err := base64.StdEncoding.DecodeString(imap.pi.IMAPAuthenticationBlob)
 	if err != nil {
 		imap.Error("Error decoding AuthBlob")
@@ -277,10 +276,10 @@ func (imap *IMAPClient) doExamine() error {
 
 func (imap *IMAPClient) sendIMAPCommand(command string) error {
 	commandName := imap.getNameFromCommand(command)
-	imap.Debug("Sending IMAP %s Command to server", commandName)
+	imap.Info("Sending IMAP %s Command to server", commandName)
 	//imap.Debug("Sending IMAP Command to server:[%s]", command)
 	if commandName == "IDLE" {
-		imap.Debug("Setting isIdling to true.")
+		imap.Info("Setting isIdling to true.")
 		imap.isIdling = true
 	}
 	if len(command) > 0 {
@@ -303,11 +302,11 @@ func (imap *IMAPClient) doIMAPCommand(command string, waitTime int64) ([]string,
 	for _, commandLine := range commandLines {
 		err := imap.sendIMAPCommand(commandLine)
 		if err != nil {
-			imap.Debug("%s", err)
+			imap.Warning("%s", err)
 			return nil, err
 		}
 		if imap.cancelled == true {
-			imap.Debug("Request cancelled. Exiting...")
+			imap.Info("Request cancelled. Exiting...")
 			err = fmt.Errorf("Request cancelled")
 			return nil, err
 		}
@@ -324,12 +323,12 @@ func (imap *IMAPClient) doIMAPCommand(command string, waitTime int64) ([]string,
 			lastResponse := responses[len(responses)-1]
 			if !imap.isOKResponse(lastResponse) && !imap.isContinueResponse(lastResponse) {
 				err := fmt.Errorf("Did not get proper response from imap server: %s", lastResponse)
-				imap.Debug("%s", err)
+				imap.Warning("%s", err)
 				return allResponses, err
 			}
 		} else {
 			err := fmt.Errorf("Did not get any response from imap server.")
-			imap.Debug("%s", err)
+			imap.Warning("%s", err)
 			return allResponses, err
 		}
 	}
@@ -348,7 +347,7 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 
 		} else if token == IMAP_EXISTS && count != imap.pi.IMAPEXISTSCount {
 			imap.Debug("Current EXISTS count %d is different from starting EXISTS count %d. Resetting count...", count, imap.pi.IMAPEXISTSCount)
-			imap.Debug("Got new mail. Stopping IDLE..")
+			imap.Info("Got new mail. Stopping IDLE..")
 			imap.hasNewEmail = true
 			imap.pi.IMAPEXISTSCount = count
 			err := imap.sendIMAPCommand(IMAP_DONE)
@@ -375,7 +374,7 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 				imap.pi.IMAPUIDNEXT = UIDNext
 			} else if UIDNext != imap.pi.IMAPUIDNEXT {
 				imap.Debug("UIDNext %d is different from starting UIDNext %d. Resetting UIDNext", UIDNext, imap.pi.IMAPUIDNEXT)
-				imap.Debug("Got new mail.")
+				imap.Info("Got new mail.")
 				imap.hasNewEmail = true
 				imap.pi.IMAPUIDNEXT = UIDNext
 			} else {
@@ -426,7 +425,7 @@ func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]st
 			imap.processResponse(command, response)
 			if imap.isFinalResponse(command, response) {
 				if imap.getNameFromCommand(command) == "IDLE" {
-					imap.Debug("Setting isIdling to false.")
+					imap.Info("Setting isIdling to false.")
 					imap.isIdling = false
 				}
 				for i, r := range responses {
@@ -455,7 +454,7 @@ func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 			break
 		} else if err := imap.scanner.Err(); err != nil {
 			if i < 3 { // try three times
-				imap.Info("Error scanning for server response: %s. Will retry...", err)
+				imap.Warning("Error scanning for server response: %s. Will retry...", err)
 				time.Sleep(time.Duration(1) * time.Second)
 			} else {
 				imap.Error("Error scanning for server response: %s. Giving up...", err)
@@ -495,14 +494,14 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 	unlockMutex = false
 	responses, err := imap.doIMAPCommand(request, 0)
 	if imap.cancelled == true {
-		imap.Debug("Request cancelled. Exiting...")
+		imap.Info("Request cancelled. Exiting...")
 		return
 	}
 	if err != nil {
 		if imap.isIdling {
 			imap.isIdling = false
 		}
-		imap.Debug("Got error %s. Sending back LongPollReRegister", err)
+		imap.Warning("Got error %s. Sending back LongPollReRegister", err)
 		errCh <- LongPollReRegister // erroring out... ask for reregister
 		return
 	}
@@ -519,14 +518,14 @@ func defaultPort(addr, port string) string {
 }
 
 func (imap *IMAPClient) setupConn() error {
-	imap.Debug("Setting up TLS connection...")
+	imap.Info("Setting up TLS connection...")
 	if imap.tlsConn != nil {
 		imap.tlsConn.Close()
 	}
 	if imap.url == nil {
 		imapUrl, err := url.Parse(imap.pi.MailServerUrl)
 		if err != nil {
-			imap.Debug("err %s", err)
+			imap.Warning("err %s", err)
 			return err
 		}
 		imap.url = imapUrl
@@ -538,28 +537,27 @@ func (imap *IMAPClient) setupConn() error {
 	conn, err := net.DialTimeout("tcp", imap.url.Host, netTimeout)
 	if err == nil {
 		imap.tlsConn = tls.Client(conn, imap.tlsConfig)
-		//if c, err = NewClient(tlsConn, host, clientTimeout); err != nil {
 		if imap.tlsConn == nil {
 			conn.Close()
 			return fmt.Errorf("Cannot create TLS Connection")
 		}
 	}
 	if err != nil {
-		imap.Debug("err %s", err)
+		imap.Warning("err %s", err)
 		return err
 	}
 	imap.setupScanner()
 
 	err = imap.handleGreeting()
 	if err != nil {
-		imap.Debug("err %s", err)
+		imap.Warning("err %s", err)
 		return err
 	}
 	return nil
 }
 
 func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan error) {
-	imap.Debug("Starting LongPoll")
+	imap.Info("Starting LongPoll")
 	if imap.isIdling {
 		imap.Error("Already idling. Returning.")
 		return
@@ -568,7 +566,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 	defer imap.wg.Done()
 	defer Utils.RecoverCrash(imap.logger)
 	defer func() {
-		imap.Debug("Stopping...")
+		imap.Info("Stopping...")
 		imap.cancel()
 	}()
 	sleepTime := 0
@@ -616,35 +614,35 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 		} else {
 			command = fmt.Sprintf("%s %s %s %s", imap.tag.Next(), IMAP_STATUS, imap.pi.IMAPFolderName, IMAP_STATUS_QUERY)
 		}
-		imap.Debug("command %s", command)
+		imap.Info("command %s", command)
 		imap.wg.Add(1)
 		go imap.doRequestResponse(command, responseCh, errCh)
 		select {
 		case <-requestTimer.C:
 			// request timed out. Start over.
-			imap.Debug("Request timed out. Starting over.")
+			imap.Info("Request timed out. Starting over.")
 			requestTimer.Stop()
 			imap.cancelIDLE()
 
 		case err := <-errCh:
-			imap.Debug("Got error %s. Sending back LongPollReRegister", err)
+			imap.Info("Got error %s. Sending back LongPollReRegister", err)
 			errCh <- LongPollReRegister // erroring out... ask for reregister
 			return
 
 		case <-responseCh:
 			if imap.hasNewEmail {
-				imap.Debug("Got mail. Setting LongPollNewMail")
+				imap.Info("Got mail. Setting LongPollNewMail")
 				imap.hasNewEmail = false
 				errCh <- LongPollNewMail
 				return
 			}
 
 		case <-stopPollCh: // parent will close this, at which point this will trigger.
-			imap.Debug("Was told to stop. Stopping")
+			imap.Info("Was told to stop. Stopping")
 			return
 
 		case <-stopAllCh: // parent will close this, at which point this will trigger.
-			imap.Debug("Was told to stop (allStop). Stopping")
+			imap.Info("Was told to stop (allStop). Stopping")
 			return
 		}
 	}
