@@ -298,7 +298,7 @@ func (client *MailClientContext) enterPinging(e *fsm.Event) {
 	client.stopPollCh = make(chan int)
 	errCh := e.Args[0].(chan error)
 	client.setStatus(MailClientStatusPinging, nil)
-	client.Debug("Enter pinging. starting long poll. %+v", client.mailClient)
+	client.Info("Enter pinging. starting long poll. %+v", client.mailClient)
 	go client.mailClient.LongPoll(client.stopPollCh, client.stopAllCh, errCh)
 }
 

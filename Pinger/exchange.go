@@ -321,7 +321,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 	}
 	redactedUrl := strings.Split(ex.pi.MailServerUrl, "?")[0]
 
-	ex.Debug("New HTTP Client with timeout %s %s<redacted>", ex.transport.ResponseHeaderTimeout, redactedUrl)
+	ex.Info("New HTTP Client with timeout %s %s<redacted>", ex.transport.ResponseHeaderTimeout, redactedUrl)
 	sleepTime := 0
 	tooFastResponse := (time.Duration(ex.pi.ResponseTimeout) * time.Millisecond) / 4
 	ex.Debug("TooFast timeout set to %s", tooFastResponse)
@@ -330,7 +330,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 	for {
 		if sleepTime > 0 {
 			s := time.Duration(sleepTime) * time.Second
-			ex.Debug("Sleeping %s before retry", s)
+			ex.Info("Sleeping %s before retry", s)
 			time.Sleep(s)
 		}
 		if responseErrCh != nil {
