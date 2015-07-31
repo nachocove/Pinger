@@ -468,6 +468,7 @@ func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 
 func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []string, errCh chan error) {
 	imap.Debug("Doing Request/Response")
+	imap.wg.Add(1)
 	defer Utils.RecoverCrash(imap.logger)
 	imap.mutex.Lock() // prevents the longpoll from cancelling the request while we're still setting it up.
 	unlockMutex := true
@@ -505,6 +506,7 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 		errCh <- LongPollReRegister // erroring out... ask for reregister
 		return
 	}
+	imap.Debug("Sending responses back")
 	responseCh <- responses
 	return
 }
@@ -615,7 +617,6 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			command = fmt.Sprintf("%s %s %s %s", imap.tag.Next(), IMAP_STATUS, imap.pi.IMAPFolderName, IMAP_STATUS_QUERY)
 		}
 		imap.Info("command %s", command)
-		imap.wg.Add(1)
 		go imap.doRequestResponse(command, responseCh, errCh)
 		select {
 		case <-requestTimer.C:
@@ -650,7 +651,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 
 func (imap *IMAPClient) cancelIDLE() {
 	if imap.isIdling {
-		imap.Info("Cancelling outstanding request")
+		imap.Info("Cancelling outstanding IDLE request")
 		err := imap.sendIMAPCommand(IMAP_DONE)
 		if err != nil {
 			imap.Error("Error sending IMAP Command %s: %s", IMAP_DONE, err)
@@ -664,7 +665,6 @@ func (imap *IMAPClient) cancel() {
 	imap.Info("IsIdling %t", imap.isIdling)
 	imap.cancelIDLE()
 	imap.mutex.Unlock()
-	imap.cancelled = false
 }
 
 func (imap *IMAPClient) Cleanup() {

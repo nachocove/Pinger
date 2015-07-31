@@ -434,7 +434,7 @@ func RPCAliveCheck(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args 
 			err = e
 		}
 	}()
-	logger.Info("Received aliveCheck request")
+	logger.Debug("Received aliveCheck request")
 	if globals.config.PingerUpdater > 0 {
 		logger.Warning("Running both auto-updater and a remote Alive Check")
 	}
