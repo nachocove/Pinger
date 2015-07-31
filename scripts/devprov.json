@@ -138,7 +138,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-8d9c9ebd",
+        "ami_id": "ami-dbf9f7eb",
         "key_pair": "goTestServer",
         "instance_type": "m3.medium",
         "instance_monitoring": false,
