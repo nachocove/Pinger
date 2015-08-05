@@ -105,7 +105,7 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 		go pinger.Updater(config.Backend.PingerUpdater)
 	}
 
-	logger.Debug("Starting RPC server on %s (pinger id %s)", config.Rpc.String(), pingerHostId)
+	logger.Debug("Starting RPC server on %s|pingerid=%s", config.Rpc.String(), pingerHostId)
 	switch {
 	case config.Rpc.Protocol == RPCProtocolHTTP:
 		rpcServer.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
@@ -165,7 +165,7 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			logger.Error("%s", err.Error())
 		}
 	}()
-	logger.Info("%s: Received StartPoll request", args.getLogPrefix())
+	logger.Info("%s|Received poll request|msgCode=RPC_START_POLL", args.getLogPrefix())
 	pollMapKey := args.pollMapKey()
 	reply.Code = PollingReplyOK
 	var client MailClientContextType
@@ -179,25 +179,25 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 	client, ok := (*pollMap)[pollMapKey]
 	if ok == true {
 		if client == nil {
-			err = fmt.Errorf("%s: Could not find poll session in map", args.getLogPrefix())
+			err = fmt.Errorf("%s|Could not find poll session in map", args.getLogPrefix())
 			return err
 		}
 		status, err := client.Status()
-		logger.Debug("%s: Found Existing polling session: status %s, err %v", args.getLogPrefix(), status, err)
+		logger.Debug("%s|Found existing poll session|pollstate=%s|err=%v|", args.getLogPrefix(), status, err)
 		switch {
 		case status == MailClientStatusStopped:
-			logger.Debug("%s: Polling has stopped.", args.getLogPrefix())
+			logger.Debug("%s|Polling has already stopped|pollstate=%s", args.getLogPrefix(), status)
 
 		case status == MailClientStatusPinging:
-			logger.Debug("%s: Polling. Stopping it.", args.getLogPrefix())
+			logger.Info("%s|Stopping the poll|pollstate=%s", args.getLogPrefix(), status)
 
 		case status == MailClientStatusError:
 			if err != nil {
-				logger.Debug("%s: Not polling. Last error was %s", args.getLogPrefix(), err)
+				logger.Info("%s|Not polling due to error|pollstate=%s|err:%s", args.getLogPrefix(), status, err)
 				reply.Message = fmt.Sprintf("Previous Ping failed with error: %s", err.Error())
 			} else {
-				logger.Debug("%s: Not polling.", args.getLogPrefix())
-				reply.Message = fmt.Sprintf("Not polling")
+				logger.Debug("%s|Not polling due to error", args.getLogPrefix())
+				reply.Message = fmt.Sprintf("Not polling due to error")
 			}
 			reply.Code = PollingReplyWarn
 		}
@@ -223,15 +223,15 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 
 func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey string, mi *MailPingInformation, logger *Logging.Logger) {
 	// nothing started. So start it.
-	logger.Debug("%s: Creating session", mi.getLogPrefix())
+	logger.Info("%s|Creating new pinger session", mi.getLogPrefix())
 	client, err := t.newMailClientContext(mi, false)
 	if err != nil {
-		logger.Error("%s: Could not create new client: %s", pollMapKey, err)
+		logger.Error("%s|Could not create new pinger session|err=%s", pollMapKey, err)
 		return
 	}
 	t.LockMap()
 	defer func() {
-		logger.Debug("%s: Done creating session", mi.getLogPrefix())
+		logger.Debug("%s|Done creating session", mi.getLogPrefix())
 		t.UnlockMap()
 	}()
 	if _, ok := (*pollMap)[pollMapKey]; ok == true {
@@ -256,7 +256,7 @@ func (sp *StopPollArgs) pollMapKey() string {
 
 func (sp *StopPollArgs) getLogPrefix() string {
 	if sp.logPrefix == "" {
-		sp.logPrefix = fmt.Sprintf("%s:%s:%s", sp.DeviceId, sp.UserId, sp.ClientContext)
+		sp.logPrefix = fmt.Sprintf("%s|%s|%s", sp.DeviceId, sp.UserId, sp.ClientContext)
 	}
 	return sp.logPrefix
 }
@@ -274,10 +274,10 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 			err = e
 		}
 		if err != nil {
-			logger.Error("%s", err.Error())
+			logger.Error("Recovering from crash:err=%s", err.Error())
 		}
 	}()
-	logger.Info("%s: Received stopPoll request", args.getLogPrefix())
+	logger.Info("%s|Received stop request|msgCode=RPC_STOP_POLL", args.getLogPrefix())
 	pollMapKey := args.pollMapKey()
 	t.LockMap()
 	defer t.UnlockMap()
@@ -290,7 +290,7 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 		go client.stop()
 		reply.Message = "Stopped"
 	} else {
-		logger.Warning("%s: No active sessions found for key %s", args.getLogPrefix(), pollMapKey)
+		logger.Warning("%s|No active sessions found|key=%s", args.getLogPrefix(), pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "No active sessions found"
 		return
@@ -315,7 +315,7 @@ func (dp *DeferPollArgs) pollMapKey() string {
 
 func (dp *DeferPollArgs) getLogPrefix() string {
 	if dp.logPrefix == "" {
-		dp.logPrefix = fmt.Sprintf("%s:%s:%s", dp.DeviceId, dp.UserId, dp.ClientContext)
+		dp.logPrefix = fmt.Sprintf("%s|%s|%s", dp.DeviceId, dp.UserId, dp.ClientContext)
 	}
 	return dp.logPrefix
 }
@@ -330,7 +330,7 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			logger.Error("%s", err.Error())
 		}
 	}()
-	logger.Info("%s: Received deferPoll request", args.getLogPrefix())
+	logger.Info("%s|Received defer request|msgCode=RPC_DEFER_POLL", args.getLogPrefix())
 	reply.Code = PollingReplyOK
 	reply.Message = ""
 	pollMapKey := args.pollMapKey()
@@ -350,7 +350,7 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			go client.deferPoll(args.Timeout)
 		}
 	} else {
-		logger.Warning("%s: No active sessions found for key %s", args.getLogPrefix(), pollMapKey)
+		logger.Warning("%s|No active sessions found|key=%s", args.getLogPrefix(), pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "No active sessions found"
 		return
@@ -375,7 +375,7 @@ type FindSessionsResponse struct {
 
 func (fs *FindSessionsArgs) getLogPrefix() string {
 	if fs.logPrefix == "" {
-		fs.logPrefix = fmt.Sprintf("%s:%s:%s", fs.DeviceId, fs.UserId, fs.ClientContext)
+		fs.logPrefix = fmt.Sprintf("%s|%s|%s", fs.DeviceId, fs.UserId, fs.ClientContext)
 	}
 	return fs.logPrefix
 }
@@ -387,10 +387,10 @@ func RPCFindActiveSessions(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMa
 			err = e
 		}
 	}()
-	logger.Debug("Received findActiveSessions request with options %s", args.getLogPrefix())
+	logger.Debug("|Received findActiveSessions request with options %s", args.getLogPrefix())
 	for key, poll := range *pollMap {
 		if args.MaxSessions > 0 && len(reply.SessionInfos) >= args.MaxSessions {
-			logger.Debug("Max sessions read (%d). Stopping search.", len(reply.SessionInfos))
+			logger.Debug("|Max sessions read (%d). Stopping search.", len(reply.SessionInfos))
 			break
 		}
 		session, err := poll.getSessionInfo()
@@ -434,7 +434,7 @@ func RPCAliveCheck(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args 
 			err = e
 		}
 	}()
-	logger.Debug("Received aliveCheck request")
+	logger.Debug("Received aliveCheck request||msgCode=RPC_ALIVE_CHECK")
 	if globals.config.PingerUpdater > 0 {
 		logger.Warning("Running both auto-updater and a remote Alive Check")
 	}

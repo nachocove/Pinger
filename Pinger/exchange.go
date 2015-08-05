@@ -52,7 +52,7 @@ func NewExchangeClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, 
 }
 
 func (ex *ExchangeClient) getLogPrefix() (prefix string) {
-	prefix = ex.pi.getLogPrefix() + "/ActiveSync"
+	prefix = ex.pi.getLogPrefix() + ":ActiveSync"
 	return
 }
 
@@ -96,6 +96,7 @@ func redactEmailFromError(message string) string {
 
 // doRequestResponse is used as a go-routine to do the actual send/receive (blocking) of the exchange messages.
 func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errCh chan error) {
+	ex.Debug("Starting doRequestResponse")
 	defer Utils.RecoverCrash(ex.logger)
 	ex.mutex.Lock() // prevents the longpoll from cancelling the request while we're still setting it up.
 	unlockMutex := true
@@ -169,9 +170,10 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	// TODO Can we guard against bogus SSL negotiation from a hacked server?
 	// TODO Perhaps we need to read and assess the Go SSL/TLS implementation
 	response, err := ex.httpClient.Do(ex.request)
+	ex.Info("Done with the server")
 	ex.request = nil // unsave it. We're done with it.
 	if ex.cancelled == true {
-		ex.Debug("request cancelled. Exiting.")
+		ex.Debug("Exchange Request cancelled. Exiting.")
 		return
 	}
 	if err != nil {
@@ -239,7 +241,9 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 			ex.Debug("response:\n%s%s", headerBytes, responseBytes)
 		}
 	}
+	ex.Debug("sending response back")
 	responseCh <- response
+	ex.Debug("sent response back")
 }
 
 func (ex *ExchangeClient) exponentialBackoff(sleepTime int) int {
@@ -281,12 +285,15 @@ func (ex *ExchangeClient) cancel() {
 //    the dummy errors, we'd need a resultsChannel or some kind.
 //
 func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan error) {
+	ex.Debug("Starting LongPoll")
 	defer Utils.RecoverCrash(ex.logger) // catch all panic. RecoverCrash logs information needed for debugging.
-
 	ex.wg.Add(1)
 	defer ex.wg.Done()
 
-	defer ex.cancel()
+	defer func() {
+		ex.Debug("Stopping LongPoll...")
+		ex.cancel()
+	}()
 
 	var err error
 	reqTimeout := ex.pi.ResponseTimeout
@@ -345,8 +352,9 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 		timeSent := time.Now()
 		ex.wg.Add(1)
 		ex.cancelled = false
+		ex.Debug("go do doRequestResponse")
 		go ex.doRequestResponse(responseCh, responseErrCh)
-		ex.Debug("Waiting for response")
+		ex.Debug("go done doRequestResponse")
 		select {
 		case err = <-responseErrCh:
 			ex.sendError(errCh, err)
@@ -422,6 +430,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 
 // SelfDelete Used to zero out the structure and let garbage collection reap the empty stuff.
 func (ex *ExchangeClient) Cleanup() {
+	ex.Debug("Cleaning up")
 	ex.pi.cleanup()
 	ex.pi = nil
 	if ex.transport != nil {

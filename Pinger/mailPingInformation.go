@@ -47,7 +47,7 @@ type MailPingInformation struct {
 }
 
 func (pi *MailPingInformation) String() string {
-	return fmt.Sprintf("NoChangeReply:%s, RequestData:%s, ExpectedReply:%s",
+	return fmt.Sprintf("NoChangeReply=%s|RequestData=%s|ExpectedReply=%s",
 		base64.StdEncoding.EncodeToString(pi.NoChangeReply),
 		base64.StdEncoding.EncodeToString(pi.RequestData),
 		base64.StdEncoding.EncodeToString(pi.ExpectedReply))
@@ -114,7 +114,7 @@ func (pi *MailPingInformation) Validate() bool {
 
 func (pi *MailPingInformation) getLogPrefix() string {
 	if pi.logPrefix == "" {
-		pi.logPrefix = fmt.Sprintf("%s:%s:%s:%s", pi.DeviceId, pi.UserId, pi.ClientContext, pi.SessionId)
+		pi.logPrefix = fmt.Sprintf("%s|%s|%s|%s", pi.DeviceId, pi.UserId, pi.ClientContext, pi.SessionId)
 	}
 	return pi.logPrefix
 }

@@ -65,24 +65,24 @@ func init() {
 }
 
 func (imap *IMAPClient) getLogPrefix() (prefix string) {
-	prefix = imap.pi.getLogPrefix() + ":" + imap.tag.String() + "/IMAP"
+	prefix = imap.pi.getLogPrefix() + "|" + string(imap.tag.id) + ":" + strconv.FormatUint(imap.tag.seq, 10) + "|IMAP"
 	return
 }
 
 func (imap *IMAPClient) Debug(format string, args ...interface{}) {
-	imap.logger.Debug(fmt.Sprintf("%s: %s", imap.getLogPrefix(), format), args...)
+	imap.logger.Debug(fmt.Sprintf("%s|%s", imap.getLogPrefix(), format), args...)
 }
 
 func (imap *IMAPClient) Info(format string, args ...interface{}) {
-	imap.logger.Info(fmt.Sprintf("%s: %s", imap.getLogPrefix(), format), args...)
+	imap.logger.Info(fmt.Sprintf("%s|%s", imap.getLogPrefix(), format), args...)
 }
 
 func (imap *IMAPClient) Error(format string, args ...interface{}) {
-	imap.logger.Error(fmt.Sprintf("%s: %s", imap.getLogPrefix(), format), args...)
+	imap.logger.Error(fmt.Sprintf("%s|%s", imap.getLogPrefix(), format), args...)
 }
 
 func (imap *IMAPClient) Warning(format string, args ...interface{}) {
-	imap.logger.Warning(fmt.Sprintf("%s: %s", imap.getLogPrefix(), format), args...)
+	imap.logger.Warning(fmt.Sprintf("%s|%s", imap.getLogPrefix(), format), args...)
 }
 
 func NewIMAPClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, logger *Logging.Logger) (*IMAPClient, error) {
@@ -268,8 +268,8 @@ func (imap *IMAPClient) parseIDLEResponse(response string) (value int, token str
 }
 
 func (imap *IMAPClient) doExamine() error {
-	imap.Debug("Folder %s", imap.pi.IMAPFolderName)
 	command := fmt.Sprintf("%s %s %s", imap.tag.Next(), IMAP_EXAMINE, imap.pi.IMAPFolderName)
+	imap.Debug("Folder %s", imap.pi.IMAPFolderName)
 	_, err := imap.doIMAPCommand(command, 0)
 	return err
 }
@@ -306,7 +306,7 @@ func (imap *IMAPClient) doIMAPCommand(command string, waitTime int64) ([]string,
 			return nil, err
 		}
 		if imap.cancelled == true {
-			imap.Info("Request cancelled. Exiting...")
+			imap.Info("IMAP Command. Request cancelled. Exiting...")
 			err = fmt.Errorf("Request cancelled")
 			return nil, err
 		}
@@ -408,7 +408,7 @@ func (imap *IMAPClient) getNameFromCommand(command string) string {
 func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]string, error) {
 	completed := false
 	responses := make([]string, 0)
-
+	imap.Debug("Getting Server Responses")
 	for completed == false {
 		response, err := imap.getServerResponse(waitTime)
 		if err != nil {
@@ -443,13 +443,16 @@ func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]st
 }
 
 func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
+	imap.Debug("Getting server response. Timeout = %d", waitTime)
 	if waitTime > 0 {
 		waitUntil := time.Now().Add(time.Duration(waitTime) * time.Millisecond)
 		imap.tlsConn.SetReadDeadline(waitUntil)
 		defer imap.tlsConn.SetReadDeadline(time.Time{})
 	}
 	for i := 0; ; i++ {
+		imap.Debug("Scanning...")
 		ok := imap.scanner.Scan()
+		imap.Debug("Done Scanning...")
 		if ok {
 			break
 		} else if err := imap.scanner.Err(); err != nil {
@@ -462,12 +465,13 @@ func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 			}
 		}
 	}
+	imap.Debug("Extract scanned text")
 	response := imap.scanner.Text()
 	return response, nil
 }
 
 func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []string, errCh chan error) {
-	imap.Debug("Doing Request/Response")
+	imap.Debug("Starting doRequestResponse")
 	imap.wg.Add(1)
 	defer Utils.RecoverCrash(imap.logger)
 	imap.mutex.Lock() // prevents the longpoll from cancelling the request while we're still setting it up.
@@ -493,9 +497,11 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 	}
 	imap.mutex.Unlock()
 	unlockMutex = false
-	responses, err := imap.doIMAPCommand(request, 0)
+	imap.Info("Doing IMAP Command")
+	responses, err := imap.doIMAPCommand(request, int64(netTimeout/time.Millisecond))
+	imap.Info("Done with IMAP Command")
 	if imap.cancelled == true {
-		imap.Info("Request cancelled. Exiting...")
+		imap.Info("IMAP Request cancelled. Exiting...")
 		return
 	}
 	if err != nil {
@@ -504,10 +510,12 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 		}
 		imap.Warning("Got error %s. Sending back LongPollReRegister", err)
 		errCh <- LongPollReRegister // erroring out... ask for reregister
+		imap.Warning("Sent LongPollReRegister")
 		return
 	}
 	imap.Debug("Sending responses back")
 	responseCh <- responses
+	imap.Debug("Sent responses back")
 	return
 }
 
@@ -568,7 +576,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 	defer imap.wg.Done()
 	defer Utils.RecoverCrash(imap.logger)
 	defer func() {
-		imap.Info("Stopping...")
+		imap.Info("Stopping LongPoll...")
 		imap.cancel()
 	}()
 	sleepTime := 0
@@ -599,7 +607,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			imap.Debug("Supporting idle")
 			err := imap.doExamine()
 			if err != nil {
-				imap.Error("%v", err)
+				imap.Error("Examine failure: %v", err)
 				return
 			}
 		} else {
@@ -616,8 +624,9 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 		} else {
 			command = fmt.Sprintf("%s %s %s %s", imap.tag.Next(), IMAP_STATUS, imap.pi.IMAPFolderName, IMAP_STATUS_QUERY)
 		}
-		imap.Info("command %s", command)
+		imap.Info("go do command %s", command)
 		go imap.doRequestResponse(command, responseCh, errCh)
+		imap.Info("go done command %s", command)
 		select {
 		case <-requestTimer.C:
 			// request timed out. Start over.
@@ -628,13 +637,15 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 		case err := <-errCh:
 			imap.Info("Got error %s. Sending back LongPollReRegister", err)
 			errCh <- LongPollReRegister // erroring out... ask for reregister
+			imap.Info("Sent LongPollReRegister")
 			return
 
 		case <-responseCh:
 			if imap.hasNewEmail {
-				imap.Info("Got mail. Setting LongPollNewMail")
+				imap.Info("Got mail. Sending LongPollNewMail")
 				imap.hasNewEmail = false
 				errCh <- LongPollNewMail
+				imap.Info("Sent LongPollNewMail")
 				return
 			}
 
@@ -668,6 +679,7 @@ func (imap *IMAPClient) cancel() {
 }
 
 func (imap *IMAPClient) Cleanup() {
+	imap.Info("Cleaning up")
 	imap.cancel()
 	imap.pi.cleanup()
 	imap.pi = nil
