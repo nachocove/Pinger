@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"errors"
 )
 
 // IMAP Commands
@@ -466,6 +467,7 @@ func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 			err := imap.scanner.Err()
 			if err == nil {
 				imap.Debug("EOF. Breaking from the scan loop")
+				return "", errors.New("EOF received")
 			}
 			nerr, ok := err.(net.Error)
 			if ok && nerr.Timeout() {
@@ -476,11 +478,11 @@ func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 					imap.Warning("Temporary error scanning for server response: %s. Will retry...", nerr)
 					time.Sleep(time.Duration(1) * time.Second)
 				} else {
-					imap.Error("Error scanning for server response: %s. Giving up...", nerr)
+					imap.Warning("Error scanning for server response: %s. Giving up...", nerr)
 					return "", err
 				}
 			} else {
-				imap.Error("Error scanning for server response: %s. Giving up...", err)
+				imap.Warning("Error scanning for server response: %s. Giving up...", err)
 				return "", err
 			}
 		}
