@@ -15,6 +15,7 @@
         "users": {
             "pinger": {
                 "inline_policies" : [
+                                    "Sid": "Stmt1426990618000",
                 ]
             },
             "pinger_boot": {

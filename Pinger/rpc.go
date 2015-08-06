@@ -256,7 +256,7 @@ func (sp *StopPollArgs) pollMapKey() string {
 
 func (sp *StopPollArgs) getLogPrefix() string {
 	if sp.logPrefix == "" {
-		sp.logPrefix = fmt.Sprintf("%s|%s|%s", sp.DeviceId, sp.UserId, sp.ClientContext)
+		sp.logPrefix = fmt.Sprintf("|%s|%s|%s", sp.DeviceId, sp.UserId, sp.ClientContext)
 	}
 	return sp.logPrefix
 }
@@ -315,7 +315,7 @@ func (dp *DeferPollArgs) pollMapKey() string {
 
 func (dp *DeferPollArgs) getLogPrefix() string {
 	if dp.logPrefix == "" {
-		dp.logPrefix = fmt.Sprintf("%s|%s|%s", dp.DeviceId, dp.UserId, dp.ClientContext)
+		dp.logPrefix = fmt.Sprintf("|%s|%s|%s", dp.DeviceId, dp.UserId, dp.ClientContext)
 	}
 	return dp.logPrefix
 }
@@ -350,7 +350,7 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			go client.deferPoll(args.Timeout)
 		}
 	} else {
-		logger.Warning("%s|No active sessions found|key=%s", args.getLogPrefix(), pollMapKey)
+		logger.Warning("No active sessions found|key=%s", pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "No active sessions found"
 		return
@@ -375,7 +375,7 @@ type FindSessionsResponse struct {
 
 func (fs *FindSessionsArgs) getLogPrefix() string {
 	if fs.logPrefix == "" {
-		fs.logPrefix = fmt.Sprintf("%s|%s|%s", fs.DeviceId, fs.UserId, fs.ClientContext)
+		fs.logPrefix = fmt.Sprintf("|%s|%s|%s", fs.DeviceId, fs.UserId, fs.ClientContext)
 	}
 	return fs.logPrefix
 }

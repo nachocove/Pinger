@@ -57,19 +57,19 @@ func (ex *ExchangeClient) getLogPrefix() (prefix string) {
 }
 
 func (ex *ExchangeClient) Debug(format string, args ...interface{}) {
-	ex.logger.Debug(fmt.Sprintf("%s: %s", ex.getLogPrefix(), format), args...)
+	ex.logger.Debug(fmt.Sprintf("%s|%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) Info(format string, args ...interface{}) {
-	ex.logger.Info(fmt.Sprintf("%s: %s", ex.getLogPrefix(), format), args...)
+	ex.logger.Info(fmt.Sprintf("%s|%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) Error(format string, args ...interface{}) {
-	ex.logger.Error(fmt.Sprintf("%s: %s", ex.getLogPrefix(), format), args...)
+	ex.logger.Error(fmt.Sprintf("%s|%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) Warning(format string, args ...interface{}) {
-	ex.logger.Warning(fmt.Sprintf("%s: %s", ex.getLogPrefix(), format), args...)
+	ex.logger.Warning(fmt.Sprintf("%s|%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) maxResponseSize() (size int) {

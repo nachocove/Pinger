@@ -54,7 +54,7 @@ type MailClientContext struct {
 
 func (client *MailClientContext) getLogPrefix() string {
 	if client.logPrefix == "" {
-		client.logPrefix = fmt.Sprintf("%s|%s|%s|%s", client.DeviceId, client.UserId, client.ClientContext, client.sessionId)
+		client.logPrefix = fmt.Sprintf("|%s|%s|%s|%s", client.DeviceId, client.UserId, client.ClientContext, client.sessionId)
 	}
 	return client.logPrefix
 }
@@ -182,26 +182,26 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 		return nil, fmt.Errorf("%s|Could not create new mail client pinger|msgCode=PINGER_CREATE_FAIL", pi.getLogPrefix())
 	}
 	client.updateLastContact()
-	client.Debug("Creating pinger|msgCode=PINGER_CREATED|%s", pi.String())
+	client.Debug("Creating pinger|%s|msgCode=PINGER_CREATED", pi.String())
 	client.mailClient = mailclient
 	go client.start()
 	return client, nil
 }
 
 func (client *MailClientContext) Debug(format string, args ...interface{}) {
-	client.logger.Debug(fmt.Sprintf("%s|%s|", client.getLogPrefix(), format), args...)
+	client.logger.Debug(fmt.Sprintf("%s|%s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Info(format string, args ...interface{}) {
-	client.logger.Info(fmt.Sprintf("%s|%s|", client.getLogPrefix(), format), args...)
+	client.logger.Info(fmt.Sprintf("%s|%s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Error(format string, args ...interface{}) {
-	client.logger.Error(fmt.Sprintf("%s|%s|", client.getLogPrefix(), format), args...)
+	client.logger.Error(fmt.Sprintf("%s|%s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Warning(format string, args ...interface{}) {
-	client.logger.Warning(fmt.Sprintf("%s|%s|", client.getLogPrefix(), format), args...)
+	client.logger.Warning(fmt.Sprintf("%s|%s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Status() (MailClientStatus, error) {
@@ -291,7 +291,7 @@ func (client *MailClientContext) enterDeferred(e *fsm.Event) {
 }
 
 func (client *MailClientContext) exitDeferred(e *fsm.Event) {
-	client.Debug("Exit defer|pollstatus=%s", client.status)
+	client.Debug("Exit defer|pollstate=%s", client.status)
 	client.deferTimer.Stop()
 }
 
@@ -299,17 +299,17 @@ func (client *MailClientContext) enterPinging(e *fsm.Event) {
 	client.stopPollCh = make(chan int)
 	errCh := e.Args[0].(chan error)
 	client.setStatus(MailClientStatusPinging, nil)
-	client.Info("Enter pinging|pollstatus=%s|msgCode=PINGER_START_POLL", client.status)
+	client.Info("Enter pinging|pollstate=%s|msgCode=PINGER_START_POLL", client.status)
 	go client.mailClient.LongPoll(client.stopPollCh, client.stopAllCh, errCh)
 }
 
 func (client *MailClientContext) exitPinging(e *fsm.Event) {
-	client.Debug("Exit pinging|pollstatus=%s", client.status)
+	client.Debug("Exit pinging|pollstate=%s", client.status)
 	close(client.stopPollCh)
 }
 
 func (client *MailClientContext) enterStopped(e *fsm.Event) {
-	client.Info("Enter stopped|pollstatus=%s|msgCode=PINGER_STOP_POLL", client.status)
+	client.Info("Enter stopped|pollstate=%s|msgCode=PINGER_STOP_POLL", client.status)
 	msg := e.Args[0].(string)
 	status := e.Args[1].(MailClientStatus)
 	err, ok := e.Args[2].(error)
@@ -321,7 +321,7 @@ func (client *MailClientContext) enterStopped(e *fsm.Event) {
 }
 
 func (client *MailClientContext) exitStopped(e *fsm.Event) {
-	client.Debug("Exit stopped|pollstatus=%s", client.status)
+	client.Debug("Exit stopped|pollstate=%s", client.status)
 }
 
 func logError(err error, logger *Logging.Logger) {
@@ -357,6 +357,7 @@ func (client *MailClientContext) start() {
 	for {
 		select {
 		case <-client.maxPollTimer.C:
+			client.Info("MaxPoll timer expired. Sending ReRegister push message")
 			perr := client.di.PushRegister()
 			if perr != nil {
 				if perr == APNSInvalidToken {
@@ -374,6 +375,7 @@ func (client *MailClientContext) start() {
 			return
 
 		case <-client.deferTimer.C:
+			client.Info("Defer timer expired. Starting poll")
 			err = client.fsm.Event(FSMPinging, errCh)
 			if err != nil {
 				panic(err)
@@ -432,6 +434,7 @@ func (client *MailClientContext) start() {
 				}
 
 			case err == LongPollReRegister:
+				client.Info("LogPollReRegister message received. Sending ReRegister push message")
 				err1 := client.di.PushRegister()
 				if err1 != nil {
 					// don't bother with this error. The real/main error is the http status. Just log it.

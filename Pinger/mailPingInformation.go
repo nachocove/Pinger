@@ -1,7 +1,6 @@
 package Pinger
 
 import (
-	"encoding/base64"
 	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
@@ -47,10 +46,14 @@ type MailPingInformation struct {
 }
 
 func (pi *MailPingInformation) String() string {
-	return fmt.Sprintf("NoChangeReply=%s|RequestData=%s|ExpectedReply=%s",
-		base64.StdEncoding.EncodeToString(pi.NoChangeReply),
-		base64.StdEncoding.EncodeToString(pi.RequestData),
-		base64.StdEncoding.EncodeToString(pi.ExpectedReply))
+	return fmt.Sprintf("UserId:%s|ClientContext=%s|DeviceId=%s|Platform=%s|MailServerUrl=%s|"+
+		"Protocol=%s|ResponseTimeout=%d|WaitBeforeUse=%d|PushToken=%s|PushServer=%s|MaxPollTimeout=%d|"+
+		"OSVersion=%s|AppBuildVersion=%s|AppBuildNumber=%s|SessionId=%s|IMAPFolderName=%s|IMAPSupportsIdle=%t|"+
+		"IMAPSupportsExpunge=%t|IMAPEXISTSCount=%d|IMAPUIDNEXT=%d",
+		pi.UserId, pi.ClientContext, pi.DeviceId, pi.Platform, pi.MailServerUrl, pi.Protocol,
+		pi.ResponseTimeout, pi.WaitBeforeUse, pi.PushToken, pi.PushService, pi.MaxPollTimeout, pi.OSVersion,
+		pi.AppBuildVersion, pi.AppBuildNumber, pi.SessionId, pi.IMAPFolderName, pi.IMAPSupportsIdle,
+		pi.IMAPSupportsExpunge, pi.IMAPEXISTSCount, pi.IMAPUIDNEXT)
 }
 
 func (pi *MailPingInformation) cleanup() {
@@ -114,7 +117,7 @@ func (pi *MailPingInformation) Validate() bool {
 
 func (pi *MailPingInformation) getLogPrefix() string {
 	if pi.logPrefix == "" {
-		pi.logPrefix = fmt.Sprintf("%s|%s|%s|%s", pi.DeviceId, pi.UserId, pi.ClientContext, pi.SessionId)
+		pi.logPrefix = fmt.Sprintf("|%s|%s|%s|%s", pi.DeviceId, pi.UserId, pi.ClientContext, pi.SessionId)
 	}
 	return pi.logPrefix
 }
