@@ -46,7 +46,7 @@ type MailPingInformation struct {
 }
 
 func (pi *MailPingInformation) String() string {
-	return fmt.Sprintf("UserId:%s|ClientContext=%s|DeviceId=%s|Platform=%s|MailServerUrl=%s|"+
+	return fmt.Sprintf("UserId=%s|ClientContext=%s|DeviceId=%s|Platform=%s|MailServerUrl=%s|"+
 		"Protocol=%s|ResponseTimeout=%d|WaitBeforeUse=%d|PushToken=%s|PushServer=%s|MaxPollTimeout=%d|"+
 		"OSVersion=%s|AppBuildVersion=%s|AppBuildNumber=%s|SessionId=%s|IMAPFolderName=%s|IMAPSupportsIdle=%t|"+
 		"IMAPSupportsExpunge=%t|IMAPEXISTSCount=%d|IMAPUIDNEXT=%d",
@@ -117,7 +117,7 @@ func (pi *MailPingInformation) Validate() bool {
 
 func (pi *MailPingInformation) getLogPrefix() string {
 	if pi.logPrefix == "" {
-		pi.logPrefix = fmt.Sprintf("|%s|%s|%s|%s", pi.DeviceId, pi.UserId, pi.ClientContext, pi.SessionId)
+		pi.logPrefix = fmt.Sprintf("|device=%s|client=%s|context=%s|session=%s", pi.DeviceId, pi.UserId, pi.ClientContext, pi.SessionId)
 	}
 	return pi.logPrefix
 }

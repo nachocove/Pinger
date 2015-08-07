@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"errors"
 )
 
 // IMAP Commands
@@ -66,25 +66,24 @@ func init() {
 	prng = rand.New(&prngSource{src: rand.NewSource(time.Now().UnixNano())})
 }
 
-func (imap *IMAPClient) getLogPrefix() (prefix string) {
-	prefix = imap.pi.getLogPrefix() + "|" + string(imap.tag.id) + ":" + strconv.FormatUint(imap.tag.seq, 10) + "|IMAP"
-	return
+func (imap *IMAPClient) getLogPrefix() string {
+	return imap.pi.getLogPrefix() + "|protocol=IMAP" + "|tag=" + string(imap.tag.id) + ":" + strconv.FormatUint(imap.tag.seq, 10)
 }
 
 func (imap *IMAPClient) Debug(format string, args ...interface{}) {
-	imap.logger.Debug(fmt.Sprintf("%s|%s", imap.getLogPrefix(), format), args...)
+	imap.logger.Debug(fmt.Sprintf("%s|message=%s", imap.getLogPrefix(), format), args...)
 }
 
 func (imap *IMAPClient) Info(format string, args ...interface{}) {
-	imap.logger.Info(fmt.Sprintf("%s|%s", imap.getLogPrefix(), format), args...)
+	imap.logger.Info(fmt.Sprintf("%s|message=%s", imap.getLogPrefix(), format), args...)
 }
 
 func (imap *IMAPClient) Error(format string, args ...interface{}) {
-	imap.logger.Error(fmt.Sprintf("%s|%s", imap.getLogPrefix(), format), args...)
+	imap.logger.Error(fmt.Sprintf("%s|message=%s", imap.getLogPrefix(), format), args...)
 }
 
 func (imap *IMAPClient) Warning(format string, args ...interface{}) {
-	imap.logger.Warning(fmt.Sprintf("%s|%s", imap.getLogPrefix(), format), args...)
+	imap.logger.Warning(fmt.Sprintf("%s|message=%s", imap.getLogPrefix(), format), args...)
 }
 
 func NewIMAPClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, logger *Logging.Logger) (*IMAPClient, error) {
@@ -98,7 +97,7 @@ func NewIMAPClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, logg
 		tag:       genNewCmdTag(0),
 	}
 	imap.logger.SetCallDepth(1)
-	imap.Info("Created new IMAP Client %s", imap.getLogPrefix())
+	imap.Info("Created new IMAP Client|msgCode=IMAP_CLIENT_CREATED")
 	return &imap, nil
 }
 

@@ -47,29 +47,29 @@ func NewExchangeClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, 
 		cancelled: false,
 	}
 	ex.logger.SetCallDepth(1)
-	ex.Debug("Created new Exchange Client %s", ex.getLogPrefix())
+	ex.Debug("Created new Exchange client %s|msgCode=EAS_CLIENT_CREATED", ex.getLogPrefix())
 	return ex, nil
 }
 
 func (ex *ExchangeClient) getLogPrefix() (prefix string) {
-	prefix = ex.pi.getLogPrefix() + ":ActiveSync"
+	prefix = ex.pi.getLogPrefix() + "|protocol=EAS"
 	return
 }
 
 func (ex *ExchangeClient) Debug(format string, args ...interface{}) {
-	ex.logger.Debug(fmt.Sprintf("%s|%s", ex.getLogPrefix(), format), args...)
+	ex.logger.Debug(fmt.Sprintf("%s|message=%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) Info(format string, args ...interface{}) {
-	ex.logger.Info(fmt.Sprintf("%s|%s", ex.getLogPrefix(), format), args...)
+	ex.logger.Info(fmt.Sprintf("%s|message=%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) Error(format string, args ...interface{}) {
-	ex.logger.Error(fmt.Sprintf("%s|%s", ex.getLogPrefix(), format), args...)
+	ex.logger.Error(fmt.Sprintf("%s|message=%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) Warning(format string, args ...interface{}) {
-	ex.logger.Warning(fmt.Sprintf("%s|%s", ex.getLogPrefix(), format), args...)
+	ex.logger.Warning(fmt.Sprintf("%s|message=%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) maxResponseSize() (size int) {
@@ -173,7 +173,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	ex.Info("Done with the server")
 	ex.request = nil // unsave it. We're done with it.
 	if ex.cancelled == true {
-		ex.Debug("Exchange Request cancelled. Exiting.")
+		ex.Debug("Exchange Request cancelled. Exiting|msgCode=EAS_REQ_CANCELLED")
 		return
 	}
 	if err != nil {
@@ -383,7 +383,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 				switch {
 				case response.StatusCode == 401:
 					// ask the client to re-register, since nothing we could do would fix this
-					ex.Warning("401 response. Telling client to re-register")
+					ex.Warning("401 response. Telling client to re-register|msgCode=EAS_AUTH_ERR_REREGISTER")
 					errCh <- LongPollReRegister
 					return
 
@@ -408,7 +408,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 				if ex.pi.ExpectedReply != nil {
 					ex.Info("Reply matched ExpectedReply")
 				}
-				ex.Debug("Got mail. Setting LongPollNewMail")
+				ex.Debug("Got mail. Setting LongPollNewMail|msgCode=EAS_NEW_EMAIL")
 				errCh <- LongPollNewMail
 				return
 

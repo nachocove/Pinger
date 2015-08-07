@@ -8,14 +8,12 @@ import (
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
-	"github.com/nachocove/Pinger/Utils/HostId"
 	"github.com/op/go-logging"
 	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
 	"path"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -43,7 +41,6 @@ type TelemetryWriter struct {
 	doUploadNow             chan int             // a channel to make the background 'task' write immediately (used when an error is encountered, for example).
 	aws                     AWS.AWSHandler       // the AWS methods
 	logger                  *log.Logger          // the logger
-	hostId                  string               // this pinger's host ID
 	includeDebug            bool                 // whether to also upload debugs. Used for debugging.
 	debug                   bool                 // whether to debug the telemetry writer (to debug we use printfs, so there's no logging loop)
 	msgCount                int64                // the message count. Keeps track of how many messages we have buffered. We upload every 100.
@@ -61,7 +58,6 @@ func NewTelemetryWriter(config *TelemetryConfiguration, aws AWS.AWSHandler, debu
 		doUploadNow:        make(chan int, 5),
 		aws:                aws,
 		logger:             log.New(os.Stderr, "telemetryWriter", log.LstdFlags|log.Lshortfile),
-		hostId:             HostId.HostId(),
 		includeDebug:       config.IncludeDebug,
 		debug:              debug,
 		mutex:              sync.Mutex{},
@@ -87,47 +83,6 @@ func NewTelemetryWriter(config *TelemetryConfiguration, aws AWS.AWSHandler, debu
 	return &writer, nil
 }
 
-var deviceClientContextRegexp *regexp.Regexp
-var deviceClientContextProtocolRegexp *regexp.Regexp
-var userIdRegex *regexp.Regexp
-var deviceIdIdRegex *regexp.Regexp
-
-func init() {
-	commonRegex := "^(?P<device>Ncho[A-Z0-9a-z]+)|(?P<user>us-[a-z]+-[0-9]+:[a-z\\-0-9]+)|(?P<context>[a-z0-9A-Z]+)|(?P<session>[a-z0-9A-Z]+)"
-	deviceClientContextRegexp = regexp.MustCompile(fmt.Sprintf("%s: (?P<message>.*)$", commonRegex))
-	deviceClientContextProtocolRegexp = regexp.MustCompile(fmt.Sprintf("%s|(?P<protocol>[a-zA-z0-9]+)|(?P<message>.*)$", commonRegex))
-
-	userIdRegex = regexp.MustCompile("^.*(?P<user>us-[a-z]+-[0-9]+:[a-z\\-0-9]+).*$")
-	deviceIdIdRegex = regexp.MustCompile("^.*(?P<device>Ncho[0-9A-Z]{24}).*$")
-}
-
-func newTelemetryMsgFromRecord(eventType telemetryLogEventType, rec *logging.Record, hostId string) telemetryLogMsg {
-	message := rec.Message()
-	var user, deviceId, sessionId, context string
-	switch {
-	case deviceClientContextRegexp.MatchString(message):
-		user = deviceClientContextRegexp.ReplaceAllString(message, "${user}")
-		deviceId = deviceClientContextRegexp.ReplaceAllString(message, "${device}")
-		sessionId = deviceClientContextRegexp.ReplaceAllString(message, "${session}")
-		context = deviceClientContextRegexp.ReplaceAllString(message, "${context}")
-		message = deviceClientContextRegexp.ReplaceAllString(message, "${message} (context ${context}, device ${device}, session ${session})")
-
-	case deviceClientContextProtocolRegexp.MatchString(message):
-		user = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${user}")
-		deviceId = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${device}")
-		sessionId = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${session}")
-		context = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${context}")
-		message = deviceClientContextProtocolRegexp.ReplaceAllString(message, "${message} (protocol ${protocol}, context ${context}, device ${device}, session ${session})")
-	}
-	if user == "" && userIdRegex.MatchString(message) {
-		user = userIdRegex.ReplaceAllString(message, "${user}")
-	}
-	if deviceId == "" && userIdRegex.MatchString(message) {
-		deviceId = deviceIdIdRegex.ReplaceAllString(message, "${device}")
-	}
-	return NewTelemetryMsg(eventType, rec.Module, user, deviceId, sessionId, context, message, hostId, rec.Time.Round(time.Millisecond).UTC())
-}
-
 // Log Implements the logging Interface so this can be used as a logger backend.
 func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logging.Record) error {
 	var eventType telemetryLogEventType
@@ -148,7 +103,7 @@ func (writer *TelemetryWriter) Log(level logging.Level, calldepth int, rec *logg
 		eventType = telemetryLogEventWarning
 	}
 	if writer.includeDebug || eventType == telemetryLogEventWarning || eventType == telemetryLogEventError || eventType == telemetryLogEventInfo {
-		msg := newTelemetryMsgFromRecord(eventType, rec, writer.hostId)
+		msg := NewTelemetryMsg(eventType, rec.Module, rec.Message(), rec.Time.Round(time.Millisecond).UTC())
 		writer.telemetryCh <- msg
 	}
 	return nil

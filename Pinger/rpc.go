@@ -256,7 +256,7 @@ func (sp *StopPollArgs) pollMapKey() string {
 
 func (sp *StopPollArgs) getLogPrefix() string {
 	if sp.logPrefix == "" {
-		sp.logPrefix = fmt.Sprintf("|%s|%s|%s", sp.DeviceId, sp.UserId, sp.ClientContext)
+		sp.logPrefix = fmt.Sprintf("|device=%s|client=%s|context=%s|message=", sp.DeviceId, sp.UserId, sp.ClientContext)
 	}
 	return sp.logPrefix
 }
@@ -277,7 +277,7 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 			logger.Error("Recovering from crash:err=%s", err.Error())
 		}
 	}()
-	logger.Info("%s|Received stop request|msgCode=RPC_STOP_POLL", args.getLogPrefix())
+	logger.Info("%sReceived stop request|msgCode=RPC_STOP_POLL", args.getLogPrefix())
 	pollMapKey := args.pollMapKey()
 	t.LockMap()
 	defer t.UnlockMap()
@@ -285,12 +285,12 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 	if ok {
 		delete((*pollMap), pollMapKey)
 		if client == nil {
-			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
+			return fmt.Errorf("%sCould not find poll item in map", args.getLogPrefix())
 		}
 		go client.stop()
 		reply.Message = "Stopped"
 	} else {
-		logger.Warning("%s|No active sessions found|key=%s", args.getLogPrefix(), pollMapKey)
+		logger.Warning("%sNo active sessions found|key=%s", args.getLogPrefix(), pollMapKey)
 		reply.Code = PollingReplyError
 		reply.Message = "No active sessions found"
 		return
@@ -315,7 +315,7 @@ func (dp *DeferPollArgs) pollMapKey() string {
 
 func (dp *DeferPollArgs) getLogPrefix() string {
 	if dp.logPrefix == "" {
-		dp.logPrefix = fmt.Sprintf("|%s|%s|%s", dp.DeviceId, dp.UserId, dp.ClientContext)
+		dp.logPrefix = fmt.Sprintf("|device=%s|client=%s|context=%s|message=", dp.DeviceId, dp.UserId, dp.ClientContext)
 	}
 	return dp.logPrefix
 }
@@ -330,14 +330,14 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			logger.Error("%s", err.Error())
 		}
 	}()
-	logger.Info("%s|Received defer request|msgCode=RPC_DEFER_POLL", args.getLogPrefix())
+	logger.Info("%sReceived defer request|msgCode=RPC_DEFER_POLL", args.getLogPrefix())
 	reply.Code = PollingReplyOK
 	reply.Message = ""
 	pollMapKey := args.pollMapKey()
 	client, ok := (*pollMap)[pollMapKey]
 	if ok {
 		if client == nil {
-			return fmt.Errorf("%s: Could not find poll item in map", args.getLogPrefix())
+			return fmt.Errorf("%sCould not find poll item in map", args.getLogPrefix())
 		}
 		status, err := client.Status()
 		if err != nil {
@@ -375,7 +375,7 @@ type FindSessionsResponse struct {
 
 func (fs *FindSessionsArgs) getLogPrefix() string {
 	if fs.logPrefix == "" {
-		fs.logPrefix = fmt.Sprintf("|%s|%s|%s", fs.DeviceId, fs.UserId, fs.ClientContext)
+		fs.logPrefix = fmt.Sprintf("|device=%s|client=%s|context=%s|message=", fs.DeviceId, fs.UserId, fs.ClientContext)
 	}
 	return fs.logPrefix
 }
@@ -387,10 +387,10 @@ func RPCFindActiveSessions(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMa
 			err = e
 		}
 	}()
-	logger.Debug("|Received findActiveSessions request with options %s", args.getLogPrefix())
+	logger.Debug("Received findActiveSessions request with options %s", args.getLogPrefix())
 	for key, poll := range *pollMap {
 		if args.MaxSessions > 0 && len(reply.SessionInfos) >= args.MaxSessions {
-			logger.Debug("|Max sessions read (%d). Stopping search.", len(reply.SessionInfos))
+			logger.Debug("Max sessions read (%d). Stopping search.", len(reply.SessionInfos))
 			break
 		}
 		session, err := poll.getSessionInfo()

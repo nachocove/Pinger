@@ -54,7 +54,7 @@ type MailClientContext struct {
 
 func (client *MailClientContext) getLogPrefix() string {
 	if client.logPrefix == "" {
-		client.logPrefix = fmt.Sprintf("|%s|%s|%s|%s", client.DeviceId, client.UserId, client.ClientContext, client.sessionId)
+		client.logPrefix = fmt.Sprintf("|device=%s|client=%s|context=%s|session=%s", client.DeviceId, client.UserId, client.ClientContext, client.sessionId)
 	}
 	return client.logPrefix
 }
@@ -189,19 +189,19 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 }
 
 func (client *MailClientContext) Debug(format string, args ...interface{}) {
-	client.logger.Debug(fmt.Sprintf("%s|%s", client.getLogPrefix(), format), args...)
+	client.logger.Debug(fmt.Sprintf("%s|message=%s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Info(format string, args ...interface{}) {
-	client.logger.Info(fmt.Sprintf("%s|%s", client.getLogPrefix(), format), args...)
+	client.logger.Info(fmt.Sprintf("%s|message=%s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Error(format string, args ...interface{}) {
-	client.logger.Error(fmt.Sprintf("%s|%s", client.getLogPrefix(), format), args...)
+	client.logger.Error(fmt.Sprintf("%s|message=%s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Warning(format string, args ...interface{}) {
-	client.logger.Warning(fmt.Sprintf("%s|%s", client.getLogPrefix(), format), args...)
+	client.logger.Warning(fmt.Sprintf("%s|message=%s", client.getLogPrefix(), format), args...)
 }
 
 func (client *MailClientContext) Status() (MailClientStatus, error) {
