@@ -51,14 +51,14 @@ func (msg *telemetryLogMsg) toMap() telemetryLogMsgMap {
 	tokens := strings.Split(msg.Message, "|")
 	var rawMessage string
 	for _, token := range tokens {
-		pair := strings.Split(token, "=")
+		pair := strings.SplitN(token, "=", 2)
 		if len(pair) == 1 {
 			if rawMessage == "" {
 				rawMessage = pair[0]
 			} else {
 				rawMessage += "," + pair[0]
 			}
-		} else if len(pair) == 2 {
+		} else{
 			msgMap[pair[0]] = pair[1]
 		}
 	}
