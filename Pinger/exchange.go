@@ -170,7 +170,6 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	// TODO Can we guard against bogus SSL negotiation from a hacked server?
 	// TODO Perhaps we need to read and assess the Go SSL/TLS implementation
 	response, err := ex.httpClient.Do(ex.request)
-	ex.Info("Done with the server")
 	ex.request = nil // unsave it. We're done with it.
 	if ex.cancelled == true {
 		ex.Debug("Exchange Request cancelled. Exiting|msgCode=EAS_REQ_CANCELLED")
