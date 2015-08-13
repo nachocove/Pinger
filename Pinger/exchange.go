@@ -47,7 +47,7 @@ func NewExchangeClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, 
 		cancelled: false,
 	}
 	ex.logger.SetCallDepth(1)
-	ex.Debug("Created new Exchange client %s|msgCode=EAS_CLIENT_CREATED", ex.getLogPrefix())
+	ex.Info("Created new Exchange client %s|msgCode=EAS_CLIENT_CREATED", ex.getLogPrefix())
 	return ex, nil
 }
 
@@ -164,7 +164,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	ex.mutex.Unlock()
 	unlockMutex = false
 
-	ex.Info("Making Connection to server")
+	ex.Debug("Making Connection to server")
 	// Make the request and wait for response; this could take a while
 	// TODO Can we and how do we validate the server certificate?
 	// TODO Can we guard against bogus SSL negotiation from a hacked server?
@@ -240,9 +240,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 			ex.Debug("response:\n%s%s", headerBytes, responseBytes)
 		}
 	}
-	ex.Debug("sending response back")
 	responseCh <- response
-	ex.Debug("sent response back")
 }
 
 func (ex *ExchangeClient) exponentialBackoff(sleepTime int) int {
@@ -284,13 +282,13 @@ func (ex *ExchangeClient) cancel() {
 //    the dummy errors, we'd need a resultsChannel or some kind.
 //
 func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan error) {
-	ex.Debug("Starting LongPoll")
+	ex.Info("Starting LongPoll|msgCode=POLLING")
 	defer Utils.RecoverCrash(ex.logger) // catch all panic. RecoverCrash logs information needed for debugging.
 	ex.wg.Add(1)
 	defer ex.wg.Done()
 
 	defer func() {
-		ex.Debug("Stopping LongPoll...")
+		ex.Info("Stopping LongPoll...")
 		ex.cancel()
 	}()
 
@@ -351,9 +349,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 		timeSent := time.Now()
 		ex.wg.Add(1)
 		ex.cancelled = false
-		ex.Debug("go do doRequestResponse")
 		go ex.doRequestResponse(responseCh, responseErrCh)
-		ex.Debug("go done doRequestResponse")
 		select {
 		case err = <-responseErrCh:
 			ex.sendError(errCh, err)
@@ -405,7 +401,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 			case ex.pi.ExpectedReply == nil || bytes.Compare(responseBody, ex.pi.ExpectedReply) == 0:
 				// there's new mail!
 				if ex.pi.ExpectedReply != nil {
-					ex.Info("Reply matched ExpectedReply")
+					ex.Debug("Reply matched ExpectedReply")
 				}
 				ex.Debug("Got mail. Setting LongPollNewMail|msgCode=EAS_NEW_EMAIL")
 				errCh <- LongPollNewMail

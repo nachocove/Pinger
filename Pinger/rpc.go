@@ -165,7 +165,7 @@ func RPCStartPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			logger.Error("%s", err.Error())
 		}
 	}()
-	logger.Info("%s|Received poll request|msgCode=RPC_START_POLL", args.getLogPrefix())
+	logger.Info("%s|Received poll request|msgCode=RPC_REGISTER", args.getLogPrefix())
 	pollMapKey := args.pollMapKey()
 	reply.Code = PollingReplyOK
 	var client MailClientContextType
@@ -226,12 +226,11 @@ func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey st
 	logger.Info("%s|Creating new pinger session", mi.getLogPrefix())
 	client, err := t.newMailClientContext(mi, false)
 	if err != nil {
-		logger.Error("%s|Could not create new pinger session|err=%s", pollMapKey, err)
+		logger.Error("%s|pollMapKey=%s|msgCode=PINGER_CREATE_FAIL", err, pollMapKey)
 		return
 	}
 	t.LockMap()
 	defer func() {
-		logger.Debug("%s|Done creating session", mi.getLogPrefix())
 		t.UnlockMap()
 	}()
 	if _, ok := (*pollMap)[pollMapKey]; ok == true {
@@ -277,7 +276,7 @@ func RPCStopPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *S
 			logger.Error("Recovering from crash:err=%s", err.Error())
 		}
 	}()
-	logger.Info("%sReceived stop request|msgCode=RPC_STOP_POLL", args.getLogPrefix())
+	logger.Info("%sReceived stop request|msgCode=RPC_STOP", args.getLogPrefix())
 	pollMapKey := args.pollMapKey()
 	t.LockMap()
 	defer t.UnlockMap()
@@ -330,7 +329,7 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			logger.Error("%s", err.Error())
 		}
 	}()
-	logger.Info("%sReceived defer request|msgCode=RPC_DEFER_POLL", args.getLogPrefix())
+	logger.Info("%sReceived defer request|msgCode=RPC_DEFER", args.getLogPrefix())
 	reply.Code = PollingReplyOK
 	reply.Message = ""
 	pollMapKey := args.pollMapKey()
@@ -434,7 +433,7 @@ func RPCAliveCheck(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args 
 			err = e
 		}
 	}()
-	logger.Debug("Received aliveCheck request||msgCode=RPC_ALIVE_CHECK")
+	logger.Info("Received aliveCheck request||msgCode=RPC_ALIVE_CHECK")
 	if globals.config.PingerUpdater > 0 {
 		logger.Warning("Running both auto-updater and a remote Alive Check")
 	}

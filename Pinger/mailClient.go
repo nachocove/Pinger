@@ -179,10 +179,10 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 	}
 
 	if mailclient == nil {
-		return nil, fmt.Errorf("%s|Could not create new mail client pinger|msgCode=PINGER_CREATE_FAIL", pi.getLogPrefix())
+		return nil, fmt.Errorf("%s|Could not create new mail client pinger", pi.getLogPrefix())
 	}
 	client.updateLastContact()
-	client.Debug("Creating pinger|%s|msgCode=PINGER_CREATED", pi.String())
+	client.Info("Created new Pinger|%s|msgCode=PINGER_CREATED", pi.String())
 	client.mailClient = mailclient
 	go client.start()
 	return client, nil
@@ -276,7 +276,7 @@ func (client *MailClientContext) initFsm() {
 
 func (client *MailClientContext) leaveInit(e *fsm.Event) {
 	client.maxPollTime = time.Duration(client.MaxPollTimeout) * time.Millisecond
-	client.Debug("Setting max poll timer|maxPollTimer=%s|msgCode=PINGER_INIT", client.maxPollTime)
+	client.Debug("Setting max poll timer|maxPollTimer=%s", client.maxPollTime)
 	client.maxPollTimer = time.NewTimer(client.maxPollTime)
 	client.deferTimer = time.NewTimer(time.Duration(client.WaitBeforeUse) * time.Millisecond)
 }
@@ -285,7 +285,7 @@ func (client *MailClientContext) enterDeferred(e *fsm.Event) {
 	status := e.Args[0].(MailClientStatus)
 	client.deferTimer.Stop()
 	deferTime := time.Duration(client.WaitBeforeUse) * time.Millisecond
-	client.Debug("Enter defer|deferTimer=%s|msgCode=PINGER_DEFER", deferTime)
+	client.Debug("Enter defer|deferTimer=%s", deferTime)
 	client.deferTimer.Reset(deferTime)
 	client.setStatus(status, nil)
 }
@@ -299,7 +299,7 @@ func (client *MailClientContext) enterPinging(e *fsm.Event) {
 	client.stopPollCh = make(chan int)
 	errCh := e.Args[0].(chan error)
 	client.setStatus(MailClientStatusPinging, nil)
-	client.Info("Enter pinging|pollstate=%s|msgCode=PINGER_START_POLL", client.status)
+	client.Debug("Enter pinging|pollstate=%s", client.status)
 	go client.mailClient.LongPoll(client.stopPollCh, client.stopAllCh, errCh)
 }
 
@@ -309,7 +309,7 @@ func (client *MailClientContext) exitPinging(e *fsm.Event) {
 }
 
 func (client *MailClientContext) enterStopped(e *fsm.Event) {
-	client.Info("Enter stopped|pollstate=%s|msgCode=PINGER_STOP_POLL", client.status)
+	client.Debug("Enter stopped|pollstate=%s", client.status)
 	msg := e.Args[0].(string)
 	status := e.Args[1].(MailClientStatus)
 	err, ok := e.Args[2].(error)
@@ -341,7 +341,7 @@ func (client *MailClientContext) start() {
 	if client.stats != nil {
 		go client.stats.TallyResponseTimes()
 	}
-	client.Info("Starting polls|msgCode=PINGER_STARTED")
+	client.Info("Starting state machine...|msgCode=START_SM")
 
 	errCh := make(chan error)
 	rearmingCount := 0
@@ -385,7 +385,7 @@ func (client *MailClientContext) start() {
 		case err := <-errCh:
 			switch {
 			case err == LongPollNewMail:
-				client.Info("New mail detected, checking notification status|timeSince=%s|rearmingCount=%d|msgCode=PINGER_NEW_MAIL", time.Since(timeSent), rearmingCount)
+				client.Info("New mail detected, checking notification status|timeSince=%s|rearmingCount=%d|msgCode=NEW_MAIL", time.Since(timeSent), rearmingCount)
 				pushSent := false
 				if time.Since(timeSent) > tooFastResponse || rearmingCount == 0 {
 					client.Info("Sending push message for new mail")
@@ -406,9 +406,9 @@ func (client *MailClientContext) start() {
 						}
 					}
 					pushSent = true
-					client.Debug("Newmail notification sent|msgCode=PINGER_NOTIF_SENT")
+					client.Info("Newmail notification sent|msgCode=PUSH_SENT")
 				} else {
-					client.Debug("Newmail notification not sent|msgCode=PINGER_NOTIF_NOT_SENT")
+					client.Info("Newmail notification not sent|msgCode=PUSH_NOT_SENT")
 				}
 				var msg string
 				if pushSent {
@@ -416,6 +416,8 @@ func (client *MailClientContext) start() {
 				} else {
 					msg = "Stopping - no push notification sent"
 				}
+				client.Info("Stopping Poll|msgCode=STOP_POLL")
+
 				err = client.fsm.Event(FSMStopped, msg, MailClientStatusStopped, nil)
 				if err != nil {
 					panic(err)
@@ -423,7 +425,7 @@ func (client *MailClientContext) start() {
 				if rearmingCount < 3 {
 					rearmingCount++
 					client.WaitBeforeUse = int64(rearmTimeout) / int64(time.Millisecond)
-					client.Info("Rearming poll|rearmingCount=%d|rearmTimeout=%s|msgCode=PINGER_REARMED", rearmingCount, rearmTimeout)
+					client.Info("Rearming poll|rearmingCount=%d|rearmTimeout=%s|msgCode=REARMED", rearmingCount, rearmTimeout)
 					err = client.fsm.Event(FSMDeferred, MailClientStatusReDeferred)
 					if err != nil {
 						panic(err)
@@ -508,7 +510,7 @@ func (client *MailClientContext) stop() {
 		client.Warning("Poll is already stopped")
 		return
 	}
-	client.Debug("Stopping poll|msgCode=PINGER_STOP")
+	client.Info("Stopping poll")
 	err := client.updateLastContact()
 	if err != nil {
 		client.Error("Could not update last contact|err=%s", err.Error())
@@ -525,7 +527,7 @@ func (client *MailClientContext) deferPoll(timeout int64) {
 		client.Warning("Poll is stopped, cannot defer it")
 		return
 	}
-	client.Debug("Deferring polls|msgCode=PINGER_DEFER")
+	client.Info("Processing defer poll request")
 	err := client.updateLastContact()
 	if err != nil {
 		client.Error("Could not update last contact|err=%s", err.Error())

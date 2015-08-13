@@ -102,4 +102,3 @@ func (s *writerTester) TestFileCreation() {
 	err = writer.createFilesFromMessages(&messages)
 	s.NoError(err)
 }
-

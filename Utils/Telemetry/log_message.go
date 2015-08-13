@@ -58,7 +58,7 @@ func (msg *telemetryLogMsg) toMap() telemetryLogMsgMap {
 			} else {
 				rawMessage += "," + pair[0]
 			}
-		} else{
+		} else {
 			msgMap[pair[0]] = pair[1]
 		}
 	}
