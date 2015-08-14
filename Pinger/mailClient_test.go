@@ -108,7 +108,8 @@ func (s *mailClientTester) TestMailClient() {
 	client, err = NewMailClientContext(s.dbmap, s.aws, pi, debug, doStats, s.logger)
 	s.Nil(client)
 	s.Error(err)
-	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testUserId, s.testClientContext, s.sessionId, ""), err.Error())
+
+	s.Equal(fmt.Sprintf("|device=%s|client=%s|context=%s|session=%s|Unsupported mail protocol|protocol=%s", s.testDeviceId, s.testUserId, s.testClientContext, s.sessionId, ""), err.Error())
 
 	pi = &MailPingInformation{
 		UserId:        s.testUserId,
@@ -124,7 +125,7 @@ func (s *mailClientTester) TestMailClient() {
 	s.Nil(client)
 	s.Error(err)
 
-	s.Equal(fmt.Sprintf("%s:%s:%s:%s: Unsupported Mail Protocol %s", s.testDeviceId, s.testUserId, s.testClientContext, s.sessionId, "Foo"), err.Error())
+	s.Equal(fmt.Sprintf("|device=%s|client=%s|context=%s|session=%s|Unsupported mail protocol|protocol=%s", s.testDeviceId, s.testUserId, s.testClientContext, s.sessionId, "Foo"), err.Error())
 	pi = &MailPingInformation{
 		UserId:        s.testUserId,
 		ClientContext: s.testClientContext,

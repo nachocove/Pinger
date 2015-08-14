@@ -47,29 +47,29 @@ func NewExchangeClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, 
 		cancelled: false,
 	}
 	ex.logger.SetCallDepth(1)
-	ex.Debug("Created new Exchange Client %s", ex.getLogPrefix())
+	ex.Info("Created new Exchange client %s|msgCode=EAS_CLIENT_CREATED", ex.getLogPrefix())
 	return ex, nil
 }
 
 func (ex *ExchangeClient) getLogPrefix() (prefix string) {
-	prefix = ex.pi.getLogPrefix() + "/ActiveSync"
+	prefix = ex.pi.getLogPrefix() + "|protocol=EAS"
 	return
 }
 
 func (ex *ExchangeClient) Debug(format string, args ...interface{}) {
-	ex.logger.Debug(fmt.Sprintf("%s: %s", ex.getLogPrefix(), format), args...)
+	ex.logger.Debug(fmt.Sprintf("%s|message=%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) Info(format string, args ...interface{}) {
-	ex.logger.Info(fmt.Sprintf("%s: %s", ex.getLogPrefix(), format), args...)
+	ex.logger.Info(fmt.Sprintf("%s|message=%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) Error(format string, args ...interface{}) {
-	ex.logger.Error(fmt.Sprintf("%s: %s", ex.getLogPrefix(), format), args...)
+	ex.logger.Error(fmt.Sprintf("%s|message=%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) Warning(format string, args ...interface{}) {
-	ex.logger.Warning(fmt.Sprintf("%s: %s", ex.getLogPrefix(), format), args...)
+	ex.logger.Warning(fmt.Sprintf("%s|message=%s", ex.getLogPrefix(), format), args...)
 }
 
 func (ex *ExchangeClient) maxResponseSize() (size int) {
@@ -96,6 +96,7 @@ func redactEmailFromError(message string) string {
 
 // doRequestResponse is used as a go-routine to do the actual send/receive (blocking) of the exchange messages.
 func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errCh chan error) {
+	ex.Debug("Starting doRequestResponse")
 	defer Utils.RecoverCrash(ex.logger)
 	ex.mutex.Lock() // prevents the longpoll from cancelling the request while we're still setting it up.
 	unlockMutex := true
@@ -163,7 +164,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	ex.mutex.Unlock()
 	unlockMutex = false
 
-	ex.Info("Making Connection to server")
+	ex.Debug("Making Connection to server")
 	// Make the request and wait for response; this could take a while
 	// TODO Can we and how do we validate the server certificate?
 	// TODO Can we guard against bogus SSL negotiation from a hacked server?
@@ -171,7 +172,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	response, err := ex.httpClient.Do(ex.request)
 	ex.request = nil // unsave it. We're done with it.
 	if ex.cancelled == true {
-		ex.Debug("request cancelled. Exiting.")
+		ex.Debug("Exchange Request cancelled. Exiting|msgCode=EAS_REQ_CANCELLED")
 		return
 	}
 	if err != nil {
@@ -281,12 +282,15 @@ func (ex *ExchangeClient) cancel() {
 //    the dummy errors, we'd need a resultsChannel or some kind.
 //
 func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan error) {
+	ex.Info("Starting LongPoll|msgCode=POLLING")
 	defer Utils.RecoverCrash(ex.logger) // catch all panic. RecoverCrash logs information needed for debugging.
-
 	ex.wg.Add(1)
 	defer ex.wg.Done()
 
-	defer ex.cancel()
+	defer func() {
+		ex.Info("Stopping LongPoll...")
+		ex.cancel()
+	}()
 
 	var err error
 	reqTimeout := ex.pi.ResponseTimeout
@@ -346,7 +350,6 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 		ex.wg.Add(1)
 		ex.cancelled = false
 		go ex.doRequestResponse(responseCh, responseErrCh)
-		ex.Debug("Waiting for response")
 		select {
 		case err = <-responseErrCh:
 			ex.sendError(errCh, err)
@@ -375,7 +378,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 				switch {
 				case response.StatusCode == 401:
 					// ask the client to re-register, since nothing we could do would fix this
-					ex.Warning("401 response. Telling client to re-register")
+					ex.Warning("401 response. Telling client to re-register|msgCode=EAS_AUTH_ERR_REREGISTER")
 					errCh <- LongPollReRegister
 					return
 
@@ -398,9 +401,9 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 			case ex.pi.ExpectedReply == nil || bytes.Compare(responseBody, ex.pi.ExpectedReply) == 0:
 				// there's new mail!
 				if ex.pi.ExpectedReply != nil {
-					ex.Info("Reply matched ExpectedReply")
+					ex.Debug("Reply matched ExpectedReply")
 				}
-				ex.Debug("Got mail. Setting LongPollNewMail")
+				ex.Debug("Got mail. Setting LongPollNewMail|msgCode=EAS_NEW_EMAIL")
 				errCh <- LongPollNewMail
 				return
 
@@ -422,6 +425,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 
 // SelfDelete Used to zero out the structure and let garbage collection reap the empty stuff.
 func (ex *ExchangeClient) Cleanup() {
+	ex.Debug("Cleaning up")
 	ex.pi.cleanup()
 	ex.pi = nil
 	if ex.transport != nil {

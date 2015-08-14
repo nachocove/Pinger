@@ -15,14 +15,88 @@
         "users": {
             "pinger": {
                 "inline_policies" : [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "Stmt1426990618000",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:PutObject"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:s3:::nachotele3/beta/*",
+                                        "arn:aws:s3:::e01c178d-d558-4b54-b11f-897af5700283-beta-pinger/*"
+                                    ]
+                                },
+                                {
+                                    "Sid": "Stmt1426990755000",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "cognito-identity:DescribeIdentity",
+                                        "cognito-identity:ListIdentities"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:cognito-identity:us-east-1:610813048224:identitypool/"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
                 ]
             },
             "pinger_boot": {
                 "inline_policies" : [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:Get*",
+                                        "s3:List*"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:s3:::nachobetaconf/betapinger/*"
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:ListBucket"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:s3:::nachobetaconf"
+                                    ],
+                                    "Condition":{
+                                        "StringLike":{"s3:prefix":["betapinger/*"]}
+                                    }
+                                }
+                            ]
+                        }
+                    }
                 ]
             },
             "pinger_cloudwatch": {
                 "inline_policies" : [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:*"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:logs:*:*:*"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
                 ]
             }
         }
