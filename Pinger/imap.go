@@ -389,7 +389,7 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 
 func (imap *IMAPClient) isFinalResponse(command string, response string) bool {
 	tokens := strings.Split(command, " ")
-	if len(response) >= 1 && response == "+ " {
+	if len(response) >= 2 && response[0:2] == "+ " {
 		return true
 	} else if len(tokens) > 0 {
 		token := tokens[0]
@@ -503,8 +503,12 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 	var err error
 	if imap == nil || imap.pi == nil {
 		if imap.logger != nil {
-			imap.Warning("doRequestResponse called but structures cleaned up")
+			imap.Info("doRequestResponse called but structures cleaned up")
 		}
+		return
+	}
+	if imap.tlsConn == nil {
+		imap.Info("doRequestResponse called but tls connection has been cleaned up")
 		return
 	}
 	imap.mutex.Unlock()
@@ -609,7 +613,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			}
 			authSuccess, err := imap.doImapAuth()
 			if err != nil {
-				imap.Error("Authentication error: %v", err)
+				imap.Warning("Authentication error: %v", err)
 				return
 			}
 			if !authSuccess {
@@ -621,7 +625,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			imap.Debug("Supporting idle")
 			err := imap.doExamine()
 			if err != nil {
-				imap.Error("Examine failure: %v", err)
+				imap.Warning("Examine failure: %v", err)
 				return
 			}
 		}
@@ -679,8 +683,8 @@ func (imap *IMAPClient) cancelIDLE() {
 func (imap *IMAPClient) cancel() {
 	imap.mutex.Lock()
 	imap.cancelled = true
-	imap.cancelIDLE()
 	if imap.tlsConn != nil {
+		imap.cancelIDLE()
 		imap.tlsConn.Close()
 		imap.tlsConn = nil
 	}
