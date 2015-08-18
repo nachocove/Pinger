@@ -503,12 +503,12 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 	var err error
 	if imap == nil || imap.pi == nil {
 		if imap.logger != nil {
-			imap.Warning("doRequestResponse called but structures cleaned up")
+			imap.Info("doRequestResponse called but structures cleaned up")
 		}
 		return
 	}
 	if imap.tlsConn == nil {
-		imap.Warning("doRequestResponse called but tls connection has been cleaned up")
+		imap.Info("doRequestResponse called but tls connection has been cleaned up")
 		return
 	}
 	imap.mutex.Unlock()
