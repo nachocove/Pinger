@@ -389,7 +389,7 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 
 func (imap *IMAPClient) isFinalResponse(command string, response string) bool {
 	tokens := strings.Split(command, " ")
-	if len(response) >= 2 && response[0:2] == "+ " {
+	if len(response) >= 2 && response[0:2] == "+ " && imap.getNameFromCommand(command) != "IDLE" {
 		return true
 	} else if len(tokens) > 0 {
 		token := tokens[0]
