@@ -507,6 +507,10 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 		}
 		return
 	}
+	if imap.tlsConn == nil {
+		imap.Warning("doRequestResponse called but tls connection has been cleaned up")
+		return
+	}
 	imap.mutex.Unlock()
 	unlockMutex = false
 	imap.Debug("Executing IMAP Command|timeout=%d", int64(replyTimeout/time.Millisecond))
@@ -609,7 +613,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			}
 			authSuccess, err := imap.doImapAuth()
 			if err != nil {
-				imap.Error("Authentication error: %v", err)
+				imap.Warning("Authentication error: %v", err)
 				return
 			}
 			if !authSuccess {
@@ -621,7 +625,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			imap.Debug("Supporting idle")
 			err := imap.doExamine()
 			if err != nil {
-				imap.Error("Examine failure: %v", err)
+				imap.Warning("Examine failure: %v", err)
 				return
 			}
 		}
@@ -679,8 +683,8 @@ func (imap *IMAPClient) cancelIDLE() {
 func (imap *IMAPClient) cancel() {
 	imap.mutex.Lock()
 	imap.cancelled = true
-	imap.cancelIDLE()
 	if imap.tlsConn != nil {
+		imap.cancelIDLE()
 		imap.tlsConn.Close()
 		imap.tlsConn = nil
 	}

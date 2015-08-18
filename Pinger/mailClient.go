@@ -436,7 +436,7 @@ func (client *MailClientContext) start() {
 				}
 
 			case err == LongPollReRegister:
-				client.Info("LogPollReRegister message received. Sending ReRegister push message")
+				client.Info("LongPollReRegister message received. Sending ReRegister push message")
 				err1 := client.di.PushRegister()
 				if err1 != nil {
 					// don't bother with this error. The real/main error is the http status. Just log it.
