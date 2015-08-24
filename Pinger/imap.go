@@ -168,7 +168,7 @@ func (imap *IMAPClient) setupScanner() {
 }
 
 func (imap *IMAPClient) isContinueResponse(response string) bool {
-	if response == "+" {
+	if len(response) > 0 && response[0] == '+' {
 		return true
 	} else {
 		return false
@@ -177,7 +177,7 @@ func (imap *IMAPClient) isContinueResponse(response string) bool {
 
 func (imap *IMAPClient) isOKResponse(response string) bool {
 	tokens := strings.Split(response, " ")
-	if len(tokens) >= 2 || tokens[1] == "OK" {
+	if len(tokens) >= 2 && tokens[1] == "OK" {
 		return true
 	} else {
 		return false
@@ -207,10 +207,21 @@ func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
 		imap.Error("Error decoding AuthBlob")
 		return false, err
 	}
-	_, err = imap.doIMAPCommand(fmt.Sprintf("%s %s", imap.tag.Next(), decodedBlob), int64(replyTimeout/time.Millisecond))
+	responses, err := imap.doIMAPCommand(fmt.Sprintf("%s %s", imap.tag.Next(), decodedBlob), int64(replyTimeout/time.Millisecond))
 	if err != nil {
 		return false, err
 	}
+	if len(responses) > 0 {
+		lastResponse := responses[len(responses)-1]
+		if imap.isContinueResponse(lastResponse) { // auth failed
+			imap.Debug("Authentication failed: %s", lastResponse)
+			responses, err = imap.doIMAPCommand(" ", int64(replyTimeout/time.Millisecond))
+		}
+		if !imap.isOKResponse(lastResponse) {
+			return false, err
+		}
+	}
+	imap.Error("Authentication successful|msgCode=IMAP_AUTH_SUCCESS")
 	return true, nil
 }
 
@@ -613,19 +624,22 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			}
 			authSuccess, err := imap.doImapAuth()
 			if err != nil {
-				imap.Warning("Authentication error: %v", err)
+				imap.Warning("Authentication failed. Telling client to re-register|msgCode=IMAP_AUTH_FAIL_REREGISTER")
+				errCh <- LongPollReRegister
 				return
 			}
 			if !authSuccess {
-				imap.Warning("Authentication failed. Telling client to re-register|msgCode=IMAP_AUTH_ERR_REREGISTER")
+				imap.Warning("Authentication failed. Telling client to re-register|msgCode=IMAP_AUTH_FAIL_REREGISTER")
 				errCh <- LongPollReRegister
+				return
 			}
 		}
 		if imap.pi.IMAPSupportsIdle {
-			imap.Debug("Supporting idle")
+			imap.Debug("Supporting idle. Running Examine Command")
 			err := imap.doExamine()
 			if err != nil {
-				imap.Warning("Examine failure: %v", err)
+				imap.Warning("Examine failure: %v. Telling client to re-register|msgCode=IMAP_AUTH_FAIL_REREGISTER", err)
+				errCh <- LongPollReRegister
 				return
 			}
 		}
