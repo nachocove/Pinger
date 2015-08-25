@@ -27,12 +27,12 @@ func Push(aws AWS.AWSHandler, platform, service, token, endpointArn, alert, soun
 	for i := 0; i < 10; i++ {
 		if strings.EqualFold(service, PushServiceAPNS) == false || globals.config.APNSCertFile == "" || globals.config.APNSKeyFile == "" {
 			if endpointArn == "" {
-				return fmt.Errorf("Endpoint not registered: Token ('%s:%s')", service, token)
+				return fmt.Errorf("Endpoint not registered|pushToken=%s:%s", service, token)
 			}
 			pushMessage, err := awsPushMessageString(
 				platform, alert, sound, contentAvailable, ttl, pingerMap, logger)
 			if err == nil {
-				logger.Debug("Sending push message to AWS: pushToken: %s/%s AWSEndpointArn:%s %s", service, token, endpointArn, pushMessage)
+				logger.Debug("message=Sending push message to AWS|pushToken=%s/%s|AWSEndpointArn:%s|pushMessage=%s", service, token, endpointArn, pushMessage)
 				err = aws.SendPushNotification(endpointArn, pushMessage)
 			}
 		} else {
@@ -43,11 +43,11 @@ func Push(aws AWS.AWSHandler, platform, service, token, endpointArn, alert, soun
 			if err == APNSInvalidToken {
 				return err
 			} else if err != APNSMessageTooLarge {
-				logger.Warning("Push error %s. Retrying attempt %d in %s", err, i, retryInterval)
+				logger.Warning("message=Push error %s. Retrying attempt %d in %s", err, i, retryInterval)
 				time.Sleep(retryInterval)
 			}
 		} else {
-			logger.Debug("Successfully pushed after %d retries", i)
+			logger.Debug("message=Successfully pushed after %d retries", i)
 			break
 		}
 	}
@@ -197,7 +197,7 @@ func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger
 		err = Push(aws, serviceAndToken.Platform, serviceAndToken.PushService, serviceAndToken.PushToken, serviceAndToken.AWSEndpointArn,
 			alert, globals.config.APNSSound, globals.config.APNSContentAvailable, globals.config.APNSExpirationSeconds, pingerMap, serviceAndToken.OSVersion, logger)
 		if err != nil {
-			logger.Error("Could not send push: %s", err.Error())
+			logger.Error("message=Could not send push: %s", err.Error())
 		} else {
 			pushesSent++
 			count++
