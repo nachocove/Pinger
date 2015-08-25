@@ -221,7 +221,7 @@ func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
 			return false, err
 		}
 	}
-	imap.Error("Authentication successful|msgCode=IMAP_AUTH_SUCCESS")
+	imap.Debug("Authentication successful|msgCode=IMAP_AUTH_SUCCESS")
 	return true, nil
 }
 
@@ -365,7 +365,7 @@ func (imap *IMAPClient) processResponse(command string, response string) {
 			imap.pi.IMAPEXISTSCount = count
 			err := imap.sendIMAPCommand(IMAP_DONE)
 			if err != nil {
-				imap.Error("Error sending IMAP Command|command=%s|err=%s", IMAP_DONE, err)
+				imap.Warning("Error sending IMAP Command|command=%s|err=%s", IMAP_DONE, err)
 			}
 		}
 	case "EXAMINE":
@@ -620,6 +620,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			err := imap.setupConn()
 			if err != nil {
 				imap.Error("Connection setup error: %v", err)
+				errCh <- LongPollReRegister
 				return
 			}
 			authSuccess, err := imap.doImapAuth()
