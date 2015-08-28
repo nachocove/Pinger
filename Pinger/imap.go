@@ -497,7 +497,7 @@ func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 	return response, nil
 }
 
-func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []string, errCh chan error) {
+func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []string, responseErrCh chan error) {
 	imap.Debug("Starting doRequestResponse")
 	imap.wg.Add(1)
 	defer Utils.RecoverCrash(imap.logger)
@@ -534,8 +534,8 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 		if imap.isIdling {
 			imap.isIdling = false
 		}
-		imap.Warning("Error '%s'. Sending back LongPollReRegister||msgCode=IMAP_ERR_REREGISTER", err)
-		errCh <- LongPollReRegister // erroring out... ask for reregister
+		imap.Info("Request/Response Error: %s", err)
+		responseErrCh <- fmt.Errorf("Request/Response Error: %s", err)
 		return
 	}
 	responseCh <- responses
@@ -648,13 +648,15 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 		reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 		requestTimer := time.NewTimer(time.Duration(reqTimeout) * time.Millisecond)
 		responseCh := make(chan []string)
+		responseErrCh := make(chan error)
 		command := IMAP_NOOP
 		if imap.pi.IMAPSupportsIdle {
 			command = fmt.Sprintf("%s %s", imap.tag.Next(), IMAP_IDLE)
 		} else {
 			command = fmt.Sprintf("%s %s %s %s", imap.tag.Next(), IMAP_STATUS, imap.pi.IMAPFolderName, IMAP_STATUS_QUERY)
 		}
-		go imap.doRequestResponse(command, responseCh, errCh)
+
+		go imap.doRequestResponse(command, responseCh, responseErrCh)
 		select {
 		case <-requestTimer.C:
 			// request timed out. Start over.
@@ -662,8 +664,8 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			requestTimer.Stop()
 			imap.cancelIDLE()
 
-		case err := <-errCh:
-			imap.Info("Got error %s. Sending back LongPollReRegister|msgCode=IMAP_ERR_REREGISTER", err)
+		case err := <-responseErrCh:
+			imap.Warning("Got error %s. Sending back LongPollReRegister|msgCode=IMAP_ERR_REREGISTER", err)
 			errCh <- LongPollReRegister // erroring out... ask for reregister
 			return
 
