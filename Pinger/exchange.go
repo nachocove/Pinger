@@ -182,7 +182,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		// TODO Can 'err.Error()' be data from the remote endpoint? Do we need to protect against it?
 		// TODO Perhaps limit the length we log here.
 		if strings.Contains(err.Error(), "use of closed network connection") == false {
-			ex.Warning("httpClient.Do failed: %s", redactEmailFromError(err.Error()))
+			ex.Info("httpClient.Do failed: %s. Will retry", redactEmailFromError(err.Error()))
 		} else {
 			ex.Debug("%s", err.Error())
 		}

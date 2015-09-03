@@ -2,7 +2,6 @@ package Pinger
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
@@ -142,18 +141,6 @@ func (t *cmdTag) Next() string {
 
 func (t *cmdTag) String() string {
 	return fmt.Sprintf("%s%d", t.id, t.seq)
-}
-
-func (imap *IMAPClient) ScanIMAPTerminator(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	if atEOF && len(data) == 0 {
-		return 0, nil, nil
-	}
-	lines := bytes.Split(data, imap.pi.CommandAcknowledgement)
-	if len(lines) > 0 {
-		return len(lines[0]) + len(imap.pi.CommandAcknowledgement), lines[0], nil
-	}
-	// Request more data.
-	return 0, nil, nil
 }
 
 func (imap *IMAPClient) setupScanner() {
@@ -335,12 +322,12 @@ func (imap *IMAPClient) doIMAPCommand(command string, waitTime int64) ([]string,
 			lastResponse := responses[len(responses)-1]
 			if !imap.isOKResponse(lastResponse) && !imap.isContinueResponse(lastResponse) {
 				err := fmt.Errorf("Did not get proper response from imap server: %s", lastResponse)
-				imap.Warning("%s", err)
+				imap.Debug("%s", err)
 				return allResponses, err
 			}
 		} else {
 			err := fmt.Errorf("Did not get any response from imap server.")
-			imap.Warning("%s", err)
+			imap.Debug("%s", err)
 			return allResponses, err
 		}
 	}
@@ -481,14 +468,14 @@ func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
 				return "", err
 			} else if ok && nerr.Temporary() {
 				if i < 3 { // try three times
-					imap.Warning("Temporary error scanning for server response: %s. Will retry...", nerr)
+					imap.Info("Temporary error scanning for server response: %s. Will retry...", nerr)
 					time.Sleep(time.Duration(1) * time.Second)
 				} else {
-					imap.Warning("Error scanning for server response: %s. Giving up...", nerr)
+					imap.Debug("Error scanning for server response: %s.", nerr)
 					return "", err
 				}
 			} else {
-				imap.Warning("Error scanning for server response: %s. Giving up...", err)
+				imap.Debug("Error scanning for server response: %s.", err)
 				return "", err
 			}
 		}
