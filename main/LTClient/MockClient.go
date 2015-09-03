@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 )
 
 const (
@@ -90,6 +94,10 @@ type MockClientInterface interface {
 	Register() error
 	Defer() error
 	Stop() error
+}
+
+type MockClient struct {
+	lta *LTAccount
 }
 
 func (rrd registerResponseData) String() string {
@@ -180,4 +188,97 @@ func GetStopJSONBytes(spData stopPostData) []byte {
 		return nil
 	}
 	return JSONBytes
+}
+
+func (rpData *registerPostData) updateRegisterData(lta *LTAccount) {
+	rpData.ClientContext = lta.accountName
+	rpData.MailServerUrl = strings.Replace(rpData.MailServerUrl, "EMAIL_SERVER_NAME", lta.emailServerName, 1)
+}
+
+func (dpData *deferPostData) updateDeferData(lta *LTAccount) {
+	dpData.ClientContext = lta.accountName
+	dpData.Token = lta.token
+}
+
+func (spData *stopPostData) updateStopData(lta *LTAccount) {
+	spData.ClientContext = lta.accountName
+	spData.Token = lta.token
+}
+
+func (m *MockClient) init(lta *LTAccount) {
+	m.lta = lta
+}
+
+func (m *MockClient) RegisterWithRequest(registerRequest string) error {
+	rpData := ParseRegisterJSON([]byte(registerRequest))
+	rpData.updateRegisterData(m.lta)
+	err, response := m.doRequestResponse(RegisterAPI, GetRegisterJSONBytes(rpData))
+	rrData := ParseRegisterResponse(response)
+	m.lta.token = rrData.Token
+	logger.Info("RegisterResponse: %s", rrData.String())
+	return err
+}
+
+func (m *MockClient) Defer() error {
+	dpData := ParseDeferJSON([]byte(DeferRequest))
+	dpData.updateDeferData(m.lta)
+	err, response := m.doRequestResponse(DeferAPI, GetDeferJSONBytes(dpData))
+	drData := ParseDeferResponse(response)
+	logger.Info("DeferResponse %s", drData.String())
+	return err
+}
+
+func (m *MockClient) Stop() error {
+	spData := ParseStopJSON([]byte(StopRequest))
+	spData.updateStopData(m.lta)
+	err, response := m.doRequestResponse(StopAPI, GetStopJSONBytes(spData))
+	srData := ParseStopResponse(response)
+	logger.Info("StopResponse %s", srData.String())
+	return err
+}
+
+func (m *MockClient) doRequestResponse(requestAPI string, postData []byte) (error, []byte) {
+	//logger.Debug("Starting doRequestResponse")
+	defer func() {
+		//logger.Debug("Exiting doRequestResponse")
+	}()
+
+	var err error
+	URL := m.lta.user.pingerURL + "/" + requestAPI
+	logger.Info("Connection to %s", URL)
+	logger.Info("Sending Body %s", postData)
+	requestBody := bytes.NewReader(postData)
+	req, err := http.NewRequest("POST", URL, requestBody)
+	if err != nil {
+		logger.Error("Failed to create request: %s", err.Error())
+		return err, nil
+	}
+
+	req.Header.Add("Connection", "keep-alive")
+	req.Header.Add("Content-Type", "application/json")
+	req.Proto = "HTTP/1.1"
+	req.ProtoMajor = 1
+	req.ProtoMinor = 1
+
+	//logger.Debug("Making Connection to pinger")
+	response, err := m.lta.httpClient.Do(req)
+	if err != nil {
+		logger.Error("Error doing post %s", err)
+		return err, nil
+	}
+	if response.StatusCode != 200 {
+		logger.Error("Did not get 200 status code: %d", response.StatusCode)
+		return fmt.Errorf("Did not get 200 status code: %d", response.StatusCode), nil
+	}
+	var responseBytes []byte
+	responseBytes = make([]byte, 10240) // read up to 10K
+
+	n, err := response.Body.Read(responseBytes)
+	if err != nil && err != io.EOF {
+		logger.Error("Failed to read response: %s", err.Error())
+		return err, nil
+	}
+	response.Body.Close()
+	//logger.Debug("response [%s]", string(responseBytes[:n]))
+	return nil, responseBytes[:n]
 }

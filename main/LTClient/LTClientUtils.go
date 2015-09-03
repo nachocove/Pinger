@@ -40,21 +40,21 @@ type LTUser struct {
 }
 
 type LTAccount struct {
-	user               *LTUser
-	accountId          int
-	currentDeferCount  int
-	tlsConn            *tls.Conn
-	totalRequestCount  int
-	accountName        string
-	passwd             string
-	emailServerAddress string
-	serverType         string
-	transport          *http.Transport
-	request            *http.Request
-	httpClient         *http.Client
-	mockClient         MockClientInterface
-	token              string
-	logger             *Logging.Logger
+	user              *LTUser
+	accountId         int
+	currentDeferCount int
+	tlsConn           *tls.Conn
+	totalRequestCount int
+	accountName       string
+	passwd            string
+	emailServerName   string
+	serverType        string
+	transport         *http.Transport
+	request           *http.Request
+	httpClient        *http.Client
+	mockClient        MockClientInterface
+	token             string
+	logger            *Logging.Logger
 }
 
 func (ltu *LTUser) String() string {
@@ -169,9 +169,10 @@ func (ltu *LTUser) StartUserSimulation() error {
 		accountName := ltu.userName + strconv.Itoa(i)
 		logger.Info("Setting up account %s", accountName)
 		ltu.waitGroup.Add(1)
-		//emailServerAddress := getRandomDomainName()
-		emailServerAddress := "ltmail.officeburrito.com"
+		//emailServerName := getRandomDomainName()
+		emailServerName := "ltmail.officeburrito.com"
 		serverType := getRandomServerType()
+		logger.Debug("serverType %s", serverType)
 		var mockClient MockClientInterface
 		if serverType == MailClientIMAP {
 			mockClient = &MockIMAPClient{}
@@ -179,7 +180,8 @@ func (ltu *LTUser) StartUserSimulation() error {
 			mockClient = &MockEASClient{}
 		}
 		ltAccount := LTAccount{user: ltu, accountId: i, logger: ltu.logger, accountName: accountName,
-			passwd: accountName, emailServerAddress: emailServerAddress, serverType: serverType, mockClient: mockClient}
+			passwd: accountName, emailServerName: emailServerName, serverType: serverType,
+			mockClient: mockClient}
 		mockClient.init(&ltAccount)
 		go ltAccount.StartAccountSimulation()
 		Utils.ActiveClientCount++
@@ -192,7 +194,7 @@ func getRandomAround(num int) int {
 }
 
 func getRandomServerType() string {
-	if rng.Intn(1) == 0 {
+	if rng.Intn(2) == 0 {
 		return MailClientActiveSync
 	} else {
 		return MailClientIMAP

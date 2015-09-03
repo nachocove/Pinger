@@ -62,7 +62,7 @@ func main() {
 	flag.IntVar(&sleepBetweenOpens, "sleep-after-open", 0, "Sleep n milliseconds after each connection opened.")
 	flag.BoolVar(&verbose, "v", false, "Verbose")
 	flag.BoolVar(&help, "h", false, "Help")
-	flag.BoolVar(&tlsCheckHostname, "tlscheckhost", false, "Verify the hostname to the certificate")
+	flag.BoolVar(&tlsCheckHostname, "checkhost", false, "Verify the hostname to the certificate")
 	flag.BoolVar(&noReopenConnections, "no-reopen", false, "No Reopen Connections")
 	flag.BoolVar(&printMem, "m", false, "print memory mode")
 	flag.IntVar(&printMemPeriodic, "mem", 0, "print memory periodically mode in seconds")
@@ -121,7 +121,6 @@ func main() {
 	}
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	logger.Info("Running with %d users (%d accounts). (Processors: %d)", maxUsers, averageAccountCount, runtime.NumCPU())
-
 	var memstats *Utils.MemStats
 	if printMemPeriodic > 0 || printMem {
 		memstats = Utils.NewMemStats(memStatsExtraInfo, true, false)
