@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	deferTimeout    = 5       // how long to wait before calling defer in seconds
-	postDeferBGTime = 20      // how long to wait after defer timeout to reconnect in seconds
-	requestTimeout  = 30 * 60 // how long to wait before timeout
+	deferTimeout       = 5       // how long to wait before calling defer in seconds
+	postDeferBGTimeout = 20      // how long to wait after defer timeout to reconnect in seconds
+	requestTimeout     = 30 * 60 // how long to wait before timeout
 )
 
 const (
@@ -69,7 +69,7 @@ func init() {
 
 func (lta *LTAccount) getSleepTime() int {
 	if lta.currentDeferCount == lta.user.deferCount { //out of defers
-		return postDeferBGTime
+		return postDeferBGTimeout
 	}
 	return deferTimeout
 }

@@ -98,6 +98,7 @@ func main() {
 		} else {
 			TLSConfig.InsecureSkipVerify = true
 		}
+		fmt.Println("tlsskipverify", TLSConfig.InsecureSkipVerify)
 	}
 
 	if logFileName == "" {
@@ -168,17 +169,15 @@ func main() {
 	}
 	logger.Info("All simulations started. Waiting...")
 	wg.Wait()
-	defer func() {
-		logger.Info("All Connections closed.")
-		if memstats != nil {
-			memstats.PrintMemStats()
-		}
-		profileFile := "/tmp/memprofile.pprof"
-		logger.Info("Writing memory profile: %s\n", profileFile)
-		f, err := os.Create(profileFile)
-		if err != nil {
-			logger.Fatalf(err.Error())
-		}
-		pprof.WriteHeapProfile(f)
-	}()
+	logger.Info("All Connections closed.")
+	if memstats != nil {
+		memstats.PrintMemStats()
+	}
+	profileFile := "/tmp/memprofile.pprof"
+	logger.Info("Writing memory profile: %s\n", profileFile)
+	f, err := os.Create(profileFile)
+	if err != nil {
+		logger.Fatalf(err.Error())
+	}
+	pprof.WriteHeapProfile(f)
 }
