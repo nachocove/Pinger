@@ -5,8 +5,6 @@ import (
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils"
 	"github.com/nachocove/Pinger/Utils/Logging"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -84,13 +82,11 @@ type BackendPoller interface {
 type pollMapType map[string]MailClientContextType
 
 func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Logger) error {
-	pollingAPI, err := NewBackendPolling(config, true, logger)
+	pollingAPI, err := NewBackendPolling(config, debug, logger)
 	if err != nil {
 		return err
 	}
 	setGlobal(&config.Backend)
-
-	log.SetOutput(ioutil.Discard) // rpc.Register logs a warning for ToggleDebug, which we don't want.
 
 	rpcServer := rpc.NewServer()
 	rpcServer.Register(pollingAPI)

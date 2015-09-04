@@ -84,9 +84,11 @@ func (ex *ExchangeClient) maxResponseSize() (size int) {
 
 // This dummy response is used to indicate to the receiver of the http reply that we need to retry.
 var retryResponse *http.Response
+var NoSuchHostError error
 
 func init() {
 	retryResponse = &http.Response{}
+	NoSuchHostError = fmt.Errorf("No such host exists")
 }
 
 func redactEmailFromError(message string) string {
@@ -181,10 +183,12 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		// memory leakage in this case
 		// TODO Can 'err.Error()' be data from the remote endpoint? Do we need to protect against it?
 		// TODO Perhaps limit the length we log here.
-		if strings.Contains(err.Error(), "use of closed network connection") == false {
-			ex.Warning("httpClient.Do failed: %s", redactEmailFromError(err.Error()))
+		if strings.Contains(err.Error(), "no such host") == true {
+			ex.Warning("No such host: %s", redactEmailFromError(err.Error()))
+			errCh <- NoSuchHostError
+			return
 		} else {
-			ex.Debug("%s", err.Error())
+			ex.Info("Post failed: %s. Will retry", err.Error())
 		}
 		responseCh <- retryResponse
 		return
@@ -296,7 +300,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 	reqTimeout := ex.pi.ResponseTimeout
 	reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 	ex.transport = &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: ex.debug},
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: false},
 		ResponseHeaderTimeout: time.Duration(reqTimeout) * time.Millisecond,
 	}
 
@@ -352,7 +356,11 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 		go ex.doRequestResponse(responseCh, responseErrCh)
 		select {
 		case err = <-responseErrCh:
-			ex.sendError(errCh, err)
+			if err == NoSuchHostError {
+				errCh <- LongPollReRegister
+			} else {
+				ex.sendError(errCh, err)
+			}
 			return
 
 		case response := <-responseCh:
