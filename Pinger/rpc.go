@@ -82,7 +82,7 @@ type BackendPoller interface {
 type pollMapType map[string]MailClientContextType
 
 func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Logger) error {
-	pollingAPI, err := NewBackendPolling(config, false, logger)
+	pollingAPI, err := NewBackendPolling(config, debug, logger)
 	if err != nil {
 		return err
 	}
