@@ -181,10 +181,12 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		// memory leakage in this case
 		// TODO Can 'err.Error()' be data from the remote endpoint? Do we need to protect against it?
 		// TODO Perhaps limit the length we log here.
-		if strings.Contains(err.Error(), "use of closed network connection") == false {
-			ex.Info("httpClient.Do failed: %s. Will retry", redactEmailFromError(err.Error()))
+		if strings.Contains(err.Error(), "no such host") == true {
+			ex.Warning("No such host: %s", redactEmailFromError(err.Error()))
+			errCh <- err
+			return
 		} else {
-			ex.Debug("%s", err.Error())
+			ex.Info("Post failed: %s. Will retry", err.Error())
 		}
 		responseCh <- retryResponse
 		return
@@ -352,7 +354,11 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 		go ex.doRequestResponse(responseCh, responseErrCh)
 		select {
 		case err = <-responseErrCh:
-			ex.sendError(errCh, err)
+			if strings.Contains(err.Error(), "no such host") == true {
+				errCh <- LongPollReRegister
+			} else {
+				ex.sendError(errCh, err)
+			}
 			return
 
 		case response := <-responseCh:
