@@ -75,7 +75,6 @@ func (context *Context) run() error {
 			}
 		}()
 	}
-	Utils.AddDebugToggleSignal(context)
 	var err error
 	if config.Server.ServerCertFile != "" && config.Server.ServerKeyFile != "" {
 		// start the https server

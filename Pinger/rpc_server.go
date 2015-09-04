@@ -38,11 +38,6 @@ func (t *BackendPolling) newMailClientContext(pi *MailPingInformation, doStats b
 	return NewMailClientContext(t.dbm, t.aws, pi, t.debug, false, t.logger)
 }
 
-func (t *BackendPolling) ToggleDebug() {
-	t.debug = !t.debug
-	t.loggerLevel = Logging.ToggleLogging(t.logger, t.loggerLevel)
-}
-
 func (t *BackendPolling) LockMap() {
 	t.pollMapMutex.Lock()
 }
