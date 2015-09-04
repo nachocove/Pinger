@@ -84,9 +84,11 @@ func (ex *ExchangeClient) maxResponseSize() (size int) {
 
 // This dummy response is used to indicate to the receiver of the http reply that we need to retry.
 var retryResponse *http.Response
+var NoSuchHostError error
 
 func init() {
 	retryResponse = &http.Response{}
+	NoSuchHostError = fmt.Errorf("No such host exists")
 }
 
 func redactEmailFromError(message string) string {
@@ -183,7 +185,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		// TODO Perhaps limit the length we log here.
 		if strings.Contains(err.Error(), "no such host") == true {
 			ex.Warning("No such host: %s", redactEmailFromError(err.Error()))
-			errCh <- err
+			errCh <- NoSuchHostError
 			return
 		} else {
 			ex.Info("Post failed: %s. Will retry", err.Error())
@@ -354,7 +356,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 		go ex.doRequestResponse(responseCh, responseErrCh)
 		select {
 		case err = <-responseErrCh:
-			if strings.Contains(err.Error(), "no such host") == true {
+			if err == NoSuchHostError {
 				errCh <- LongPollReRegister
 			} else {
 				ex.sendError(errCh, err)
