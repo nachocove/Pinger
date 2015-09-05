@@ -103,21 +103,24 @@ func (cfg *ServerConfiguration) CheckToken(token string) bool {
 }
 
 func (cfg *ServerConfiguration) CreateAuthToken(userId, clientContext, deviceId string) (string, []byte, error) {
-	str := fmt.Sprintf("%s:%s:%s", userId, clientContext, deviceId)
 	key := make256Key()
-	authTokenMAC := makeTokenMAC([]byte(str), key)
+	authTokenMAC := makeTokenMAC(makeIdBytes(userId, clientContext, deviceId), key)
 	b64Token := base64.StdEncoding.EncodeToString(authTokenMAC)
 	return b64Token, key, nil
 }
 
 func (cfg *ServerConfiguration) ValidateAuthToken(userId, clientContext, deviceId, tokenb64 string, key []byte) bool {
 	// TODO Check length on token so base64 decoding doesn't blow up
-	str := fmt.Sprintf("%s:%s:%s", userId, clientContext, deviceId)
 	token, err := base64.StdEncoding.DecodeString(tokenb64)
 	if err != nil {
 		return false
 	}
-	return checkMAC([]byte(str), token, key)
+	return checkMAC(makeIdBytes(userId, clientContext, deviceId), token, key)
+}
+
+func makeIdBytes(userId, clientContext, deviceId string) []byte {
+	str := fmt.Sprintf("%s:%s:%s", userId, clientContext, deviceId)
+	return []byte(str)
 }
 
 func checkMAC(message, messageMAC, key []byte) bool {
