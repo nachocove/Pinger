@@ -2,14 +2,13 @@ package Pinger
 
 import (
 	"crypto/aes"
-	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"net"
 	"strings"
-	"time"
 )
 
 const (
@@ -103,75 +102,41 @@ func (cfg *ServerConfiguration) CheckToken(token string) bool {
 	return foundMatch
 }
 
-func (cfg *ServerConfiguration) CreateAuthToken(userId, clientContext, deviceId string) (string, error) {
-	block, err := aes.NewCipher([]byte(cfg.TokenAuthKey))
-	if err != nil {
-		return "", err
-	}
-	str := fmt.Sprintf("%d::%s::%s::%s", time.Now().UTC().Unix(), userId, clientContext, deviceId)
-	ciphertext := make([]byte, aes.BlockSize+len(str))
-	iv := ciphertext[:aes.BlockSize]
-	// TODO Check the RNG algorithm
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return "", err
-	}
-	// TODO Check this code for forgeability. Make sure it's encrypted and auth'd (hmac + encryption)
-	cfb := cipher.NewCFBEncrypter(block, iv)
-	cfb.XORKeyStream(ciphertext[aes.BlockSize:], []byte(str))
-	b64 := base64.StdEncoding.EncodeToString(ciphertext)
-	return b64, nil
+func (cfg *ServerConfiguration) CreateAuthToken(userId, clientContext, deviceId string) (string, []byte, error) {
+	str := fmt.Sprintf("%s::%s::%s", userId, clientContext, deviceId)
+	key := make256Key()
+	authTokenMAC := makeTokenMAC([]byte(str), key)
+	b64Token := base64.StdEncoding.EncodeToString(authTokenMAC)
+	return b64Token, key, nil
 }
 
-func (cfg *ServerConfiguration) ValidateAuthToken(userId, clientContext, deviceId, token string) (time.Time, error) {
+func (cfg *ServerConfiguration) ValidateAuthToken(userId, clientContext, deviceId, tokenb64 string, key []byte) bool {
 	// TODO Check length on token so base64 decoding doesn't blow up
-	errTime := time.Time{}
-	block, err := aes.NewCipher([]byte(cfg.TokenAuthKey))
+	str := fmt.Sprintf("%s::%s::%s", userId, clientContext, deviceId)
+	token, err := base64.StdEncoding.DecodeString(tokenb64)
 	if err != nil {
-		return errTime, err
+		return false
 	}
-	data, err := base64.StdEncoding.DecodeString(token)
-	if err != nil {
-		return errTime, err
-	}
-	if len(data) < aes.BlockSize {
-		return errTime, fmt.Errorf("ciphertext too short")
-	}
-	// do a sanity check on the string.
-	if len(data) > 512 {
-		return errTime, fmt.Errorf("data exceeds acceptable limits")
-	}
+	return checkMAC([]byte(str), token, key)
+}
 
-	iv := []byte(data[:aes.BlockSize])
-	text := []byte(data[aes.BlockSize:])
-	cfb := cipher.NewCFBDecrypter(block, iv)
-	cfb.XORKeyStream(text, text)
-	if err != nil {
-		return errTime, err
-	}
+func checkMAC(message, messageMAC, key []byte) bool {
+	expectedMAC := makeTokenMAC(message, key)
+	return hmac.Equal(messageMAC, expectedMAC)
+}
 
-	parts := strings.Split(string(text), "::")
-	if len(parts) != 4 {
-		return errTime, fmt.Errorf("Bad tokenized string %s", string(text))
-	}
-	var timestamp int64
-	n, err := fmt.Sscanf(parts[0], "%d", &timestamp)
+func make256Key() []byte {
+	key := make([]byte, 256)
+	_, err := rand.Read(key)
 	if err != nil {
-		return errTime, err
+		return nil
 	}
-	if n == 0 {
-		return errTime, fmt.Errorf("time is empty")
-	}
-	if parts[1] == "" {
-		return errTime, fmt.Errorf("userId is empty")
-	}
-	if parts[2] == "" {
-		return errTime, fmt.Errorf("context is empty")
-	}
-	if parts[3] == "" {
-		return errTime, fmt.Errorf("deviceId is empty")
-	}
-	if parts[1] != userId || parts[2] != clientContext || parts[3] != deviceId {
-		return errTime, fmt.Errorf("device info doesn't match token")
-	}
-	return time.Unix(timestamp, 0), nil
+	return key
+}
+
+func makeTokenMAC(message, key []byte) []byte {
+	mac := hmac.New(sha256.New, key)
+	mac.Write(message)
+	token := mac.Sum(nil)
+	return token
 }
