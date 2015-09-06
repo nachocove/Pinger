@@ -10,10 +10,13 @@ import (
 	"strings"
 )
 
+var authTokenKeys map[string][]byte
+
 func init() {
 	httpsRouter.HandleFunc("/1/register", registerDevice)
 	httpsRouter.HandleFunc("/1/defer", deferPolling)
 	httpsRouter.HandleFunc("/1/stop", stopPolling)
+	authTokenKeys = make(map[string][]byte)
 }
 
 //const SessionVarUserId = "UserId"
@@ -217,12 +220,13 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		responseError(w, MissingRequiredData, strings.Join(missingFields, ","))
 		return
 	}
-	token, err := context.Config.Server.CreateAuthToken(postInfo.UserId, postInfo.ClientContext, postInfo.DeviceId)
+	token, key, err := context.Config.Server.CreateAuthToken(postInfo.UserId, postInfo.ClientContext, postInfo.DeviceId)
 	if err != nil {
 		context.Logger.Error("%s: error creating token %s", postInfo.getLogPrefix(), err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	authTokenKeys[token] = key
 
 	//	session.Values[SessionVarUserId] = postInfo.UserId
 	sessionId, err := makeSessionId(token)
@@ -324,23 +328,33 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		deferData.UserId = deferData.ClientId
 		context.Logger.Info("%s: Old client using ClientId (%s) instead of UserId.", deferData.getLogPrefix(), deferData.ClientId)
 	}
-	_, err = context.Config.Server.ValidateAuthToken(deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Token)
-	if err != nil {
+
+	key, ok := authTokenKeys[deferData.Token]
+	if !ok {
 		reply = &Pinger.PollingResponse{
 			Code:    Pinger.PollingReplyError,
 			Message: "Token is not valid",
 		}
 	} else {
-		//	if session.Values[SessionVarUserId] != deferData.UserId {
-		//		context.Logger.Error("Client ID %s does not match session", deferData.UserId)
-		//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
-		//		return
-		//	}
-		reply, err = Pinger.DeferPoll(&context.Config.Rpc, deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout)
-		if err != nil {
-			context.Logger.Error("%s: Error deferring poll %s", deferData.getLogPrefix(), err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		valid := context.Config.Server.ValidateAuthToken(deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Token, key)
+		if !valid {
+			reply = &Pinger.PollingResponse{
+				Code:    Pinger.PollingReplyError,
+				Message: "Token is not valid",
+			}
+		} else {
+			//	if session.Values[SessionVarUserId] != deferData.UserId {
+			//		context.Logger.Error("Client ID %s does not match session", deferData.UserId)
+			//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
+			//		return
+			//	}
+			context.Logger.Debug("%s: Token %s is valid", deferData.getLogPrefix(), deferData.Token)
+			reply, err = Pinger.DeferPoll(&context.Config.Rpc, deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout)
+			if err != nil {
+				context.Logger.Error("%s: Error deferring poll %s", deferData.getLogPrefix(), err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 	responseData := make(map[string]string)
@@ -423,23 +437,33 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 		stopData.UserId = stopData.ClientId
 		context.Logger.Info("%s: Old client using ClientId (%s) instead of UserId.", stopData.getLogPrefix(), stopData.ClientId)
 	}
-	_, err = context.Config.Server.ValidateAuthToken(stopData.UserId, stopData.ClientContext, stopData.DeviceId, stopData.Token)
-	if err != nil {
+	key, ok := authTokenKeys[stopData.Token]
+	if !ok {
 		reply = &Pinger.PollingResponse{
 			Code:    Pinger.PollingReplyError,
 			Message: "Token is not valid",
 		}
 	} else {
-		//	if session.Values[SessionVarUserId] != stopData.UserId {
-		//		context.Logger.Error("User ID %s does not match session", stopData.UserId)
-		//		http.Error(w, "Unknown User ID", http.StatusForbidden)
-		//		return
-		//	}
-		reply, err = Pinger.StopPoll(&context.Config.Rpc, stopData.UserId, stopData.ClientContext, stopData.DeviceId)
-		if err != nil {
-			context.Logger.Error("%s: Error stopping poll %s", stopData.getLogPrefix(), err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		valid := context.Config.Server.ValidateAuthToken(stopData.UserId, stopData.ClientContext, stopData.DeviceId, stopData.Token, key)
+		if !valid {
+			reply = &Pinger.PollingResponse{
+				Code:    Pinger.PollingReplyError,
+				Message: "Token is not valid",
+			}
+		} else {
+			//	if session.Values[SessionVarUserId] != stopData.UserId {
+			//		context.Logger.Error("User ID %s does not match session", stopData.UserId)
+			//		http.Error(w, "Unknown User ID", http.StatusForbidden)
+			//		return
+			//	}
+			context.Logger.Debug("%s: Deleting key for token %s", stopData.getLogPrefix(), stopData.Token)
+			delete(authTokenKeys, stopData.Token)
+			reply, err = Pinger.StopPoll(&context.Config.Rpc, stopData.UserId, stopData.ClientContext, stopData.DeviceId)
+			if err != nil {
+				context.Logger.Error("%s: Error stopping poll %s", stopData.getLogPrefix(), err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 	responseData := make(map[string]string)
