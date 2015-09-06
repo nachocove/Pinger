@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
 	"net"
@@ -94,7 +95,7 @@ func (cfg *ServerConfiguration) CheckIP(ip net.IP) bool {
 func (cfg *ServerConfiguration) CheckToken(token string) bool {
 	foundMatch := false
 	for _, tok := range cfg.AliveCheckToken {
-		if strings.EqualFold(tok, token) {
+		if subtle.ConstantTimeCompare([]byte(tok), []byte(token)) == 1 {
 			foundMatch = true
 			break
 		}
