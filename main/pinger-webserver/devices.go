@@ -274,7 +274,6 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
-	context.Logger.Info("json response %s", string(responseJson))
 	fmt.Fprintf(w, string(responseJson))
 	return
 }
@@ -385,7 +384,6 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
-	context.Logger.Info("json response %s", string(responseJson))
 	fmt.Fprintf(w, string(responseJson))
 	return
 }
@@ -495,7 +493,6 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
-	context.Logger.Info("json response %s", string(responseJson))
 	fmt.Fprintf(w, string(responseJson))
 	return
 }
