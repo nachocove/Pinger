@@ -60,9 +60,11 @@ type IMAPClient struct {
 }
 
 var prng *rand.Rand
+var commandTerminator []byte
 
 func init() {
 	prng = rand.New(&prngSource{src: rand.NewSource(time.Now().UnixNano())})
+	commandTerminator = []byte("\r\n")
 }
 
 func (imap *IMAPClient) getLogPrefix() string {
@@ -144,12 +146,6 @@ func (t *cmdTag) String() string {
 }
 
 func (imap *IMAPClient) setupScanner() {
-	if len(imap.pi.CommandTerminator) <= 0 {
-		imap.pi.CommandTerminator = []byte("\r\n")
-	}
-	if len(imap.pi.CommandAcknowledgement) <= 0 {
-		imap.pi.CommandAcknowledgement = []byte("\r\n")
-	}
 	imap.scanner = bufio.NewScanner(imap.tlsConn)
 	imap.scanner.Split(bufio.ScanLines)
 }
@@ -286,7 +282,7 @@ func (imap *IMAPClient) sendIMAPCommand(command string) error {
 		if err != nil {
 			return err
 		}
-		_, err = imap.tlsConn.Write(imap.pi.CommandTerminator)
+		_, err = imap.tlsConn.Write(commandTerminator)
 		if err != nil {
 			return err
 		}

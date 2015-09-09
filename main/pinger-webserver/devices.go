@@ -42,8 +42,6 @@ type registerPostData struct {
 	RequestData            []byte
 	ExpectedReply          []byte
 	NoChangeReply          []byte
-	CommandTerminator      []byte // used by imap
-	CommandAcknowledgement []byte // used by imap
 	ResponseTimeout        int64  // in milliseconds
 	WaitBeforeUse          int64  // in milliseconds
 	PushToken              string // platform dependent push token
@@ -146,8 +144,6 @@ func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInforma
 	pi.RequestData = pd.RequestData
 	pi.ExpectedReply = pd.ExpectedReply
 	pi.NoChangeReply = pd.NoChangeReply
-	pi.CommandTerminator = pd.CommandTerminator
-	pi.CommandAcknowledgement = pd.CommandAcknowledgement
 	pi.ResponseTimeout = pd.ResponseTimeout
 	pi.WaitBeforeUse = pd.WaitBeforeUse
 	pi.PushToken = pd.PushToken

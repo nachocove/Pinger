@@ -24,8 +24,6 @@ type MailPingInformation struct {
 	RequestData            []byte
 	ExpectedReply          []byte
 	NoChangeReply          []byte
-	CommandTerminator      []byte // used by imap
-	CommandAcknowledgement []byte // used by imap
 	ResponseTimeout        int64  // in milliseconds
 	WaitBeforeUse          int64  // in milliseconds
 	PushToken              string // platform dependent push token
@@ -75,8 +73,6 @@ func (pi *MailPingInformation) cleanup() {
 	pi.RequestData = nil
 	pi.ExpectedReply = nil
 	pi.NoChangeReply = nil
-	pi.CommandTerminator = nil
-	pi.CommandAcknowledgement = nil
 	pi.PushToken = ""
 	pi.PushService = ""
 	pi.OSVersion = ""
