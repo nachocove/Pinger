@@ -375,7 +375,7 @@ func (di *DeviceInfo) PushNewMail() error {
 }
 
 func (di *DeviceInfo) Push(message PingerNotification, alert, sound string, contentAvailable int) error {
-	pingerMap := pingerPushMessageMapV2([](*sessionContextMessage){newSessionContextMessage(message, di.ClientContext, di.SessionId)})
+	pingerMap := pingerPushMessageMapV2([](*contextMessage){newContextMessage(message, di.ClientContext)})
 	ttl := globals.config.APNSExpirationSeconds
 	err := Push(di.aws, di.Platform, di.PushService, di.PushToken, di.AWSEndpointArn, alert, sound, contentAvailable, ttl, pingerMap, di.OSVersion, di.logger)
 	if err == nil {

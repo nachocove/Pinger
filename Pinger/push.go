@@ -8,7 +8,6 @@ import (
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
-	"github.com/nachocove/Pinger/Utils/Telemetry"
 	"strings"
 	"time"
 )
@@ -54,35 +53,17 @@ func Push(aws AWS.AWSHandler, platform, service, token, endpointArn, alert, soun
 	return err
 }
 
-// AWS Push message code
-
-func pingerPushMessageMapV1(message PingerNotification, contextIds []string, sessionId string) map[string]interface{} {
-	if message == "" {
-		panic("Message can not be empty")
-	}
-	pingerMap := make(map[string]interface{})
-	for _, context := range contextIds {
-		pingerMap[context] = string(message)
-	}
-	pingerMap["timestamp"] = time.Now().UTC().Round(time.Millisecond).Format(Telemetry.TelemetryTimeZFormat)
-	if sessionId != "" {
-		pingerMap["session"] = sessionId
-	}
-	return pingerMap
-}
-
-type sessionContextMessage struct {
+type contextMessage struct {
 	message PingerNotification
 	context string
-	session string
 }
 
-func newSessionContextMessage(message PingerNotification, context, session string) *sessionContextMessage {
-	return &sessionContextMessage{message, context, session}
+func newContextMessage(message PingerNotification, context string) *contextMessage {
+	return &contextMessage{message, context}
 }
 
-func pingerPushMessageMapV2(contexts [](*sessionContextMessage)) map[string]interface{} {
-	//"contexts": {"context1": { "command": "new" | "register", "session": "abc123"},  ... ]\}
+func pingerPushMessageMapV2(contexts [](*contextMessage)) map[string]interface{} {
+	//"contexts": {"context1": { "command": "new" | "register"},  ... ]\}
 	//"metadata": {"timestamp": "2015-04-10T09:30:00Z, ...}
 	pingerMap := make(map[string]interface{})
 	metadataMap := make(map[string]string)
@@ -94,9 +75,6 @@ func pingerPushMessageMapV2(contexts [](*sessionContextMessage)) map[string]inte
 		for _, context := range contexts {
 			ctxMap := make(map[string]string)
 			ctxMap["cmd"] = string(context.message)
-			if context.session != "" {
-				ctxMap["ses"] = context.session
-			}
 			contextsMap[context.context] = ctxMap
 		}
 		pingerMap["ctxs"] = contextsMap
@@ -189,11 +167,11 @@ func alertAllDevices(dbm *gorp.DbMap, aws AWS.AWSHandler, logger *Logging.Logger
 		if err != nil {
 			panic(err)
 		}
-		sessionContexts := make([](*sessionContextMessage), 0, 5)
+		contextMessages := make([](*contextMessage), 0, 5)
 		for _, c := range contexts {
-			sessionContexts = append(sessionContexts, newSessionContextMessage(PingerNotificationRegister, c, ""))
+			contextMessages = append(contextMessages, newContextMessage(PingerNotificationRegister, c))
 		}
-		pingerMap := pingerPushMessageMapV2(sessionContexts)
+		pingerMap := pingerPushMessageMapV2(contextMessages)
 		err = Push(aws, serviceAndToken.Platform, serviceAndToken.PushService, serviceAndToken.PushToken, serviceAndToken.AWSEndpointArn,
 			alert, globals.config.APNSSound, globals.config.APNSContentAvailable, globals.config.APNSExpirationSeconds, pingerMap, serviceAndToken.OSVersion, logger)
 		if err != nil {
