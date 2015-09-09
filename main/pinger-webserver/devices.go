@@ -174,8 +174,8 @@ func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInforma
 
 func makeSessionId(token string) (string, error) {
 	ha := sha256.Sum256([]byte(token))
-	myId := make([]byte, 8)
-	n := hex.Encode(myId, ha[0:4])
+	myId := make([]byte, 16)
+	n := hex.Encode(myId, ha[0:8])
 	if n <= 0 {
 		return "", fmt.Errorf("Could not encode to hex string")
 	}
