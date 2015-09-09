@@ -33,10 +33,9 @@ const (
 
 // Timeout values for the Dial functions.
 const (
-	netTimeout        = 30 * time.Second // Time to establish a TCP connection
-	POLLING_INTERVAL  = 30
-	replyTimeout      = 300 * time.Second // Time to wait on server response
-	CommandTerminator = "\r\n"
+	netTimeout       = 30 * time.Second // Time to establish a TCP connection
+	POLLING_INTERVAL = 30
+	replyTimeout     = 300 * time.Second // Time to wait on server response
 )
 
 type cmdTag struct {
@@ -61,9 +60,11 @@ type IMAPClient struct {
 }
 
 var prng *rand.Rand
+var commandTerminator []byte
 
 func init() {
 	prng = rand.New(&prngSource{src: rand.NewSource(time.Now().UnixNano())})
+	commandTerminator = []byte("\r\n")
 }
 
 func (imap *IMAPClient) getLogPrefix() string {
@@ -281,7 +282,7 @@ func (imap *IMAPClient) sendIMAPCommand(command string) error {
 		if err != nil {
 			return err
 		}
-		_, err = imap.tlsConn.Write([] byte(CommandTerminator))
+		_, err = imap.tlsConn.Write(commandTerminator)
 		if err != nil {
 			return err
 		}
