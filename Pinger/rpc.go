@@ -299,7 +299,7 @@ type DeferPollArgs struct {
 	UserId        string
 	ClientContext string
 	DeviceId      string
-	Timeout       int64
+	Timeout       uint64
 
 	logPrefix string
 }

@@ -298,7 +298,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 
 	var err error
 	reqTimeout := ex.pi.ResponseTimeout
-	reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
+	reqTimeout += uint64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 	ex.transport = &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: false},
 		ResponseHeaderTimeout: time.Duration(reqTimeout) * time.Millisecond,

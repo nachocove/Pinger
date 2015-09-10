@@ -5,14 +5,37 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/asaskevich/govalidator"
 	"github.com/nachocove/Pinger/Pinger"
+	"github.com/nachocove/Pinger/Utils/AWS"
+	"github.com/nachocove/Pinger/Utils/Logging"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
+)
+
+const (
+	PLATFORM_IOS      string = "ios"
+	PLATFORM_ANDROID  string = "android"
+	EAS_URL_SCHEME    string = "https"
+	IMAP_URL_SCHEME   string = "imap"
+	PUSH_SERVICE_APNS string = "APNS"
+	PUSH_SERVICE_GCM  string = "GCM"
 )
 
 var authTokenKeys map[string][]byte
 
+var clientIdRegex *regexp.Regexp
+var deviceIdRegex *regexp.Regexp
+var contextIdRegex *regexp.Regexp
+var pushTokenRegex *regexp.Regexp
+
 func init() {
+	clientIdRegex = regexp.MustCompile("^(?P<client>us-[a-z]+-[0-9]+:[a-z\\-0-9]+).*$")
+	deviceIdRegex = regexp.MustCompile("^(?P<device>Ncho[0-9A-Z]{24})$")
+	contextIdRegex = regexp.MustCompile("^(?P<context>[a-z0-9A-Z]+)$")
+	pushTokenRegex = regexp.MustCompile("^(?P<pushtoken>[0-9A-Z]{64})$")
 	httpsRouter.HandleFunc("/1/register", registerDevice)
 	httpsRouter.HandleFunc("/1/defer", deferPolling)
 	httpsRouter.HandleFunc("/1/stop", stopPolling)
@@ -42,11 +65,11 @@ type registerPostData struct {
 	RequestData            []byte
 	ExpectedReply          []byte
 	NoChangeReply          []byte
-	ResponseTimeout        int64  // in milliseconds
-	WaitBeforeUse          int64  // in milliseconds
+	ResponseTimeout        uint64 // in milliseconds
+	WaitBeforeUse          uint64 // in milliseconds
 	PushToken              string // platform dependent push token
 	PushService            string // APNS, AWS, GCM, etc.
-	MaxPollTimeout         int64  // maximum time to poll. Default is 2 days.
+	MaxPollTimeout         uint64 // maximum time to poll. Default is 2 days.
 	OSVersion              string
 	AppBuildNumber         string
 	AppBuildVersion        string
@@ -54,35 +77,188 @@ type registerPostData struct {
 	IMAPFolderName         string
 	IMAPSupportsIdle       bool
 	IMAPSupportsExpunge    bool
-	IMAPEXISTSCount        int
-	IMAPUIDNEXT            int
-	logPrefix              string
+	IMAPEXISTSCount        uint
+	IMAPUIDNEXT            uint
 }
 
 func (pd *registerPostData) getLogPrefix() string {
-	if pd.logPrefix == "" {
-		pd.logPrefix = fmt.Sprintf("%s:%s:%s", pd.DeviceId, pd.UserId, pd.ClientContext)
+	return fmt.Sprintf("%s:%s:%s", pd.DeviceId, pd.UserId, pd.ClientContext)
+}
+
+func isValidUserId(userId string) bool {
+	if !govalidator.StringLength(userId, "46", "46") {
+		return false
 	}
-	return pd.logPrefix
+	if !clientIdRegex.MatchString(userId) {
+		return false
+	}
+	return true
+}
+
+func isValidDeviceId(deviceId string) bool {
+	if !deviceIdRegex.MatchString(deviceId) {
+		return false
+	}
+	return true
+}
+
+func isValidClientContextId(contextId string) bool {
+	if !govalidator.StringLength(contextId, "5", "64") {
+		return false
+	}
+	if !contextIdRegex.MatchString(contextId) {
+		return false
+	}
+	return true
+}
+
+func isValidPushToken(pushService, pushToken string) bool {
+	if pushService == PUSH_SERVICE_APNS {
+		decodedToken, err := AWS.DecodeAPNSPushToken(pushToken)
+		if err != nil {
+			return false
+		}
+		if !pushTokenRegex.MatchString(decodedToken) {
+			return false
+		}
+	} else {
+		//TODO - add check for android push token format
+		return false
+	}
+	return true
+}
+
+func isValidMailServerCredentials(userName, password string) bool {
+	if !govalidator.StringLength(userName, "1", "64") { // is this enough? what regex can we use
+		return false
+	}
+	if !govalidator.StringLength(password, "0", "64") { // is this enough? what regex can we use
+		return false
+	}
+	return true
+}
+
+func isMailServerURL(rawurl string) bool {
+	url, err := url.ParseRequestURI(rawurl)
+	if err != nil {
+		return false //Couldn't even parse the rawurl
+	}
+	if len(url.Scheme) == 0 {
+		return false //No Scheme found
+	} else if url.Scheme != EAS_URL_SCHEME && url.Scheme != IMAP_URL_SCHEME {
+		return false
+	}
+	if len(url.Host) == 0 {
+		return false
+	}
+	return true
+}
+
+func isValidPushService(pushService string) bool {
+	if pushService != PUSH_SERVICE_APNS && pushService != PUSH_SERVICE_GCM {
+		return false
+	}
+	return true
 }
 
 // Validate validate the structure/information to make sure required information exists.
-func (pd *registerPostData) Validate(context *Context) (bool, []string) {
-	// TODO Enhance this function to do more security validation.
+func (pd *registerPostData) Validate(logger *Logging.Logger) (bool, []string) {
+	ok := true
+	invalidFields := []string{}
+	if !isValidUserId(pd.UserId) {
+		ok = false
+		invalidFields = append(invalidFields, "UserId")
+	}
+	if !isValidDeviceId(pd.DeviceId) {
+		ok = false
+		invalidFields = append(invalidFields, "DeviceId")
+	}
+	if !isValidClientContextId(pd.ClientContext) {
+		ok = false
+		invalidFields = append(invalidFields, "ClientContextId")
+	}
+	if pd.Platform != PLATFORM_IOS && pd.Platform != PLATFORM_ANDROID {
+		ok = false
+		invalidFields = append(invalidFields, "Platform")
+	}
+	if !isMailServerURL(pd.MailServerUrl) {
+		ok = false
+		invalidFields = append(invalidFields, "MailServerUrl")
+	}
+	if pd.ResponseTimeout > 3600000 { //1 hr max ok?
+		ok = false
+		invalidFields = append(invalidFields, "ResponseTimeout")
+	}
+	if pd.WaitBeforeUse > 600000 { //10 minutes max ok?
+		ok = false
+		invalidFields = append(invalidFields, "WaitBeforeUse")
+	}
+	if pd.MaxPollTimeout > 1728000000 { //20 days max ok?
+		ok = false
+		invalidFields = append(invalidFields, "MaxPollTimeout")
+	}
+	if !isValidPushService(pd.PushService) {
+		ok = false
+		invalidFields = append(invalidFields, "PushService")
+		invalidFields = append(invalidFields, "PushToken") // we can't validate PushToken if we don't know the service type
+	} else {
+		if !isValidPushToken(pd.PushService, pd.PushToken) {
+			ok = false
+			invalidFields = append(invalidFields, "PushToken")
+		}
+	}
+	//PushToken              string // platform dependent push token
+	//PushService            string // APNS, AWS, GCM, etc.
+	//OSVersion              string
+	//AppBuildNumber         string
+	//AppBuildVersion        string
+
+	if pd.Protocol == Pinger.MailClientActiveSync {
+		if !isValidMailServerCredentials(pd.MailServerCredentials.Username, pd.MailServerCredentials.Password) {
+			ok = false
+			invalidFields = append(invalidFields, "MailServerCredentials")
+			//HttpHeaders            map[string]string // optional
+			//RequestData            []byte
+			//ExpectedReply          []byte
+			//NoChangeReply          []byte
+			pd.IMAPAuthenticationBlob = ""
+			pd.IMAPFolderName = ""
+			pd.IMAPSupportsIdle = false
+			pd.IMAPSupportsExpunge = false
+			pd.IMAPEXISTSCount = 0
+			pd.IMAPUIDNEXT = 0
+		}
+	} else if pd.Protocol == Pinger.MailClientIMAP {
+		pd.MailServerCredentials.Username = "" // the IMAP creds aren't passed in this way
+		pd.MailServerCredentials.Password = ""
+		pd.HttpHeaders = nil
+		pd.RequestData = nil
+		pd.ExpectedReply = nil
+		pd.NoChangeReply = nil
+		//IMAPAuthenticationBlob string
+		//	IMAPFolderName         string
+		//IMAPSupportsIdle       bool
+		//IMAPSupportsExpunge    bool
+		//IMAPEXISTSCount        uint
+		//IMAPUIDNEXT            uint
+	} else {
+		ok = false
+		invalidFields = append(invalidFields, "Protocol")
+	}
+	return ok, invalidFields
+}
+
+func (pd *registerPostData) checkForMissingFields(logger *Logging.Logger) (bool, []string) {
 	ok := true
 	MissingFields := []string{}
 	if pd.UserId == "" {
 		if pd.ClientId != "" { // old client
 			pd.UserId = pd.ClientId
-			context.Logger.Info("%s: Old client using ClientId (%s) instead of UserId.", pd.getLogPrefix(), pd.ClientId)
+			logger.Info("%s: Old client using ClientId (%s) instead of UserId.", pd.getLogPrefix(), pd.ClientId)
 		} else {
 			MissingFields = append(MissingFields, "UserId")
 			ok = false
 		}
-	}
-	if pd.ClientContext == "" {
-		MissingFields = append(MissingFields, "ClientContext")
-		ok = false
 	}
 	if pd.DeviceId == "" {
 		MissingFields = append(MissingFields, "DeviceId")
@@ -210,10 +386,16 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "UNKNOWN Encoding", http.StatusBadRequest)
 		return
 	}
-	ok, missingFields := postInfo.Validate(context)
+	ok, missingFields := postInfo.checkForMissingFields(context.Logger)
 	if ok == false {
 		context.Logger.Warning("%s: Missing non-optional data: %s", postInfo.getLogPrefix(), strings.Join(missingFields, ","))
-		responseError(w, MissingRequiredData, strings.Join(missingFields, ","))
+		responseError(w, InvalidData, strings.Join(missingFields, ","))
+		return
+	}
+	ok, invalidFields := postInfo.Validate(context.Logger)
+	if ok == false {
+		context.Logger.Warning("%s: Invalid data: %s", postInfo.getLogPrefix(), strings.Join(invalidFields, ","))
+		responseError(w, InvalidData, strings.Join(invalidFields, ","))
 		return
 	}
 	token, key, err := context.Config.Server.CreateAuthToken(postInfo.UserId, postInfo.ClientContext, postInfo.DeviceId)
@@ -279,7 +461,7 @@ type deferPost struct {
 	UserId        string
 	ClientContext string
 	DeviceId      string
-	Timeout       int64
+	Timeout       uint64
 	Token         string
 
 	logPrefix string

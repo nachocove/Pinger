@@ -17,7 +17,7 @@ import (
 )
 
 type MailClientContextType interface {
-	deferPoll(timeout int64)
+	deferPoll(timeout uint64)
 	stop()
 	updateLastContact() error
 	Status() (MailClientStatus, error)
@@ -40,9 +40,9 @@ type MailClientContext struct {
 	DeviceId        string
 	Protocol        string
 	sessionId       string
-	WaitBeforeUse   int64 // in milliseconds
-	MaxPollTimeout  int64 // max polling lifetime in milliseconds. Default 2 days.
-	ResponseTimeout int64 // in milliseconds
+	WaitBeforeUse   uint64 // in milliseconds
+	MaxPollTimeout  uint64 // max polling lifetime in milliseconds. Default 2 days.
+	ResponseTimeout uint64 // in milliseconds
 	wg              sync.WaitGroup
 	status          MailClientStatus
 	logPrefix       string
@@ -117,7 +117,7 @@ func (status MailClientStatus) String() string {
 }
 
 const (
-	DefaultMaxPollTimeout int64 = 2 * 24 * 60 * 60 * 1000 // 2 days in milliseconds
+	DefaultMaxPollTimeout uint64 = 2 * 24 * 60 * 60 * 1000 // 2 days in milliseconds
 )
 
 func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInformation, debug, doStats bool, logger *Logging.Logger) (*MailClientContext, error) {
@@ -424,7 +424,7 @@ func (client *MailClientContext) start() {
 				}
 				if rearmingCount < 3 {
 					rearmingCount++
-					client.WaitBeforeUse = int64(rearmTimeout) / int64(time.Millisecond)
+					client.WaitBeforeUse = uint64(rearmTimeout) / uint64(time.Millisecond)
 					client.Info("Rearming poll|rearmingCount=%d|rearmTimeout=%s|msgCode=REARMED", rearmingCount, rearmTimeout)
 					err = client.fsm.Event(FSMDeferred, MailClientStatusReDeferred)
 					if err != nil {
@@ -522,7 +522,7 @@ func (client *MailClientContext) stop() {
 	return
 }
 
-func (client *MailClientContext) deferPoll(timeout int64) {
+func (client *MailClientContext) deferPoll(timeout uint64) {
 	if client.mailClient == nil {
 		client.Warning("Poll is stopped, cannot defer it")
 		return

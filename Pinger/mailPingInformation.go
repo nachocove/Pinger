@@ -24,11 +24,11 @@ type MailPingInformation struct {
 	RequestData            []byte
 	ExpectedReply          []byte
 	NoChangeReply          []byte
-	ResponseTimeout        int64  // in milliseconds
-	WaitBeforeUse          int64  // in milliseconds
+	ResponseTimeout        uint64 // in milliseconds
+	WaitBeforeUse          uint64 // in milliseconds
 	PushToken              string // platform dependent push token
 	PushService            string // APNS, AWS, GCM, etc.
-	MaxPollTimeout         int64  // max polling lifetime in milliseconds. Default 2 days.
+	MaxPollTimeout         uint64 // max polling lifetime in milliseconds. Default 2 days.
 	OSVersion              string
 	AppBuildVersion        string
 	AppBuildNumber         string
@@ -37,8 +37,8 @@ type MailPingInformation struct {
 	IMAPFolderName         string
 	IMAPSupportsIdle       bool
 	IMAPSupportsExpunge    bool
-	IMAPEXISTSCount        int
-	IMAPUIDNEXT            int
+	IMAPEXISTSCount        uint
+	IMAPUIDNEXT            uint
 
 	logPrefix string
 }
