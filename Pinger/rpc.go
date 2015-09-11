@@ -325,7 +325,7 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			logger.Error("%s", err.Error())
 		}
 	}()
-	logger.Info("%sReceived defer request|msgCode=RPC_DEFER", args.getLogPrefix())
+	logger.Info("%sReceived defer request|msgCode=RPC_DEFER|timeout=%d", args.getLogPrefix(), args.Timeout)
 	reply.Code = PollingReplyOK
 	reply.Message = ""
 	pollMapKey := args.pollMapKey()

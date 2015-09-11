@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -16,25 +17,34 @@ import (
 )
 
 const (
-	PLATFORM_IOS      string = "ios"
-	PLATFORM_ANDROID  string = "android"
-	EAS_URL_SCHEME    string = "https"
-	IMAP_URL_SCHEME   string = "imap"
-	PUSH_SERVICE_APNS string = "APNS"
-	PUSH_SERVICE_GCM  string = "GCM"
+	PLATFORM_IOS               string = "ios"
+	PLATFORM_ANDROID           string = "android"
+	EAS_URL_SCHEME             string = "https"
+	IMAP_URL_SCHEME            string = "imap"
+	PUSH_SERVICE_APNS          string = "APNS"
+	PUSH_SERVICE_GCM           string = "GCM"
+	MAX_REQUEST_DATA_SIZE             = 10240 // is this enough?
+	MAX_NO_CHANGE_REPLY_SIZE          = 10240 // is this enough?
+	MAX_OS_VERSION_SIZE               = 32    // is this enough?
+	MAX_APP_BUILD_VERSION_SIZE        = 32    // is this enough?
+	MAX_APP_BUILD_NUMBER_SIZE         = 32    // is this enough?
+	IMAP_LOGIN_CMD                    = "LOGIN"
+	IMAP_AUTH_CMD_PLAIN               = "AUTHENTICATE PLAIN"
+	IMAP_AUTH_CMD_XOAUTH2             = "AUTHENTICATE XOAUTH2"
+	MAX_IMAP_AUTH_CMD_SIZE            = 10240 // As per OAUTH spec - Please use a variable length data type without a specific maximum size to store access tokens.
 )
 
 var authTokenKeys map[string][]byte
 
 var clientIdRegex *regexp.Regexp
 var deviceIdRegex *regexp.Regexp
-var contextIdRegex *regexp.Regexp
+var contextRegex *regexp.Regexp
 var pushTokenRegex *regexp.Regexp
 
 func init() {
 	clientIdRegex = regexp.MustCompile("^(?P<client>us-[a-z]+-[0-9]+:[a-z\\-0-9]+).*$")
 	deviceIdRegex = regexp.MustCompile("^(?P<device>Ncho[0-9A-Z]{24})$")
-	contextIdRegex = regexp.MustCompile("^(?P<context>[a-z0-9A-Z]+)$")
+	contextRegex = regexp.MustCompile("^(?P<context>[a-z0-9A-Z]+)$")
 	pushTokenRegex = regexp.MustCompile("^(?P<pushtoken>[0-9A-Z]{64})$")
 	httpsRouter.HandleFunc("/1/register", registerDevice)
 	httpsRouter.HandleFunc("/1/defer", deferPolling)
@@ -63,7 +73,7 @@ type registerPostData struct {
 	Protocol               string
 	HttpHeaders            map[string]string // optional
 	RequestData            []byte
-	ExpectedReply          []byte
+	ExpectedReply          []byte // not used by either EAS or IMAP
 	NoChangeReply          []byte
 	ResponseTimeout        uint64 // in milliseconds
 	WaitBeforeUse          uint64 // in milliseconds
@@ -77,12 +87,32 @@ type registerPostData struct {
 	IMAPFolderName         string
 	IMAPSupportsIdle       bool
 	IMAPSupportsExpunge    bool
-	IMAPEXISTSCount        uint
-	IMAPUIDNEXT            uint
+	IMAPEXISTSCount        uint32
+	IMAPUIDNEXT            uint32
+}
+
+func getScrubbedLogPrefix(deviceId, userId, context string) string {
+	var sUserId, sDeviceId, sContext string
+	if isValidUserId(userId) {
+		sUserId = userId
+	} else {
+		sUserId = "INVALID_USERID"
+	}
+	if isValidDeviceId(deviceId) {
+		sDeviceId = deviceId
+	} else {
+		sDeviceId = "INVALID_DEVICEID"
+	}
+	if isValidClientContext(context) {
+		sContext = context
+	} else {
+		sContext = "INVALID_CONTEXT"
+	}
+	return fmt.Sprintf("%s:%s:%s", sDeviceId, sUserId, sContext)
 }
 
 func (pd *registerPostData) getLogPrefix() string {
-	return fmt.Sprintf("%s:%s:%s", pd.DeviceId, pd.UserId, pd.ClientContext)
+	return getScrubbedLogPrefix(pd.DeviceId, pd.UserId, pd.ClientContext)
 }
 
 func isValidUserId(userId string) bool {
@@ -102,11 +132,11 @@ func isValidDeviceId(deviceId string) bool {
 	return true
 }
 
-func isValidClientContextId(contextId string) bool {
-	if !govalidator.StringLength(contextId, "5", "64") {
+func isValidClientContext(context string) bool {
+	if !govalidator.StringLength(context, "5", "64") {
 		return false
 	}
-	if !contextIdRegex.MatchString(contextId) {
+	if !contextRegex.MatchString(context) {
 		return false
 	}
 	return true
@@ -161,8 +191,33 @@ func isValidPushService(pushService string) bool {
 	return true
 }
 
+func isValidFolderName(folderName string, validFolderNames []string) bool {
+	for _, f := range validFolderNames {
+		if f == folderName {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidIMAPAuthenticationBlob(blob string) bool {
+	decodedBlob, err := base64.StdEncoding.DecodeString(blob)
+	if err != nil {
+		return false
+	} else {
+		if !strings.HasPrefix(string(decodedBlob), IMAP_LOGIN_CMD) &&
+			!strings.HasPrefix(string(decodedBlob), IMAP_AUTH_CMD_PLAIN) &&
+			!strings.HasPrefix(string(decodedBlob), IMAP_AUTH_CMD_XOAUTH2) {
+			return false
+		} else if len(decodedBlob) > MAX_IMAP_AUTH_CMD_SIZE {
+			return false
+		}
+	}
+	return true
+}
+
 // Validate validate the structure/information to make sure required information exists.
-func (pd *registerPostData) Validate(logger *Logging.Logger) (bool, []string) {
+func (pd *registerPostData) Validate(context *Context) (bool, []string) {
 	ok := true
 	invalidFields := []string{}
 	if !isValidUserId(pd.UserId) {
@@ -173,7 +228,7 @@ func (pd *registerPostData) Validate(logger *Logging.Logger) (bool, []string) {
 		ok = false
 		invalidFields = append(invalidFields, "DeviceId")
 	}
-	if !isValidClientContextId(pd.ClientContext) {
+	if !isValidClientContext(pd.ClientContext) {
 		ok = false
 		invalidFields = append(invalidFields, "ClientContextId")
 	}
@@ -193,9 +248,8 @@ func (pd *registerPostData) Validate(logger *Logging.Logger) (bool, []string) {
 		ok = false
 		invalidFields = append(invalidFields, "WaitBeforeUse")
 	}
-	if pd.MaxPollTimeout > 1728000000 { //20 days max ok?
-		ok = false
-		invalidFields = append(invalidFields, "MaxPollTimeout")
+	if pd.MaxPollTimeout == 0 || pd.MaxPollTimeout > Pinger.DefaultMaxPollTimeout { //2 days max
+		pd.MaxPollTimeout = Pinger.DefaultMaxPollTimeout
 	}
 	if !isValidPushService(pd.PushService) {
 		ok = false
@@ -207,36 +261,61 @@ func (pd *registerPostData) Validate(logger *Logging.Logger) (bool, []string) {
 			invalidFields = append(invalidFields, "PushToken")
 		}
 	}
-	//PushToken              string // platform dependent push token
-	//PushService            string // APNS, AWS, GCM, etc.
-	//OSVersion              string
-	//AppBuildNumber         string
-	//AppBuildVersion        string
-
+	if len(pd.OSVersion) > MAX_OS_VERSION_SIZE || !govalidator.IsASCII(pd.OSVersion) {
+		ok = false
+		invalidFields = append(invalidFields, "OSVersion")
+	}
+	if len(pd.AppBuildVersion) > MAX_APP_BUILD_VERSION_SIZE || !govalidator.IsASCII(pd.AppBuildVersion) {
+		ok = false
+		invalidFields = append(invalidFields, "AppBuildVersion")
+	}
+	if len(pd.AppBuildNumber) > MAX_APP_BUILD_NUMBER_SIZE || !govalidator.IsInt(pd.AppBuildNumber) {
+		ok = false
+		invalidFields = append(invalidFields, "AppBuildNumber")
+	}
 	if pd.Protocol == Pinger.MailClientActiveSync {
 		if !isValidMailServerCredentials(pd.MailServerCredentials.Username, pd.MailServerCredentials.Password) {
 			ok = false
 			invalidFields = append(invalidFields, "MailServerCredentials")
-			//HttpHeaders            map[string]string // optional
-			//RequestData            []byte
-			//ExpectedReply          []byte
-			//NoChangeReply          []byte
-			pd.IMAPAuthenticationBlob = ""
-			pd.IMAPFolderName = ""
-			pd.IMAPSupportsIdle = false
-			pd.IMAPSupportsExpunge = false
-			pd.IMAPEXISTSCount = 0
-			pd.IMAPUIDNEXT = 0
 		}
+		// TODO - validate HTTP Headers
+		//"HttpHeaders":{"User-Agent":"Apple-iPhone4C1/1208.321",
+		// "MS-ASProtocolVersion":"14.1","Content-Length":"53",
+		// "Content-Type":"application/vnd.ms-sync.wbxml"}
+		// there can be other stuff too.
+		//TODO - validate WBXML
+		if len(pd.RequestData) > MAX_REQUEST_DATA_SIZE {
+			ok = false
+			invalidFields = append(invalidFields, "RequestData")
+		}
+		//TODO - validate WBXML
+		if len(pd.RequestData) > MAX_NO_CHANGE_REPLY_SIZE {
+			ok = false
+			invalidFields = append(invalidFields, "NoChangeReply")
+		}
+		pd.ExpectedReply = nil
+		pd.IMAPAuthenticationBlob = ""
+		pd.IMAPFolderName = ""
+		pd.IMAPSupportsIdle = false
+		pd.IMAPSupportsExpunge = false
+		pd.IMAPEXISTSCount = 0
+		pd.IMAPUIDNEXT = 0
 	} else if pd.Protocol == Pinger.MailClientIMAP {
 		pd.MailServerCredentials.Username = "" // the IMAP creds aren't passed in this way
 		pd.MailServerCredentials.Password = ""
 		pd.HttpHeaders = nil
 		pd.RequestData = nil
-		pd.ExpectedReply = nil
 		pd.NoChangeReply = nil
-		//IMAPAuthenticationBlob string
-		//	IMAPFolderName         string
+		pd.ExpectedReply = nil
+		if !isValidIMAPAuthenticationBlob(pd.IMAPAuthenticationBlob) {
+			ok = false
+			invalidFields = append(invalidFields, "IMAPAuthenticationBlob")
+		}
+		if !isValidFolderName(pd.IMAPFolderName, context.Config.Server.IMAPFolderNames) {
+			ok = false
+			invalidFields = append(invalidFields, "IMAPFolderName")
+		}
+		// no checks needed for the following as their types are enough
 		//IMAPSupportsIdle       bool
 		//IMAPSupportsExpunge    bool
 		//IMAPEXISTSCount        uint
@@ -324,11 +403,7 @@ func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInforma
 	pi.WaitBeforeUse = pd.WaitBeforeUse
 	pi.PushToken = pd.PushToken
 	pi.PushService = pd.PushService
-	if pd.MaxPollTimeout == 0 {
-		pi.MaxPollTimeout = Pinger.DefaultMaxPollTimeout
-	} else {
-		pi.MaxPollTimeout = pd.MaxPollTimeout
-	}
+	pi.MaxPollTimeout = pd.MaxPollTimeout
 	pi.OSVersion = pd.OSVersion
 	pi.AppBuildNumber = pd.AppBuildNumber
 	pi.AppBuildVersion = pd.AppBuildVersion
@@ -392,7 +467,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		responseError(w, InvalidData, strings.Join(missingFields, ","))
 		return
 	}
-	ok, invalidFields := postInfo.Validate(context.Logger)
+	ok, invalidFields := postInfo.Validate(context)
 	if ok == false {
 		context.Logger.Warning("%s: Invalid data: %s", postInfo.getLogPrefix(), strings.Join(invalidFields, ","))
 		responseError(w, InvalidData, strings.Join(invalidFields, ","))
@@ -468,10 +543,30 @@ type deferPost struct {
 }
 
 func (dp *deferPost) getLogPrefix() string {
-	if dp.logPrefix == "" {
-		dp.logPrefix = fmt.Sprintf("%s:%s:%s", dp.DeviceId, dp.UserId, dp.ClientContext)
+	return getScrubbedLogPrefix(dp.DeviceId, dp.UserId, dp.ClientContext)
+}
+
+// Validate validate the structure/information to make sure required information exists.
+func (dp *deferPost) Validate(context *Context) (bool, []string) {
+	ok := true
+	invalidFields := []string{}
+	if dp.UserId == "" || !isValidUserId(dp.UserId) {
+		ok = false
+		invalidFields = append(invalidFields, "UserId")
 	}
-	return dp.logPrefix
+	if dp.DeviceId == "" || !isValidDeviceId(dp.DeviceId) {
+		ok = false
+		invalidFields = append(invalidFields, "DeviceId")
+	}
+	if dp.ClientContext == "" || !isValidClientContext(dp.ClientContext) {
+		ok = false
+		invalidFields = append(invalidFields, "ClientContextId")
+	}
+	if dp.Timeout > 600000 { //10 minutes max ok?
+		ok = false
+		invalidFields = append(invalidFields, "Timeout")
+	}
+	return ok, invalidFields
 }
 
 func deferPolling(w http.ResponseWriter, r *http.Request) {
@@ -506,7 +601,12 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		deferData.UserId = deferData.ClientId
 		context.Logger.Info("%s: Old client using ClientId (%s) instead of UserId.", deferData.getLogPrefix(), deferData.ClientId)
 	}
-
+	ok, invalidFields := deferData.Validate(context)
+	if ok == false {
+		context.Logger.Warning("%s: Invalid data: %s", deferData.getLogPrefix(), strings.Join(invalidFields, ","))
+		responseError(w, InvalidData, strings.Join(invalidFields, ","))
+		return
+	}
 	key, ok := authTokenKeys[deferData.Token]
 	if !ok {
 		reply = &Pinger.PollingResponse{
@@ -526,7 +626,8 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 			//		http.Error(w, "Unknown Client ID", http.StatusForbidden)
 			//		return
 			//	}
-			context.Logger.Debug("%s: Token %s is valid", deferData.getLogPrefix(), deferData.Token)
+			context.Logger.Debug("%s: Token is valid", deferData.getLogPrefix())
+			// deferData.Timeout is not sent by the client. It defaults to 0
 			reply, err = Pinger.DeferPoll(&context.Config.Rpc, deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout)
 			if err != nil {
 				context.Logger.Error("%s: Error deferring poll %s", deferData.getLogPrefix(), err)
@@ -576,11 +677,27 @@ type stopPost struct {
 	logPrefix string
 }
 
-func (sp *stopPost) getLogPrefix() string {
-	if sp.logPrefix == "" {
-		sp.logPrefix = fmt.Sprintf("%s:%s:%s", sp.DeviceId, sp.UserId, sp.ClientContext)
+// Validate validate the structure/information to make sure required information exists.
+func (sp *stopPost) Validate(context *Context) (bool, []string) {
+	ok := true
+	invalidFields := []string{}
+	if sp.UserId == "" || !isValidUserId(sp.UserId) {
+		ok = false
+		invalidFields = append(invalidFields, "UserId")
 	}
-	return sp.logPrefix
+	if sp.DeviceId == "" || !isValidDeviceId(sp.DeviceId) {
+		ok = false
+		invalidFields = append(invalidFields, "DeviceId")
+	}
+	if sp.ClientContext == "" || !isValidClientContext(sp.ClientContext) {
+		ok = false
+		invalidFields = append(invalidFields, "ClientContextId")
+	}
+	return ok, invalidFields
+}
+
+func (sp *stopPost) getLogPrefix() string {
+	return getScrubbedLogPrefix(sp.DeviceId, sp.UserId, sp.ClientContext)
 }
 
 func stopPolling(w http.ResponseWriter, r *http.Request) {
@@ -614,6 +731,12 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 	if stopData.UserId == "" && stopData.ClientId != "" { // old client
 		stopData.UserId = stopData.ClientId
 		context.Logger.Info("%s: Old client using ClientId (%s) instead of UserId.", stopData.getLogPrefix(), stopData.ClientId)
+	}
+	ok, invalidFields := stopData.Validate(context)
+	if ok == false {
+		context.Logger.Warning("%s: Invalid data: %s", stopData.getLogPrefix(), strings.Join(invalidFields, ","))
+		responseError(w, InvalidData, strings.Join(invalidFields, ","))
+		return
 	}
 	key, ok := authTokenKeys[stopData.Token]
 	if !ok {

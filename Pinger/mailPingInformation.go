@@ -37,8 +37,8 @@ type MailPingInformation struct {
 	IMAPFolderName         string
 	IMAPSupportsIdle       bool
 	IMAPSupportsExpunge    bool
-	IMAPEXISTSCount        uint
-	IMAPUIDNEXT            uint
+	IMAPEXISTSCount        uint32
+	IMAPUIDNEXT            uint32
 
 	logPrefix string
 }

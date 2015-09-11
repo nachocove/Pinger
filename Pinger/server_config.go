@@ -8,6 +8,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
+	"github.com/asaskevich/govalidator"
 	"net"
 	"strings"
 )
@@ -32,6 +33,7 @@ type ServerConfiguration struct {
 	SessionSecret    string   `gcfg:"session-secret"`
 	AliveCheckIPList []string `gcfg:"alive-check-ip"`
 	AliveCheckToken  []string `gcfg:"alive-check-token"`
+	IMAPFolderNames  []string `gcfg:"imap-folder-name"`
 	DumpRequests     bool
 	Debug            bool
 	TokenAuthKey     string
@@ -69,6 +71,15 @@ func (cfg *ServerConfiguration) validate() error {
 	_, err := aes.NewCipher([]byte(cfg.TokenAuthKey))
 	if err != nil {
 		return err
+	}
+	if len(cfg.IMAPFolderNames) == 0 {
+		return fmt.Errorf("Need to have at least 1 IMAPFolderName in the config")
+	}
+	for _, folderName := range cfg.IMAPFolderNames {
+		fmt.Println(folderName)
+		if !govalidator.IsASCII(folderName) {
+			return fmt.Errorf("IMAP Folder Name is not ASCII")
+		}
 	}
 	return nil
 }

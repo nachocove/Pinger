@@ -208,7 +208,7 @@ func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
 	return true, nil
 }
 
-func (imap *IMAPClient) parseEXAMINEResponse(response string) (value uint, token string) {
+func (imap *IMAPClient) parseEXAMINEResponse(response string) (value uint32, token string) {
 	tokens := strings.Split(response, " ")
 	valueToken := ""
 	if tokens[0] == "*" && tokens[2] == IMAP_EXISTS {
@@ -221,14 +221,14 @@ func (imap *IMAPClient) parseEXAMINEResponse(response string) (value uint, token
 		if err != nil {
 			imap.Warning("Cannot parse value from response : %s", response)
 		} else {
-			return uint(value), tokens[2]
+			return uint32(value), tokens[2]
 		}
 	}
 	return 0, ""
 }
 
 //* STATUS "INBOX" (MESSAGES 18 UIDNEXT 41)
-func (imap *IMAPClient) parseSTATUSResponse(response string) (uint, uint) {
+func (imap *IMAPClient) parseSTATUSResponse(response string) (uint32, uint32) {
 	re := regexp.MustCompile(".*(MESSAGES (?P<messageCount>[0-9]+) UIDNEXT (?P<UIDNext>[0-9]+))")
 	r2 := re.FindStringSubmatch(response)
 	if len(r2) == 0 {
@@ -246,17 +246,17 @@ func (imap *IMAPClient) parseSTATUSResponse(response string) (uint, uint) {
 		imap.Warning("Cannot parse value from %s", UIDNextStr)
 		UIDNext = 0
 	}
-	return uint(messageCount), uint(UIDNext)
+	return uint32(messageCount), uint32(UIDNext)
 }
 
-func (imap *IMAPClient) parseIDLEResponse(response string) (value uint, token string) {
+func (imap *IMAPClient) parseIDLEResponse(response string) (value uint32, token string) {
 	tokens := strings.Split(response, " ")
 	if tokens[0] == "*" && (tokens[2] == IMAP_EXISTS || tokens[2] == IMAP_EXPUNGE) {
 		value, err := strconv.Atoi(tokens[1])
 		if err != nil {
 			imap.Warning("Cannot parse value from %s", response)
 		} else {
-			return uint(value), tokens[2]
+			return uint32(value), tokens[2]
 		}
 	}
 	return 0, ""
