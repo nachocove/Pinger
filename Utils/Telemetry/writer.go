@@ -219,6 +219,10 @@ func (writer *TelemetryWriter) createFilesFromMessages(messages *[]telemetryLogM
 			}
 			prevTime = msg.Timestamp
 			jsonString, err := json.Marshal(msg.toMap())
+			NL := []byte("\\n")
+			CR := []byte("\\r")
+			jsonString = bytes.Replace(jsonString, CR, []byte("<CR>"), -1)
+			jsonString = bytes.Replace(jsonString, NL, []byte("<NL>"), -1)
 			if err != nil {
 				return err
 			}

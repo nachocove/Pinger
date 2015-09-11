@@ -76,7 +76,6 @@ func (cfg *ServerConfiguration) validate() error {
 		return fmt.Errorf("Need to have at least 1 IMAPFolderName in the config")
 	}
 	for _, folderName := range cfg.IMAPFolderNames {
-		fmt.Println(folderName)
 		if !govalidator.IsASCII(folderName) {
 			return fmt.Errorf("IMAP Folder Name is not ASCII")
 		}
