@@ -31,7 +31,8 @@ const (
 	IMAP_LOGIN_CMD                    = "LOGIN"
 	IMAP_AUTH_CMD_PLAIN               = "AUTHENTICATE PLAIN"
 	IMAP_AUTH_CMD_XOAUTH2             = "AUTHENTICATE XOAUTH2"
-	MAX_IMAP_AUTH_CMD_SIZE            = 10240 // As per OAUTH spec - Please use a variable length data type without a specific maximum size to store access tokens.
+	MAX_IMAP_AUTH_CMD_SIZE            = 10240  // As per OAUTH spec - Please use a variable length data type without a specific maximum size to store access tokens.
+	MAX_HTTP_REQUEST_SIZE             = 102400 // average size of requests is less than 2K
 )
 
 var authTokenKeys map[string][]byte
@@ -444,6 +445,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 	//	}
 	encodingStr := r.Header.Get("Content-Type")
 	// TODO Check the length of the encodingStr. We roughly know how long it can reasonably be.
+	r.Body = http.MaxBytesReader(w, r.Body, MAX_HTTP_REQUEST_SIZE)
 	postInfo := registerPostData{}
 	switch {
 	case encodingStr == "application/json" || encodingStr == "text/json":
@@ -588,6 +590,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deferData := deferPost{}
+	r.Body = http.MaxBytesReader(w, r.Body, MAX_HTTP_REQUEST_SIZE)
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&deferData)
 	if err != nil {
@@ -719,6 +722,7 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stopData := stopPost{}
+	r.Body = http.MaxBytesReader(w, r.Body, MAX_HTTP_REQUEST_SIZE)
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&stopData)
 	if err != nil {
