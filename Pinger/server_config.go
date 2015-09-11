@@ -22,6 +22,12 @@ const (
 	DefaultNonTLSPort     = 0
 )
 
+var DefaultIMAPFolders []string
+
+func init() {
+	DefaultIMAPFolders = []string{"INBOX"}
+}
+
 // ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
 type ServerConfiguration struct {
 	Port             int
@@ -43,13 +49,14 @@ type ServerConfiguration struct {
 
 func NewServerConfiguration() *ServerConfiguration {
 	return &ServerConfiguration{
-		Port:           DefaultPort,
-		BindAddress:    DefaultBindAddress,
-		ServerCertFile: DefaultServerCertFile,
-		ServerKeyFile:  DefaultServerKeyFile,
-		NonTlsPort:     DefaultNonTLSPort,
-		SessionSecret:  "",
-		TokenAuthKey:   "",
+		Port:            DefaultPort,
+		BindAddress:     DefaultBindAddress,
+		ServerCertFile:  DefaultServerCertFile,
+		ServerKeyFile:   DefaultServerKeyFile,
+		NonTlsPort:      DefaultNonTLSPort,
+		IMAPFolderNames: DefaultIMAPFolders,
+		SessionSecret:   "",
+		TokenAuthKey:    "",
 	}
 }
 func (cfg *ServerConfiguration) validate() error {
