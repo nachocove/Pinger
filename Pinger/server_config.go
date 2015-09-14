@@ -84,7 +84,9 @@ func (cfg *ServerConfiguration) validate() error {
 	}
 	for _, folderName := range cfg.IMAPFolderNames {
 		if !govalidator.IsUTFLetterNumeric(folderName) {
-			return fmt.Errorf("IMAP Folder Name is not Unicode")
+			if !govalidator.IsASCII(folderName) {
+				return fmt.Errorf("IMAP Folder Name is not Unicode or ASCII: [%s]", folderName)
+			}
 		}
 	}
 	return nil

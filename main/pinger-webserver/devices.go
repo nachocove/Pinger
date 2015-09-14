@@ -188,7 +188,10 @@ func isMailServerURL(rawurl string) bool {
 	}
 	if len(url.Scheme) == 0 {
 		return false //No Scheme found
-	} else if url.Scheme != EAS_URL_SCHEME && url.Scheme != IMAP_URL_SCHEME && url.Scheme != IMAPS_URL_SCHEME {
+
+	} else if !strings.EqualFold(url.Scheme, EAS_URL_SCHEME) &&
+		!strings.EqualFold(url.Scheme, IMAP_URL_SCHEME) &&
+		!strings.EqualFold(url.Scheme, IMAPS_URL_SCHEME) {
 		return false
 	}
 	if len(url.Host) == 0 {
@@ -206,7 +209,7 @@ func isValidPushService(pushService string) bool {
 
 func isValidFolderName(folderName string, validFolderNames []string) bool {
 	for _, f := range validFolderNames {
-		if f == folderName {
+		if strings.EqualFold(f, folderName) {
 			return true
 		}
 	}
@@ -286,7 +289,7 @@ func (pd *registerPostData) validate(context *Context) (bool, []string) {
 		ok = false
 		invalidFields = append(invalidFields, "AppBuildNumber")
 	}
-	if pd.Protocol == Pinger.MailClientActiveSync {
+	if strings.EqualFold(pd.Protocol, Pinger.MailClientActiveSync) {
 		if !isValidMailServerCredentials(pd.MailServerCredentials.Username, pd.MailServerCredentials.Password) {
 			ok = false
 			invalidFields = append(invalidFields, "MailServerCredentials")
@@ -313,7 +316,7 @@ func (pd *registerPostData) validate(context *Context) (bool, []string) {
 		pd.IMAPSupportsExpunge = false
 		pd.IMAPEXISTSCount = 0
 		pd.IMAPUIDNEXT = 0
-	} else if pd.Protocol == Pinger.MailClientIMAP {
+	} else if strings.EqualFold(pd.Protocol, Pinger.MailClientIMAP) {
 		pd.MailServerCredentials.Username = "" // the IMAP creds aren't passed in this way
 		pd.MailServerCredentials.Password = ""
 		pd.HttpHeaders = nil
