@@ -222,7 +222,7 @@ func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey st
 	logger.Info("%s|Creating new pinger session", mi.getLogPrefix())
 	client, err := t.newMailClientContext(mi, false)
 	if err != nil {
-		logger.Error("%s|pollMapKey=%s|msgCode=PINGER_CREATE_FAIL", err, pollMapKey)
+		logger.Warning("%s|pollMapKey=%s|msgCode=PINGER_CREATE_FAIL", err, pollMapKey)
 		return
 	}
 	t.LockMap()

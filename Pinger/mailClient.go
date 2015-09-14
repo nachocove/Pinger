@@ -138,7 +138,7 @@ func NewMailClientContext(dbm *gorp.DbMap, aws AWS.AWSHandler, pi *MailPingInfor
 	}
 	err := aws.ValidateCognitoID(pi.UserId)
 	if err != nil {
-		client.Error("Could not validate user id|userId=%s|msgCode=INVALID_USERID", err.Error())
+		client.Info("Could not validate user id:%s|userId=%s|msgCode=INVALID_USERID", err.Error(), pi.UserId)
 		return nil, err
 	}
 

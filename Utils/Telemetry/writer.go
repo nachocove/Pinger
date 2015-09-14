@@ -47,6 +47,13 @@ type TelemetryWriter struct {
 	mutex                   sync.Mutex
 }
 
+var NL, CR []byte
+
+func init() {
+	NL = []byte("\\n")
+	CR = []byte("\\r")
+}
+
 // NewTelemetryWriter create a new TelemetryWriter instance
 func NewTelemetryWriter(config *TelemetryConfiguration, aws AWS.AWSHandler, debug bool) (*TelemetryWriter, error) {
 	if config.FileLocationPrefix == "" {
@@ -219,8 +226,6 @@ func (writer *TelemetryWriter) createFilesFromMessages(messages *[]telemetryLogM
 			}
 			prevTime = msg.Timestamp
 			jsonString, err := json.Marshal(msg.toMap())
-			NL := []byte("\\n")
-			CR := []byte("\\r")
 			jsonString = bytes.Replace(jsonString, CR, []byte("<CR>"), -1)
 			jsonString = bytes.Replace(jsonString, NL, []byte("<NL>"), -1)
 			if err != nil {

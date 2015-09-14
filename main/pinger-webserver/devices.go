@@ -21,13 +21,16 @@ const (
 	PLATFORM_ANDROID           string = "android"
 	EAS_URL_SCHEME             string = "https"
 	IMAP_URL_SCHEME            string = "imap"
+	IMAPS_URL_SCHEME           string = "imaps"
 	PUSH_SERVICE_APNS          string = "APNS"
 	PUSH_SERVICE_GCM           string = "GCM"
-	MAX_REQUEST_DATA_SIZE             = 10240 // is this enough?
-	MAX_NO_CHANGE_REPLY_SIZE          = 10240 // is this enough?
-	MAX_OS_VERSION_SIZE               = 32    // is this enough?
-	MAX_APP_BUILD_VERSION_SIZE        = 32    // is this enough?
-	MAX_APP_BUILD_NUMBER_SIZE         = 32    // is this enough?
+	MAX_RESPONSE_TIMEOUT              = 3600000 ////1 hr max ok?
+	MAX_WAIT_BEFORE_USE               = 600000  //10 minutes max ok?
+	MAX_REQUEST_DATA_SIZE             = 10240   // is this enough?
+	MAX_NO_CHANGE_REPLY_SIZE          = 10240   // is this enough?
+	MAX_OS_VERSION_SIZE               = 32      // is this enough?
+	MAX_APP_BUILD_VERSION_SIZE        = 32      // is this enough?
+	MAX_APP_BUILD_NUMBER_SIZE         = 32      // is this enough?
 	IMAP_LOGIN_CMD                    = "LOGIN"
 	IMAP_AUTH_CMD_PLAIN               = "AUTHENTICATE PLAIN"
 	IMAP_AUTH_CMD_XOAUTH2             = "AUTHENTICATE XOAUTH2"
@@ -117,6 +120,9 @@ func (pd *registerPostData) getLogPrefix() string {
 }
 
 func isValidUserId(userId string) bool {
+	if userId == "" {
+		return false
+	}
 	if !govalidator.StringLength(userId, "46", "46") {
 		return false
 	}
@@ -127,6 +133,9 @@ func isValidUserId(userId string) bool {
 }
 
 func isValidDeviceId(deviceId string) bool {
+	if deviceId == "" {
+		return false
+	}
 	if !deviceIdRegex.MatchString(deviceId) {
 		return false
 	}
@@ -134,6 +143,9 @@ func isValidDeviceId(deviceId string) bool {
 }
 
 func isValidClientContext(context string) bool {
+	if context == "" {
+		return false
+	}
 	if !govalidator.StringLength(context, "5", "64") {
 		return false
 	}
@@ -176,7 +188,7 @@ func isMailServerURL(rawurl string) bool {
 	}
 	if len(url.Scheme) == 0 {
 		return false //No Scheme found
-	} else if url.Scheme != EAS_URL_SCHEME && url.Scheme != IMAP_URL_SCHEME {
+	} else if url.Scheme != EAS_URL_SCHEME && url.Scheme != IMAP_URL_SCHEME && url.Scheme != IMAPS_URL_SCHEME {
 		return false
 	}
 	if len(url.Host) == 0 {
@@ -218,7 +230,7 @@ func isValidIMAPAuthenticationBlob(blob string) bool {
 }
 
 // Validate validate the structure/information to make sure required information exists.
-func (pd *registerPostData) Validate(context *Context) (bool, []string) {
+func (pd *registerPostData) validate(context *Context) (bool, []string) {
 	ok := true
 	invalidFields := []string{}
 	if !isValidUserId(pd.UserId) {
@@ -241,11 +253,11 @@ func (pd *registerPostData) Validate(context *Context) (bool, []string) {
 		ok = false
 		invalidFields = append(invalidFields, "MailServerUrl")
 	}
-	if pd.ResponseTimeout > 3600000 { //1 hr max ok?
+	if pd.ResponseTimeout > MAX_RESPONSE_TIMEOUT {
 		ok = false
 		invalidFields = append(invalidFields, "ResponseTimeout")
 	}
-	if pd.WaitBeforeUse > 600000 { //10 minutes max ok?
+	if pd.WaitBeforeUse > MAX_WAIT_BEFORE_USE {
 		ok = false
 		invalidFields = append(invalidFields, "WaitBeforeUse")
 	}
@@ -469,7 +481,7 @@ func registerDevice(w http.ResponseWriter, r *http.Request) {
 		responseError(w, InvalidData, strings.Join(missingFields, ","))
 		return
 	}
-	ok, invalidFields := postInfo.Validate(context)
+	ok, invalidFields := postInfo.validate(context)
 	if ok == false {
 		context.Logger.Warning("%s: Invalid data: %s", postInfo.getLogPrefix(), strings.Join(invalidFields, ","))
 		responseError(w, InvalidData, strings.Join(invalidFields, ","))
@@ -549,22 +561,22 @@ func (dp *deferPost) getLogPrefix() string {
 }
 
 // Validate validate the structure/information to make sure required information exists.
-func (dp *deferPost) Validate(context *Context) (bool, []string) {
+func (dp *deferPost) validate(context *Context) (bool, []string) {
 	ok := true
 	invalidFields := []string{}
-	if dp.UserId == "" || !isValidUserId(dp.UserId) {
+	if !isValidUserId(dp.UserId) {
 		ok = false
 		invalidFields = append(invalidFields, "UserId")
 	}
-	if dp.DeviceId == "" || !isValidDeviceId(dp.DeviceId) {
+	if !isValidDeviceId(dp.DeviceId) {
 		ok = false
 		invalidFields = append(invalidFields, "DeviceId")
 	}
-	if dp.ClientContext == "" || !isValidClientContext(dp.ClientContext) {
+	if !isValidClientContext(dp.ClientContext) {
 		ok = false
 		invalidFields = append(invalidFields, "ClientContextId")
 	}
-	if dp.Timeout > 600000 { //10 minutes max ok?
+	if dp.Timeout > MAX_WAIT_BEFORE_USE {
 		ok = false
 		invalidFields = append(invalidFields, "Timeout")
 	}
@@ -604,7 +616,7 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 		deferData.UserId = deferData.ClientId
 		context.Logger.Info("%s: Old client using ClientId (%s) instead of UserId.", deferData.getLogPrefix(), deferData.ClientId)
 	}
-	ok, invalidFields := deferData.Validate(context)
+	ok, invalidFields := deferData.validate(context)
 	if ok == false {
 		context.Logger.Warning("%s: Invalid data: %s", deferData.getLogPrefix(), strings.Join(invalidFields, ","))
 		responseError(w, InvalidData, strings.Join(invalidFields, ","))
@@ -681,18 +693,18 @@ type stopPost struct {
 }
 
 // Validate validate the structure/information to make sure required information exists.
-func (sp *stopPost) Validate(context *Context) (bool, []string) {
+func (sp *stopPost) validate(context *Context) (bool, []string) {
 	ok := true
 	invalidFields := []string{}
-	if sp.UserId == "" || !isValidUserId(sp.UserId) {
+	if !isValidUserId(sp.UserId) {
 		ok = false
 		invalidFields = append(invalidFields, "UserId")
 	}
-	if sp.DeviceId == "" || !isValidDeviceId(sp.DeviceId) {
+	if !isValidDeviceId(sp.DeviceId) {
 		ok = false
 		invalidFields = append(invalidFields, "DeviceId")
 	}
-	if sp.ClientContext == "" || !isValidClientContext(sp.ClientContext) {
+	if !isValidClientContext(sp.ClientContext) {
 		ok = false
 		invalidFields = append(invalidFields, "ClientContextId")
 	}
@@ -736,7 +748,7 @@ func stopPolling(w http.ResponseWriter, r *http.Request) {
 		stopData.UserId = stopData.ClientId
 		context.Logger.Info("%s: Old client using ClientId (%s) instead of UserId.", stopData.getLogPrefix(), stopData.ClientId)
 	}
-	ok, invalidFields := stopData.Validate(context)
+	ok, invalidFields := stopData.validate(context)
 	if ok == false {
 		context.Logger.Warning("%s: Invalid data: %s", stopData.getLogPrefix(), strings.Join(invalidFields, ","))
 		responseError(w, InvalidData, strings.Join(invalidFields, ","))
