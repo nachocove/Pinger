@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
+	"strings"
 )
 
 // TODO This should probably move into the MailClient interface/struct
@@ -44,11 +45,12 @@ type MailPingInformation struct {
 }
 
 func (pi *MailPingInformation) String() string {
+	redactedUri := strings.Split(pi.MailServerUrl, "?")[0]
 	return fmt.Sprintf("UserId=%s|ClientContext=%s|DeviceId=%s|Platform=%s|MailServerUrl=%s|"+
 		"Protocol=%s|ResponseTimeout=%d|WaitBeforeUse=%d|PushToken=%s|PushServer=%s|MaxPollTimeout=%d|"+
 		"OSVersion=%s|AppBuildVersion=%s|AppBuildNumber=%s|SessionId=%s|IMAPFolderName=%s|IMAPSupportsIdle=%t|"+
 		"IMAPSupportsExpunge=%t|IMAPEXISTSCount=%d|IMAPUIDNEXT=%d",
-		pi.UserId, pi.ClientContext, pi.DeviceId, pi.Platform, pi.MailServerUrl, pi.Protocol,
+		pi.UserId, pi.ClientContext, pi.DeviceId, pi.Platform, redactedUri, pi.Protocol,
 		pi.ResponseTimeout, pi.WaitBeforeUse, pi.PushToken, pi.PushService, pi.MaxPollTimeout, pi.OSVersion,
 		pi.AppBuildVersion, pi.AppBuildNumber, pi.SessionId, pi.IMAPFolderName, pi.IMAPSupportsIdle,
 		pi.IMAPSupportsExpunge, pi.IMAPEXISTSCount, pi.IMAPUIDNEXT)
