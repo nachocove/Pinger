@@ -23,15 +23,15 @@ func addResponseError(errCode ResponseErrorString, errMsg ResponseErrorMsg, http
 }
 
 const (
-	MissingRequiredData ResponseErrorString = "MISSING_REQUIRED_DATA"
-	RPCServerError      ResponseErrorString = "RPC_SERVER_ERROR"
-	SaveSessionError    ResponseErrorString = "SAVE_SESSION_ERROR"
-	JSONEncodeError     ResponseErrorString = "JSON_ENCODE_ERROR"
+	InvalidData      ResponseErrorString = "INVALID_DATA"
+	RPCServerError   ResponseErrorString = "RPC_SERVER_ERROR"
+	SaveSessionError ResponseErrorString = "SAVE_SESSION_ERROR"
+	JSONEncodeError  ResponseErrorString = "JSON_ENCODE_ERROR"
 )
 
 func init() {
 	responseErrors = make(responseErrorType)
-	addResponseError(MissingRequiredData, "Some data that is required was missing", http.StatusBadRequest)
+	addResponseError(InvalidData, "Invalid Data", http.StatusBadRequest)
 	addResponseError(RPCServerError, "Could not reach RPC server", http.StatusInternalServerError)
 	addResponseError(SaveSessionError, "Could not save session", http.StatusInternalServerError)
 	addResponseError(JSONEncodeError, "Could not encode json reply", http.StatusInternalServerError)

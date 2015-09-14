@@ -8,6 +8,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
+	"github.com/asaskevich/govalidator"
 	"net"
 	"strings"
 )
@@ -21,6 +22,12 @@ const (
 	DefaultNonTLSPort     = 0
 )
 
+var DefaultIMAPFolders []string
+
+func init() {
+	DefaultIMAPFolders = []string{"INBOX"}
+}
+
 // ServerConfiguration - The structure of the json config needed for server values, like port, and bind_address
 type ServerConfiguration struct {
 	Port             int
@@ -32,6 +39,7 @@ type ServerConfiguration struct {
 	SessionSecret    string   `gcfg:"session-secret"`
 	AliveCheckIPList []string `gcfg:"alive-check-ip"`
 	AliveCheckToken  []string `gcfg:"alive-check-token"`
+	IMAPFolderNames  []string `gcfg:"imap-folder-name"`
 	DumpRequests     bool
 	Debug            bool
 	TokenAuthKey     string
@@ -41,13 +49,14 @@ type ServerConfiguration struct {
 
 func NewServerConfiguration() *ServerConfiguration {
 	return &ServerConfiguration{
-		Port:           DefaultPort,
-		BindAddress:    DefaultBindAddress,
-		ServerCertFile: DefaultServerCertFile,
-		ServerKeyFile:  DefaultServerKeyFile,
-		NonTlsPort:     DefaultNonTLSPort,
-		SessionSecret:  "",
-		TokenAuthKey:   "",
+		Port:            DefaultPort,
+		BindAddress:     DefaultBindAddress,
+		ServerCertFile:  DefaultServerCertFile,
+		ServerKeyFile:   DefaultServerKeyFile,
+		NonTlsPort:      DefaultNonTLSPort,
+		IMAPFolderNames: DefaultIMAPFolders,
+		SessionSecret:   "",
+		TokenAuthKey:    "",
 	}
 }
 func (cfg *ServerConfiguration) validate() error {
@@ -69,6 +78,16 @@ func (cfg *ServerConfiguration) validate() error {
 	_, err := aes.NewCipher([]byte(cfg.TokenAuthKey))
 	if err != nil {
 		return err
+	}
+	if len(cfg.IMAPFolderNames) == 0 {
+		return fmt.Errorf("Need to have at least 1 IMAPFolderName in the config")
+	}
+	for _, folderName := range cfg.IMAPFolderNames {
+		if !govalidator.IsUTFLetterNumeric(folderName) {
+			if !govalidator.IsASCII(folderName) {
+				return fmt.Errorf("IMAP Folder Name is not Unicode or ASCII: [%s]", folderName)
+			}
+		}
 	}
 	return nil
 }

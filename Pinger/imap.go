@@ -125,7 +125,7 @@ func (r *prngSource) Seed(seed int64) {
 	r.mu.Unlock()
 }
 
-func genNewCmdTag(n int) *cmdTag {
+func genNewCmdTag(n uint) *cmdTag {
 	if n < 1 || 26 < n {
 		n = 5
 	}
@@ -169,7 +169,7 @@ func (imap *IMAPClient) isOKResponse(response string) bool {
 
 func (imap *IMAPClient) handleGreeting() error {
 	imap.Debug("Handle Greeting")
-	response, err := imap.getServerResponse(int64(replyTimeout / time.Millisecond))
+	response, err := imap.getServerResponse(uint64(replyTimeout / time.Millisecond))
 	if err == nil {
 		imap.Info("Connected|host=%s|tag=%s", imap.url.Host, imap.tag.id)
 		if imap.isOKResponse(response) {
@@ -190,7 +190,7 @@ func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
 		imap.Error("Error decoding AuthBlob")
 		return false, err
 	}
-	responses, err := imap.doIMAPCommand(fmt.Sprintf("%s %s", imap.tag.Next(), decodedBlob), int64(replyTimeout/time.Millisecond))
+	responses, err := imap.doIMAPCommand(fmt.Sprintf("%s %s", imap.tag.Next(), decodedBlob), uint64(replyTimeout/time.Millisecond))
 	if err != nil {
 		return false, err
 	}
@@ -198,7 +198,7 @@ func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
 		lastResponse := responses[len(responses)-1]
 		if imap.isContinueResponse(lastResponse) { // auth failed
 			imap.Debug("Authentication failed: %s", lastResponse)
-			responses, err = imap.doIMAPCommand(" ", int64(replyTimeout/time.Millisecond))
+			responses, err = imap.doIMAPCommand(" ", uint64(replyTimeout/time.Millisecond))
 		}
 		if !imap.isOKResponse(lastResponse) {
 			return false, err
@@ -208,7 +208,7 @@ func (imap *IMAPClient) doImapAuth() (authSucess bool, err error) {
 	return true, nil
 }
 
-func (imap *IMAPClient) parseEXAMINEResponse(response string) (value int, token string) {
+func (imap *IMAPClient) parseEXAMINEResponse(response string) (value uint32, token string) {
 	tokens := strings.Split(response, " ")
 	valueToken := ""
 	if tokens[0] == "*" && tokens[2] == IMAP_EXISTS {
@@ -221,14 +221,14 @@ func (imap *IMAPClient) parseEXAMINEResponse(response string) (value int, token 
 		if err != nil {
 			imap.Warning("Cannot parse value from response : %s", response)
 		} else {
-			return value, tokens[2]
+			return uint32(value), tokens[2]
 		}
 	}
 	return 0, ""
 }
 
 //* STATUS "INBOX" (MESSAGES 18 UIDNEXT 41)
-func (imap *IMAPClient) parseSTATUSResponse(response string) (int, int) {
+func (imap *IMAPClient) parseSTATUSResponse(response string) (uint32, uint32) {
 	re := regexp.MustCompile(".*(MESSAGES (?P<messageCount>[0-9]+) UIDNEXT (?P<UIDNext>[0-9]+))")
 	r2 := re.FindStringSubmatch(response)
 	if len(r2) == 0 {
@@ -246,17 +246,17 @@ func (imap *IMAPClient) parseSTATUSResponse(response string) (int, int) {
 		imap.Warning("Cannot parse value from %s", UIDNextStr)
 		UIDNext = 0
 	}
-	return messageCount, UIDNext
+	return uint32(messageCount), uint32(UIDNext)
 }
 
-func (imap *IMAPClient) parseIDLEResponse(response string) (value int, token string) {
+func (imap *IMAPClient) parseIDLEResponse(response string) (value uint32, token string) {
 	tokens := strings.Split(response, " ")
 	if tokens[0] == "*" && (tokens[2] == IMAP_EXISTS || tokens[2] == IMAP_EXPUNGE) {
 		value, err := strconv.Atoi(tokens[1])
 		if err != nil {
 			imap.Warning("Cannot parse value from %s", response)
 		} else {
-			return value, tokens[2]
+			return uint32(value), tokens[2]
 		}
 	}
 	return 0, ""
@@ -265,7 +265,7 @@ func (imap *IMAPClient) parseIDLEResponse(response string) (value int, token str
 func (imap *IMAPClient) doExamine() error {
 	command := fmt.Sprintf("%s %s %s", imap.tag.Next(), IMAP_EXAMINE, imap.pi.IMAPFolderName)
 	imap.Debug("IMAPFolder=%s", imap.pi.IMAPFolderName)
-	_, err := imap.doIMAPCommand(command, int64(replyTimeout/time.Millisecond))
+	_, err := imap.doIMAPCommand(command, uint64(replyTimeout/time.Millisecond))
 	return err
 }
 
@@ -290,7 +290,7 @@ func (imap *IMAPClient) sendIMAPCommand(command string) error {
 	return nil
 }
 
-func (imap *IMAPClient) doIMAPCommand(command string, waitTime int64) ([]string, error) {
+func (imap *IMAPClient) doIMAPCommand(command string, waitTime uint64) ([]string, error) {
 	commandLines := strings.Split(command, "\n")
 	var allResponses []string
 	var err error
@@ -402,7 +402,7 @@ func (imap *IMAPClient) getNameFromCommand(command string) string {
 	return ""
 }
 
-func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]string, error) {
+func (imap *IMAPClient) getServerResponses(command string, waitTime uint64) ([]string, error) {
 	completed := false
 	responses := make([]string, 0)
 	imap.Debug("Getting Server Responses")
@@ -443,7 +443,7 @@ func (imap *IMAPClient) getServerResponses(command string, waitTime int64) ([]st
 	return responses, nil
 }
 
-func (imap *IMAPClient) getServerResponse(waitTime int64) (string, error) {
+func (imap *IMAPClient) getServerResponse(waitTime uint64) (string, error) {
 	imap.Debug("Getting server response|timeout=%d", waitTime)
 	if waitTime > 0 {
 		waitUntil := time.Now().Add(time.Duration(waitTime) * time.Millisecond)
@@ -507,8 +507,8 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 	}
 	imap.mutex.Unlock()
 	unlockMutex = false
-	imap.Debug("Executing IMAP Command|timeout=%d", int64(replyTimeout/time.Millisecond))
-	responses, err := imap.doIMAPCommand(request, int64(replyTimeout/time.Millisecond))
+	imap.Debug("Executing IMAP Command|timeout=%d", uint64(replyTimeout/time.Millisecond))
+	responses, err := imap.doIMAPCommand(request, uint64(replyTimeout/time.Millisecond))
 	if imap.cancelled == true {
 		imap.Info("IMAP Request cancelled. Exiting|msgCode=IMAP_REQ_CANCELLED")
 		return
@@ -628,7 +628,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			}
 		}
 		reqTimeout := imap.pi.ResponseTimeout
-		reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
+		reqTimeout += uint64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 		requestTimer := time.NewTimer(time.Duration(reqTimeout) * time.Millisecond)
 		responseCh := make(chan []string)
 		responseErrCh := make(chan error)

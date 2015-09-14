@@ -25,9 +25,17 @@ func aliveCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rIp := r.Header.Get("X-Forwarded-For")
-	if rIp == "" {
+	XFF := r.Header.Get("X-Forwarded-For")
+	var rIp string
+	if XFF == "" {
 		rIp = r.RemoteAddr
+	} else {
+		rIps := strings.Split(XFF, ",")
+		if len(rIps) == 0 {
+			rIp = r.RemoteAddr
+		} else {
+			rIp = strings.Trim(rIps[len(rIps)-1], " ")
+		}
 	}
 	// Try parsing the IP. For IPv6, the address will look like this: [::1] (for localhost, i.e. with brackets)
 	var remoteIP net.IP
@@ -39,14 +47,15 @@ func aliveCheck(w http.ResponseWriter, r *http.Request) {
 		// Split the port from the IP
 		ipParts := strings.Split(rIp, ":")
 		if len(ipParts) < 1 {
-			context.Logger.Error("Could not split remote address %s", r.RemoteAddr)
+			context.Logger.Error("Could not split remote address %s", rIp)
 			http.Error(w, "INTERNAL ERROR", http.StatusInternalServerError)
 			return
 		}
+		context.Logger.Info("ipparts [%s]", ipParts[0])
 		remoteIP = net.ParseIP(ipParts[0])
 	}
 	if remoteIP == nil {
-		context.Logger.Error("Could not parse remote address %s", r.RemoteAddr)
+		context.Logger.Error("Could not parse remote address %s", rIp)
 		http.Error(w, "INTERNAL ERROR", http.StatusInternalServerError)
 		return
 	}

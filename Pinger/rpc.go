@@ -222,7 +222,7 @@ func createNewPingerSession(t BackendPoller, pollMap *pollMapType, pollMapKey st
 	logger.Info("%s|Creating new pinger session", mi.getLogPrefix())
 	client, err := t.newMailClientContext(mi, false)
 	if err != nil {
-		logger.Error("%s|pollMapKey=%s|msgCode=PINGER_CREATE_FAIL", err, pollMapKey)
+		logger.Warning("%s|pollMapKey=%s|msgCode=PINGER_CREATE_FAIL", err, pollMapKey)
 		return
 	}
 	t.LockMap()
@@ -299,7 +299,7 @@ type DeferPollArgs struct {
 	UserId        string
 	ClientContext string
 	DeviceId      string
-	Timeout       int64
+	Timeout       uint64
 
 	logPrefix string
 }
@@ -325,7 +325,7 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			logger.Error("%s", err.Error())
 		}
 	}()
-	logger.Info("%sReceived defer request|msgCode=RPC_DEFER", args.getLogPrefix())
+	logger.Info("%sReceived defer request|msgCode=RPC_DEFER|timeout=%d", args.getLogPrefix(), args.Timeout)
 	reply.Code = PollingReplyOK
 	reply.Message = ""
 	pollMapKey := args.pollMapKey()

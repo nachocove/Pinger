@@ -1,10 +1,8 @@
 package main
 
 import (
-	"net/http"
-	"net/http/httputil"
-
 	"github.com/gorilla/context"
+	"net/http"
 )
 
 type contextKey int
@@ -24,14 +22,6 @@ func GetContext(r *http.Request) *Context {
 	context, ok := val.(*Context)
 	if !ok {
 		panic("No string template in context")
-	}
-	if context.Config.Server.DumpRequests {
-		responseBytes, err := httputil.DumpRequest(r, true)
-		if err != nil {
-			context.Logger.Error("Could not dump request %+v", r)
-		} else {
-			context.Logger.Warning("Request:\n%s", responseBytes)
-		}
 	}
 
 	return context

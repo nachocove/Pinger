@@ -195,7 +195,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	}
 
 	// read at most ex.maxResponseSize() bytes. We do this so that an attacker can't
-	// flood us with an infinte amount of data. Note we also do not (and SHOULD not)
+	// flood us with an infinite amount of data. Note we also do not (and SHOULD not)
 	// pay any attention to the Content-Length header. An attacker could screw us up
 	// with a wrong one.
 	var responseBytes []byte
@@ -298,7 +298,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 
 	var err error
 	reqTimeout := ex.pi.ResponseTimeout
-	reqTimeout += int64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
+	reqTimeout += uint64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 	ex.transport = &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: false},
 		ResponseHeaderTimeout: time.Duration(reqTimeout) * time.Millisecond,
