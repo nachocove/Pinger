@@ -682,8 +682,8 @@ func (imap *IMAPClient) cancelIDLE() {
 }
 
 func (imap *IMAPClient) UpdateRequestData(requestData []byte) {
-	if len(requestData) > 0 {
-		imap.pi.RequestData = requestData
+	if len(requestData) > 0 && bytes.Compare(requestData, ex.pi.RequestData) != 0 {
+		ex.pi.RequestData = requestData
 	}
 }
 

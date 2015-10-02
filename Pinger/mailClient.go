@@ -536,9 +536,7 @@ func (client *MailClientContext) deferPoll(timeout uint64, requestData []byte) {
 	if timeout > 0 {
 		client.WaitBeforeUse = timeout
 	}
-	if len(requestData) > 0 {
-		client.mailClient.UpdateRequestData(requestData)
-	}
+	client.mailClient.UpdateRequestData(requestData)
 	err = client.Action(PingerDefer)
 	if err != nil {
 		client.Error("Could not send defer action|err=%s", err.Error())
