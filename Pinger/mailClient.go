@@ -423,7 +423,7 @@ func (client *MailClientContext) start() {
 				if err != nil {
 					panic(err)
 				}
-				if rearmingCount < 3 {
+				if client.Protocol == MailClientIMAP && rearmingCount < 3 {
 					rearmingCount++
 					client.WaitBeforeUse = uint64(rearmTimeout) / uint64(time.Millisecond)
 					client.Info("Rearming poll|rearmingCount=%d|rearmTimeout=%s|msgCode=REARMED", rearmingCount, rearmTimeout)
