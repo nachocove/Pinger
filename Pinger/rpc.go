@@ -1,7 +1,6 @@
 package Pinger
 
 import (
-	"encoding/base64"
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils"
