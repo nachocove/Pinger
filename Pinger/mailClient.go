@@ -17,7 +17,7 @@ import (
 )
 
 type MailClientContextType interface {
-	deferPoll(timeout uint64)
+	deferPoll(timeout uint64, requestData []byte)
 	stop()
 	updateLastContact() error
 	Status() (MailClientStatus, error)
@@ -74,6 +74,7 @@ func init() {
 
 type MailClient interface {
 	LongPoll(stopPollCh, stopAllCh chan int, errCh chan error)
+	UpdateRequestData(requestData []byte)
 	Cleanup()
 }
 
@@ -522,7 +523,7 @@ func (client *MailClientContext) stop() {
 	return
 }
 
-func (client *MailClientContext) deferPoll(timeout uint64) {
+func (client *MailClientContext) deferPoll(timeout uint64, requestData []byte) {
 	if client.mailClient == nil {
 		client.Warning("Poll is stopped, cannot defer it")
 		return
@@ -534,6 +535,9 @@ func (client *MailClientContext) deferPoll(timeout uint64) {
 	}
 	if timeout > 0 {
 		client.WaitBeforeUse = timeout
+	}
+	if len(requestData) > 0 {
+		client.mailClient.UpdateRequestData(requestData)
 	}
 	err = client.Action(PingerDefer)
 	if err != nil {

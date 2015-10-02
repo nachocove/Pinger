@@ -34,6 +34,10 @@ type ExchangeClient struct {
 	cancelled  bool
 }
 
+const (
+	MAX_SYNC_RESPONSE_DATA_SIZE = 10240 // really, it can be as small as 1 since any non-empty data is considered a new email response
+)
+
 // NewExchangeClient set up a new exchange client
 func NewExchangeClient(pi *MailPingInformation, wg *sync.WaitGroup, debug bool, logger *Logging.Logger) (*ExchangeClient, error) {
 	// TODO Check the request URL here. Check for http/https, and validate/sanity check the URL itself.
@@ -78,6 +82,9 @@ func (ex *ExchangeClient) maxResponseSize() (size int) {
 	}
 	if ex.pi.NoChangeReply != nil && len(ex.pi.NoChangeReply) > size {
 		size = len(ex.pi.NoChangeReply)
+	}
+	if size == 0 {
+		size = MAX_SYNC_RESPONSE_DATA_SIZE
 	}
 	return
 }
@@ -149,16 +156,6 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
 
-	if globals.config.DumpRequests {
-		requestBytes, err := httputil.DumpRequestOut(req, true)
-		if err != nil {
-			ex.Error("DumpRequest error: %v", err)
-		} else {
-			requestBytes = []byte("<redacted>")
-			ex.Debug("Sending request:%s\n", requestBytes) // don't dump requestBytes
-		}
-	}
-
 	if ex.pi.MailServerCredentials.Username != "" && ex.pi.MailServerCredentials.Password != "" {
 		req.SetBasicAuth(ex.pi.MailServerCredentials.Username, ex.pi.MailServerCredentials.Password)
 	}
@@ -216,12 +213,19 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		if err != io.EOF {
 			ex.Error("Failed to read response: %s", err.Error())
 		} else {
-			ex.Debug("EOF from body read")
+			if ex.pi.ASIsSyncRequest == true {
+				ex.Debug("Empty response. No change")
+				responseCh <- response
+				return
+			} else {
+				ex.Debug("EOF from body read")
+			}
 		}
 		responseCh <- retryResponse
 		return
 	}
-	if n < toRead && n != len(ex.pi.ExpectedReply) && n != len(ex.pi.NoChangeReply) {
+	// If EAS Ping
+	if ex.pi.ASIsSyncRequest == false && n < toRead && n != len(ex.pi.ExpectedReply) && n != len(ex.pi.NoChangeReply) {
 		ex.Warning("Read less than expected: %d < %d", n, toRead)
 	}
 
@@ -234,7 +238,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	cached_data := ioutil.NopCloser(bytes.NewReader(responseBytes))
 	response.Body = cached_data
 
-	ex.Debug("reply WBXML %s", base64.StdEncoding.EncodeToString(responseBytes))
+	ex.Debug("reply WBXML %s", base64.StdEncoding.EncodeToString(responseBytes[:n]))
 
 	if globals.config.DumpRequests || response.StatusCode >= 500 {
 		headerBytes, _ := httputil.DumpResponse(response, false)
@@ -395,26 +399,44 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 					sleepTime = ex.exponentialBackoff(sleepTime)
 					ex.Warning("Response Status %s. Back to polling", response.Status)
 				}
-
-			case ex.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.pi.NoChangeReply) == 0:
+				//EAS Ping
+			case ex.pi.ASIsSyncRequest == false && (ex.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.pi.NoChangeReply) == 0):
 				// go back to polling
 				if time.Since(timeSent) <= tooFastResponse {
-					ex.Warning("NoChangeReply was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
+					ex.Warning("Ping: NoChangeReply was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
 					sleepTime = ex.exponentialBackoff(sleepTime)
 				} else {
-					ex.Info("NoChangeReply after %s. Back to polling", time.Since(timeSent))
+					ex.Info("Ping: NoChangeReply after %s. Back to polling", time.Since(timeSent))
+					sleepTime = 0 // good reply. Reset any exponential backoff stuff.
+				}
+				// EAS Ping
+			case ex.pi.ASIsSyncRequest == false && (ex.pi.ExpectedReply == nil || bytes.Compare(responseBody, ex.pi.ExpectedReply) == 0):
+				// there's new mail!
+				if ex.pi.ExpectedReply != nil {
+					ex.Debug("Ping: Reply matched ExpectedReply")
+				}
+				ex.Debug("Ping: Got mail. Setting LongPollNewMail|msgCode=EAS_NEW_EMAIL")
+				errCh <- LongPollNewMail
+				return
+				// EAS Sync
+			case ex.pi.ASIsSyncRequest == true && len(responseBody) == 0:
+				// go back to polling
+				if time.Since(timeSent) <= tooFastResponse {
+					ex.Warning("Sync: NoChangeReply was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
+					sleepTime = ex.exponentialBackoff(sleepTime)
+				} else {
+					ex.Info("Sync: NoChangeReply after %s. Back to polling", time.Since(timeSent))
 					sleepTime = 0 // good reply. Reset any exponential backoff stuff.
 				}
 
-			case ex.pi.ExpectedReply == nil || bytes.Compare(responseBody, ex.pi.ExpectedReply) == 0:
+			case ex.pi.ASIsSyncRequest == true && len(responseBody) > 0:
 				// there's new mail!
 				if ex.pi.ExpectedReply != nil {
-					ex.Debug("Reply matched ExpectedReply")
+					ex.Debug("Sync: Reply matched ExpectedReply")
 				}
-				ex.Debug("Got mail. Setting LongPollNewMail|msgCode=EAS_NEW_EMAIL")
+				ex.Debug("Sync: Got mail. Setting LongPollNewMail|msgCode=EAS_NEW_EMAIL")
 				errCh <- LongPollNewMail
 				return
-
 			default:
 				ex.Warning("Unhandled response. Just keep polling: Headers:%+v Body:%s", response.Header, base64.StdEncoding.EncodeToString(responseBody))
 				sleepTime = ex.exponentialBackoff(sleepTime)
@@ -428,6 +450,11 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 			ex.Debug("Was told to stop (allStop). Stopping")
 			return
 		}
+	}
+}
+func (ex *ExchangeClient) UpdateRequestData(requestData []byte) {
+	if len(requestData) > 0 && bytes.Compare(requestData, ex.pi.RequestData) != 0 {
+		ex.pi.RequestData = requestData
 	}
 }
 

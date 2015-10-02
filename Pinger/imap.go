@@ -680,6 +680,13 @@ func (imap *IMAPClient) cancelIDLE() {
 		}
 	}
 }
+
+func (imap *IMAPClient) UpdateRequestData(requestData []byte) {
+	if len(requestData) > 0 {
+		imap.pi.RequestData = requestData
+	}
+}
+
 func (imap *IMAPClient) cancel() {
 	imap.mutex.Lock()
 	imap.cancelled = true

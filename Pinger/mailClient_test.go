@@ -64,7 +64,7 @@ type testingMailClientContext struct {
 func (client *testingMailClientContext) stop() {
 	return
 }
-func (client *testingMailClientContext) deferPoll(timeout uint64) {
+func (client *testingMailClientContext) deferPoll(timeout uint64, requestData []byte) {
 	return
 }
 func (client *testingMailClientContext) updateLastContact() error {

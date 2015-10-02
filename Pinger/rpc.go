@@ -1,6 +1,7 @@
 package Pinger
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/coopernurse/gorp"
 	"github.com/nachocove/Pinger/Utils"
@@ -300,6 +301,7 @@ type DeferPollArgs struct {
 	ClientContext string
 	DeviceId      string
 	Timeout       uint64
+	RequestData   []byte
 
 	logPrefix string
 }
@@ -342,7 +344,7 @@ func RPCDeferPoll(t BackendPoller, pollMap *pollMapType, dbm *gorp.DbMap, args *
 			reply.Code = PollingReplyError
 			reply.Message = fmt.Sprintf("Client is not pinging or deferred (%s). Can not defer.", status)
 		} else {
-			go client.deferPoll(args.Timeout)
+			go client.deferPoll(args.Timeout, args.RequestData)
 		}
 	} else {
 		logger.Warning("No active sessions found|key=%s", pollMapKey)
