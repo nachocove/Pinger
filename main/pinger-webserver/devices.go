@@ -93,6 +93,7 @@ type registerPostData struct {
 	IMAPSupportsExpunge    bool
 	IMAPEXISTSCount        uint32
 	IMAPUIDNEXT            uint32
+	ASIsSyncRequest        bool
 }
 
 func getScrubbedLogPrefix(deviceId, userId, context string) string {
@@ -305,7 +306,7 @@ func (pd *registerPostData) validate(context *Context) (bool, []string) {
 			invalidFields = append(invalidFields, "RequestData")
 		}
 		//TODO - validate WBXML
-		if len(pd.RequestData) > MAX_NO_CHANGE_REPLY_SIZE {
+		if len(pd.NoChangeReply) > MAX_NO_CHANGE_REPLY_SIZE {
 			ok = false
 			invalidFields = append(invalidFields, "NoChangeReply")
 		}
@@ -372,7 +373,7 @@ func (pd *registerPostData) checkForMissingFields(logger *Logging.Logger) (bool,
 			MissingFields = append(MissingFields, "RequestData")
 			ok = false
 		}
-		if len(pd.NoChangeReply) <= 0 {
+		if len(pd.NoChangeReply) <= 0 && !pd.ASIsSyncRequest {
 			MissingFields = append(MissingFields, "NoChangeReply")
 			ok = false
 		}
@@ -429,6 +430,7 @@ func (pd *registerPostData) AsMailInfo(sessionId string) *Pinger.MailPingInforma
 	pi.IMAPSupportsExpunge = pd.IMAPSupportsExpunge
 	pi.IMAPEXISTSCount = pd.IMAPEXISTSCount
 	pi.IMAPUIDNEXT = pd.IMAPUIDNEXT
+	pi.ASIsSyncRequest = pd.ASIsSyncRequest
 
 	pi.SessionId = sessionId
 
@@ -555,6 +557,7 @@ type deferPost struct {
 	DeviceId      string
 	Timeout       uint64
 	Token         string
+	RequestData   []byte
 
 	logPrefix string
 }
@@ -579,6 +582,12 @@ func (dp *deferPost) validate(context *Context) (bool, []string) {
 		ok = false
 		invalidFields = append(invalidFields, "ClientContextId")
 	}
+	//TODO - validate WBXML
+	if len(dp.RequestData) > MAX_REQUEST_DATA_SIZE {
+		ok = false
+		invalidFields = append(invalidFields, "RequestData")
+	}
+
 	if dp.Timeout > MAX_WAIT_BEFORE_USE {
 		ok = false
 		invalidFields = append(invalidFields, "Timeout")
@@ -632,7 +641,8 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 			Message: "Token is not valid",
 		}
 	} else {
-		valid := context.Config.Server.ValidateAuthToken(deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Token, key)
+		valid := context.Config.Server.ValidateAuthToken(deferData.UserId, deferData.ClientContext,
+			deferData.DeviceId, deferData.Token, key)
 		if !valid {
 			reply = &Pinger.PollingResponse{
 				Code:    Pinger.PollingReplyError,
@@ -646,7 +656,8 @@ func deferPolling(w http.ResponseWriter, r *http.Request) {
 			//	}
 			context.Logger.Debug("%s: Token is valid", deferData.getLogPrefix())
 			// deferData.Timeout is not sent by the client. It defaults to 0
-			reply, err = Pinger.DeferPoll(&context.Config.Rpc, deferData.UserId, deferData.ClientContext, deferData.DeviceId, deferData.Timeout)
+			reply, err = Pinger.DeferPoll(&context.Config.Rpc, deferData.UserId, deferData.ClientContext,
+				deferData.DeviceId, deferData.Timeout, deferData.RequestData)
 			if err != nil {
 				context.Logger.Error("%s: Error deferring poll %s", deferData.getLogPrefix(), err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)

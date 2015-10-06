@@ -40,6 +40,7 @@ type MailPingInformation struct {
 	IMAPSupportsExpunge    bool
 	IMAPEXISTSCount        uint32
 	IMAPUIDNEXT            uint32
+	ASIsSyncRequest        bool
 
 	logPrefix string
 }
@@ -49,11 +50,11 @@ func (pi *MailPingInformation) String() string {
 	return fmt.Sprintf("UserId=%s|ClientContext=%s|DeviceId=%s|Platform=%s|MailServerUrl=%s|"+
 		"Protocol=%s|ResponseTimeout=%d|WaitBeforeUse=%d|PushToken=%s|PushServer=%s|MaxPollTimeout=%d|"+
 		"OSVersion=%s|AppBuildVersion=%s|AppBuildNumber=%s|SessionId=%s|IMAPFolderName=%s|IMAPSupportsIdle=%t|"+
-		"IMAPSupportsExpunge=%t|IMAPEXISTSCount=%d|IMAPUIDNEXT=%d",
+		"IMAPSupportsExpunge=%t|IMAPEXISTSCount=%d|IMAPUIDNEXT=%d|ASIsSyncRequest=%t",
 		pi.UserId, pi.ClientContext, pi.DeviceId, pi.Platform, redactedUri, pi.Protocol,
 		pi.ResponseTimeout, pi.WaitBeforeUse, pi.PushToken, pi.PushService, pi.MaxPollTimeout, pi.OSVersion,
 		pi.AppBuildVersion, pi.AppBuildNumber, pi.SessionId, pi.IMAPFolderName, pi.IMAPSupportsIdle,
-		pi.IMAPSupportsExpunge, pi.IMAPEXISTSCount, pi.IMAPUIDNEXT)
+		pi.IMAPSupportsExpunge, pi.IMAPEXISTSCount, pi.IMAPUIDNEXT, pi.ASIsSyncRequest)
 }
 
 func (pi *MailPingInformation) cleanup() {
@@ -86,6 +87,7 @@ func (pi *MailPingInformation) cleanup() {
 	pi.IMAPSupportsExpunge = false
 	pi.IMAPEXISTSCount = 0
 	pi.IMAPUIDNEXT = 0
+	pi.ASIsSyncRequest = false
 }
 
 // Validate validate the structure/information to make sure required information exists.

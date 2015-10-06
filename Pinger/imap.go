@@ -2,6 +2,7 @@ package Pinger
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
@@ -680,6 +681,13 @@ func (imap *IMAPClient) cancelIDLE() {
 		}
 	}
 }
+
+func (imap *IMAPClient) UpdateRequestData(requestData []byte) {
+	if len(requestData) > 0 && bytes.Compare(requestData, imap.pi.RequestData) != 0 {
+		imap.pi.RequestData = requestData
+	}
+}
+
 func (imap *IMAPClient) cancel() {
 	imap.mutex.Lock()
 	imap.cancelled = true

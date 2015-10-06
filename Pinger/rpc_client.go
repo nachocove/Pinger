@@ -47,7 +47,8 @@ func StopPoll(rpcConfig *RPCServerConfiguration, userId, clientContext, deviceId
 	return &reply, nil
 }
 
-func DeferPoll(rpcConfig *RPCServerConfiguration, userId, clientContext, deviceId string, timeout uint64) (*PollingResponse, error) {
+func DeferPoll(rpcConfig *RPCServerConfiguration, userId, clientContext, deviceId string,
+	timeout uint64, requestData []byte) (*PollingResponse, error) {
 	rpcClient, err := getRpcClient(rpcConfig)
 	if err != nil {
 		return nil, err
@@ -59,6 +60,7 @@ func DeferPoll(rpcConfig *RPCServerConfiguration, userId, clientContext, deviceI
 		ClientContext: clientContext,
 		DeviceId:      deviceId,
 		Timeout:       timeout,
+		RequestData:   requestData,
 	}
 	err = rpcClient.Call("BackendPolling.Defer", &args, &reply)
 	if err != nil {
