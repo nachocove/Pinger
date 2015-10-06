@@ -212,17 +212,19 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 	if err != nil {
 		if err != io.EOF {
 			ex.Error("Failed to read response: %s", err.Error())
-		} else {
+			responseCh <- retryResponse
+			return
+		} else if n == 0 {
 			if ex.pi.ASIsSyncRequest == true {
 				ex.Debug("Empty response. No change")
 				responseCh <- response
 				return
 			} else {
 				ex.Debug("EOF from body read")
+				responseCh <- retryResponse
+				return
 			}
 		}
-		responseCh <- retryResponse
-		return
 	}
 	// If EAS Ping
 	if ex.pi.ASIsSyncRequest == false && n < toRead && n != len(ex.pi.ExpectedReply) && n != len(ex.pi.NoChangeReply) {
@@ -422,7 +424,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 			case ex.pi.ASIsSyncRequest == true && len(responseBody) == 0:
 				// go back to polling
 				if time.Since(timeSent) <= tooFastResponse {
-					ex.Warning("Sync: NoChangeReply was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.")
+					ex.Warning("Sync: NoChangeReply after %s was too fast. Doing backoff. This usually indicates that the client is still connected to the exchange server.", time.Since(timeSent))
 					sleepTime = ex.exponentialBackoff(sleepTime)
 				} else {
 					ex.Info("Sync: NoChangeReply after %s. Back to polling", time.Since(timeSent))
@@ -454,6 +456,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 }
 func (ex *ExchangeClient) UpdateRequestData(requestData []byte) {
 	if len(requestData) > 0 && bytes.Compare(requestData, ex.pi.RequestData) != 0 {
+		ex.Debug("Updating new RequestData %s", base64.StdEncoding.EncodeToString(requestData))
 		ex.pi.RequestData = requestData
 	}
 }
