@@ -198,7 +198,12 @@ def delete_sgs_for_vpc(conn, vpc, name):
     sg_list = conn.get_all_security_groups(filters=[("vpc-id", vpc.id)])
     for sg in sg_list:
         if 'Name' in sg.tags and sg.tags['Name'] != "default":
-            conn.delete_security_group(group_id=sg.id)
+            try:
+                conn.delete_security_group(group_id=sg.id)
+            except EC2ResponseError as ex:
+                if ex.error_code == "InvalidGroup.NotFound":
+                    pass
+                raise
 
 # create Security Group
 def create_sg(conn, vpc, name, description):
@@ -251,6 +256,14 @@ def add_rules_to_sg(conn, sg, rules, is_ingress):
             delete_egress_rules_from_sg(conn, sg)
     for rule in rules:
         # reload sg again
+        if rule['cidr_ip'] == "xx.xx.xx.xx/32":
+            ip = find_my_ip()
+            if ip:
+                rule['cidr_ip'] = "%s/32" % ip
+            else:
+                print "ERROR: Rule %s skipped" % rule
+                continue
+
         sg = get_sg_by_id(conn, sg.id)
         if sg_rule_exists(sg, rule, is_ingress):
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) exists." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
@@ -260,6 +273,18 @@ def add_rules_to_sg(conn, sg, rules, is_ingress):
             else:
                 conn.authorize_security_group_egress(sg.id, ip_protocol=rule["protocol"], from_port=rule["from_port"], to_port=rule["to_port"], cidr_ip=rule["cidr_ip"])
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) added." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
+
+find_my_ip_url = ['http://www.icanhazip.com/',]
+def find_my_ip():
+    import requests
+    for url in find_my_ip_url:
+        try:
+            r = requests.get(url)
+            ip = r.text.strip('\n')
+            return ip
+        except:
+            pass
+    return None
 
 # delete auto scale and launch configuration
 def delete_autoscaler(region_name, name):
