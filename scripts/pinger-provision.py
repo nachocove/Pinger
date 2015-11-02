@@ -73,7 +73,21 @@ def delete_vpc(region, name):
         delete_route_tables_for_vpc(conn, vpc, name)
         delete_igs_for_vpc(conn, vpc, name)
         print "Deleting VPC %s..." % name
-        conn.delete_vpc(vpc.id)
+        success = False
+        for i in range(0,5):
+            try:
+                conn.delete_vpc(vpc.id)
+                success = True
+                break
+            except EC2ResponseError as ex:
+                if ex.error_code == "DependencyViolation":
+                    print "WARN(%s): Sleeping 2 and retrying" % ex.error_code
+                    time.sleep(2)
+                    continue
+                else:
+                    raise
+        if not success:
+            raise Exception("Could not delete vpc")
 
 # create VPC
 def create_vpc(conn, name, cidr_block, instance_tenancy):
@@ -171,10 +185,14 @@ def delete_route_tables_for_vpc(conn, vpc, name):
     else:
         for rt in rt_list:
             print "Deleting Route table %s..." % rt.id
-            try:
-                conn.delete_route(rt.id, "0.0.0.0/0")
-            except boto.exception.EC2ResponseError, e:
-                print "Error deleting route: %s" % e.error_message
+            for route in rt.routes:
+                if route.gateway_id == 'local':
+                    continue
+                try:
+                    conn.delete_route(rt.id, route.destination_cidr_block)
+                except boto.exception.EC2ResponseError, e:
+                    print "Error deleting route %s: %s" % (route.destination_cidr_block, e.error_message)
+                    raise
             #conn.delete_route_table(rt.id)
 
 # update routing table for VPC
@@ -197,20 +215,26 @@ def delete_sgs_for_vpc(conn, vpc, name):
     print "Deleting security groups for VPC %s" % name
     sg_list = conn.get_all_security_groups(filters=[("vpc-id", vpc.id)])
     for sg in sg_list:
-        if 'Name' in sg.tags and sg.tags['Name'] != "default":
-            for i in range(0,100):
-                try:
-                    conn.delete_security_group(group_id=sg.id)
-                    break
-                except EC2ResponseError as ex:
-                    if ex.error_code == "InvalidGroup.NotFound":
-                        pass
-                    elif ex.error_code == "DependencyViolation":
-                        # probably need to wait for the instance to die
-                        print "WARN(%s): Retrying in 2 seconds." % ex.error_code
-                        time.sleep(2)
-                        continue
-                    raise
+        if sg.name == 'default' or ('Name' in sg.tags and sg.tags['Name'] != "default"):
+            continue
+        success = False
+        for i in range(0,100):
+            try:
+                print "  Deleting VPC-SG %s" % sg.name
+                conn.delete_security_group(group_id=sg.id)
+                success = True
+                break
+            except EC2ResponseError as ex:
+                if ex.error_code == "InvalidGroup.NotFound":
+                    pass
+                elif ex.error_code == "DependencyViolation":
+                    # probably need to wait for the instance to die
+                    print "WARN(%s): Retrying in 2 seconds." % ex.error_code
+                    time.sleep(2)
+                    continue
+                raise
+        if not success:
+            raise Exception("Could not delete security group")
 
 # create Security Group
 def create_sg(conn, vpc, name, description):
@@ -289,7 +313,22 @@ def delete_autoscaler(region_name, name):
             if asg.instances:
                 for instance in asg.instances:
                     print "  Terminating instance %s" % instance.instance_id
-                    conn.terminate_instance(instance.instance_id)
+                    success = False
+                    for i in range(0,5):
+                        try:
+                            conn.terminate_instance(instance.instance_id)
+                            success = True
+                            break
+                        except BotoServerError as ex:
+                            if ex.error_code == "ValidationError":
+                                print "WARN(%s): sleeping 2 and trying again" % ex.error_code
+                                time.sleep(2)
+                                continue
+                            else:
+                                raise
+                    if not success:
+                        raise Exception("Could not terminate instance")
+
     lc_name = name + "-LC"
     lc_list = conn.get_all_launch_configurations(names=[lc_name])
     if not len(lc_list):
@@ -549,22 +588,28 @@ def json_config(file_name):
     return json_data
 
 # delete VPC et al
-def deprovision_pinger(config):
+def deprovision_pinger(args):
+    config = args.config
+    process_config(config)
     aws_config = config["aws_config"]
     iam_config = config["iam_config"]
     s3_config = config["s3_config"]
     vpc_config = config["vpc_config"]
-    as_config = config["autoscale_config"]
-    elb_config = config["elb_config"]
-    print "De-Provisioning Pinger %s" % vpc_config["name"]
-    delete_autoscaler(aws_config["region_name"], vpc_config["name"] + "-AS")
-    delete_elb(aws_config["region_name"], vpc_config["name"] + "-ELB")
-    delete_vpc(aws_config["region"], vpc_config["name"])
-    delete_pinger_cfg(vpc_config["name"], s3_config)
-    delete_iam_users_and_policies(aws_config["region_name"], vpc_config["name"], iam_config)
+    if not args.name:
+        args.name = vpc_config["name"]
+
+    print "De-Provisioning Pinger %s" % args.name
+    delete_autoscaler(aws_config["region_name"], args.name + "-AS")
+    delete_elb(aws_config["region_name"], args.name + "-ELB")
+    delete_vpc(aws_config["region"], args.name)
+    delete_pinger_cfg(args.name, s3_config)
+    delete_iam_users_and_policies(aws_config["region_name"], args.name, iam_config)
 
 # create VPC et al
-def provision_pinger(config):
+def provision_pinger(args):
+    config = args.config
+    process_config(config)
+
     aws_config = config["aws_config"]
     iam_config = config["iam_config"]
     s3_config = config["s3_config"]
@@ -609,16 +654,21 @@ def provision_pinger(config):
 # main
 def main():
     parser = argparse.ArgumentParser(description='Provision the Pinger at AWS')
-    parser.add_argument('-d', '--delete', help='use this flag to deprovision the pinger', action='store_true')
-    parser.add_argument('--config', required=True, type=json_config, metavar="config_file",
+    subparser = parser.add_subparsers()
+
+    create_parser = subparser.add_parser("create")
+    create_parser.add_argument('--config', required=True, type=json_config, metavar="config_file",
                    help='the config(json) file for the deployment', )
+    create_parser.set_defaults(func=provision_pinger)
+
+    delete_parser = subparser.add_parser("delete")
+    delete_parser.add_argument('--config', required=True, type=json_config, metavar="config_file",
+                   help='the config(json) file for the deployment', )
+    delete_parser.add_argument('-n', '--name', help="override cluster name", nargs='?', type=str, default=None)
+    delete_parser.set_defaults(func=deprovision_pinger)
+
     args = parser.parse_args()
-    config = args.config
-    process_config(config)
-    if args.delete:
-        deprovision_pinger(config)
-    else:
-        provision_pinger(config)
+    args.func(args)
 
 if __name__ == '__main__':
     main()
