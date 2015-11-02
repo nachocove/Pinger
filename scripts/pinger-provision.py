@@ -256,7 +256,7 @@ def delete_egress_rules_from_sg(conn, sg):
                                               to_port=rule.to_port, cidr_ip=rule.grants[0])
 
 # add rules to sg
-def add_rules_to_sg(conn, sg, rules, is_ingress):
+def add_rules_to_sg(conn, sg, rules, is_ingress, jump_host):
     print "Adding rules to security group - IsIngress(%s)" % is_ingress
     if not is_ingress:
         if len(rules):
@@ -264,12 +264,7 @@ def add_rules_to_sg(conn, sg, rules, is_ingress):
     for rule in rules:
         # reload sg again
         if rule['cidr_ip'] == "xx.xx.xx.xx/32":
-            ip = find_my_ip()
-            if ip:
-                rule['cidr_ip'] = "%s/32" % ip
-            else:
-                print "ERROR: Rule %s skipped" % rule
-                continue
+            rule['cidr_ip'] = "%s/32" % jump_host
 
         sg = get_sg_by_id(conn, sg.id)
         if sg_rule_exists(sg, rule, is_ingress):
@@ -280,18 +275,6 @@ def add_rules_to_sg(conn, sg, rules, is_ingress):
             else:
                 conn.authorize_security_group_egress(sg.id, ip_protocol=rule["protocol"], from_port=rule["from_port"], to_port=rule["to_port"], cidr_ip=rule["cidr_ip"])
             print "Rule [(%s)-from_port-(%s)-to_port-(%s)-allow-access(%s) added." % (rule["protocol"], rule["from_port"], rule["to_port"], rule["cidr_ip"])
-
-find_my_ip_url = ['http://www.icanhazip.com/',]
-def find_my_ip():
-    import requests
-    for url in find_my_ip_url:
-        try:
-            r = requests.get(url)
-            ip = r.text.strip('\n')
-            return ip
-        except:
-            pass
-    return None
 
 # delete auto scale and launch configuration
 def delete_autoscaler(region_name, name):
@@ -588,6 +571,7 @@ def provision_pinger(config):
     vpc_config = config["vpc_config"]
     as_config = config["autoscale_config"]
     elb_config = config["elb_config"]
+    misc_config = config["misc"]
     load_config_from_s3(s3_config)
     print "Provisioning Pinger %s" % vpc_config["name"]
     # create connection
@@ -606,15 +590,15 @@ def provision_pinger(config):
         elb_sg_config = config["elb_config"]["sg_config"]
         elb_sg = create_sg(conn, vpc, vpc_config["name"]+elb_sg_config["name"]+"-SG", elb_sg_config["description"]
                            + " for " + vpc_config["name"])
-        add_rules_to_sg(conn, elb_sg, elb_sg_config["ingress-rules"], True)
-        add_rules_to_sg(conn, elb_sg, elb_sg_config["egress-rules"], False)
+        add_rules_to_sg(conn, elb_sg, elb_sg_config["ingress-rules"], True, misc_config["jumphost"])
+        add_rules_to_sg(conn, elb_sg, elb_sg_config["egress-rules"], False, misc_config["jumphost"])
         elb = create_elb(aws_config["region_name"], vpc, subnet, elb_sg, vpc_config["name"] + "-ELB",
                          elb_config, s3_config["first_cert_pem"])
         ins_sg_config = config["autoscale_config"]["sg_config"]
         ins_sg = create_sg(conn, vpc, vpc_config["name"]+ins_sg_config["name"]+"-SG",
                            ins_sg_config["description"] + " for " + vpc_config["name"])
-        add_rules_to_sg(conn, ins_sg, ins_sg_config["ingress-rules"], True)
-        add_rules_to_sg(conn, ins_sg, ins_sg_config["egress-rules"], False)
+        add_rules_to_sg(conn, ins_sg, ins_sg_config["ingress-rules"], True, misc_config["jumphost"])
+        add_rules_to_sg(conn, ins_sg, ins_sg_config["egress-rules"], False, misc_config["jumphost"])
         ascaler = create_autoscaler(aws_config["region_name"], vpc, elb, subnet,
                                     ins_sg, vpc_config["name"] + "-AS", aws_config, as_config)
     except (BotoServerError, S3ResponseError, EC2ResponseError) as e:
