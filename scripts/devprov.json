@@ -3,6 +3,9 @@
         "region_name": "us-west-2",
         "zones": ["us-west-2a"]
     },
+    "misc" : {
+        "jumphost": "52.25.152.172"
+    },
     "vpc_config": {
         "name": "TestDevPingerVPC",
         "log_group_name": "DevPingerVPC",
@@ -138,7 +141,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-dbf9f7eb",
+        "ami_id": "ami-a25344c3",
         "key_pair": "goTestServer",
         "instance_type": "m3.medium",
         "instance_monitoring": false,

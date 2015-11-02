@@ -3,6 +3,9 @@
         "region_name": "us-west-2",
         "zones": ["us-west-2a"]
     },
+    "misc" : {
+        "jumphost": "52.25.152.172"
+    },
     "vpc_config": {
         "name": "TestProdPingerVPC",
         "log_group_name": "ProdPingerVPC",
@@ -65,7 +68,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-8d9c9ebd",
+        "ami_id": "ami-a25344c3",
         "key_pair": "ProdPinger",
         "instance_type": "m3.medium",
         "instance_monitoring": false,
