@@ -519,7 +519,7 @@ def load_config_from_s3(s3_config):
     s3_config["pinger_config"] = pinger_config
     certs = pem.parse(s3_config["s3_files"]["certs_pem"])
     s3_config["certs"] = certs
-    s3_config["first_cert_pem"] = certs[0].pem_str
+    s3_config["first_cert_pem"] = str(certs[0])
 
 # load json config
 def json_config(file_name):
@@ -589,7 +589,7 @@ def provision_pinger(config):
 def main():
     parser = argparse.ArgumentParser(description='Provision the Pinger at AWS')
     parser.add_argument('-d', '--delete', help='use this flag to deprovision the pinger', action='store_true')
-    parser.add_argument('--config', required=True, type=json_config, metavar = "config_file",
+    parser.add_argument('--config', required=True, type=json_config, metavar="config_file",
                    help='the config(json) file for the deployment', )
     args = parser.parse_args()
     config = args.config
