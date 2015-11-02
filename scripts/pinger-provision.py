@@ -198,12 +198,19 @@ def delete_sgs_for_vpc(conn, vpc, name):
     sg_list = conn.get_all_security_groups(filters=[("vpc-id", vpc.id)])
     for sg in sg_list:
         if 'Name' in sg.tags and sg.tags['Name'] != "default":
-            try:
-                conn.delete_security_group(group_id=sg.id)
-            except EC2ResponseError as ex:
-                if ex.error_code == "InvalidGroup.NotFound":
-                    pass
-                raise
+            for i in range(0,100):
+                try:
+                    conn.delete_security_group(group_id=sg.id)
+                    break
+                except EC2ResponseError as ex:
+                    if ex.error_code == "InvalidGroup.NotFound":
+                        pass
+                    elif ex.error_code == "DependencyViolation":
+                        # probably need to wait for the instance to die
+                        print "WARN(%s): Retrying in 2 seconds." % ex.error_code
+                        time.sleep(2)
+                        continue
+                    raise
 
 # create Security Group
 def create_sg(conn, vpc, name, description):
@@ -295,6 +302,11 @@ def delete_autoscaler(region_name, name):
     else:
         print "Deleting auto scaler %s..." % name
         conn.delete_auto_scaling_group(name, force_delete=True)
+        for asg in asg_list:
+            if asg.instances:
+                for instance in asg.instances:
+                    print "  Terminating instance %s" % instance.instance_id
+                    conn.terminate_instance(instance.instance_id)
     lc_name = name + "-LC"
     lc_list = conn.get_all_launch_configurations(names=[lc_name])
     if not len(lc_list):
