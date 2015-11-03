@@ -5,6 +5,13 @@ if [ -z "$1" ] ; then
   exit 0
 fi
 
+if [ "$1" == "-h" ] ; then
+    echo "USAGE: $0 <aws-user>/<aws-profile>[/aws-accountId] <mfa token>"
+    echo " Example for devops: $0 janv/nachocove 12345656"
+    echo " To automatically set the variables use backticks: \`$0 janv/nachocove 12345\`"
+    exit 0
+fi
+
 USERPROFILE=$1
 TOKEN=$2
 USER=`echo $USERPROFILE | cut -d'/' -f1`
