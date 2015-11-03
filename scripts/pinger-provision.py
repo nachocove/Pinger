@@ -69,12 +69,12 @@ def delete_vpc(region, name):
         print "VPC %s does not exist. Nothing to delete" % name
     else:
         delete_sgs_for_vpc(conn, vpc, name)
-        delete_subnets_for_vpc(conn, vpc, name)
         delete_route_tables_for_vpc(conn, vpc, name)
         delete_igs_for_vpc(conn, vpc, name)
+        delete_subnets_for_vpc(conn, vpc, name)
         print "Deleting VPC %s..." % name
         success = False
-        for i in range(0,5):
+        for i in range(0,100):
             try:
                 conn.delete_vpc(vpc.id)
                 success = True
@@ -215,7 +215,7 @@ def delete_sgs_for_vpc(conn, vpc, name):
     print "Deleting security groups for VPC %s" % name
     sg_list = conn.get_all_security_groups(filters=[("vpc-id", vpc.id)])
     for sg in sg_list:
-        if sg.name == 'default' or ('Name' in sg.tags and sg.tags['Name'] != "default"):
+        if sg.name == 'default' or ('Name' in sg.tags and sg.tags['Name'] == "default"):
             continue
         success = False
         for i in range(0,100):
@@ -314,7 +314,7 @@ def delete_autoscaler(region_name, name):
                 for instance in asg.instances:
                     print "  Terminating instance %s" % instance.instance_id
                     success = False
-                    for i in range(0,5):
+                    for i in range(0,100):
                         try:
                             conn.terminate_instance(instance.instance_id)
                             success = True
@@ -466,10 +466,14 @@ def update_pinger_cfg(config):
 def delete_pinger_cfg(vpc_name, s3_config):
     pinger_cfg_name = vpc_name + "-pingerv2.cfg"
     key_name = s3_config["bucket_prefix_key"] + "/" + s3_config["pinger_bucket_key"] + "/" + pinger_cfg_name
-    print "Deleting pinger config (%s)" % key_name
     conn = boto.connect_s3()
     bucket = boto.s3.bucket.Bucket(conn, s3_config["s3_bucket"])
-    bucket.delete_key(key_name)
+    key = bucket.get_key(key_name)
+    if key:
+        print "Deleting pinger config (%s)" % key_name
+        bucket.delete_key(key_name)
+    else:
+        print "Pinger Config %s not found to delete" % key_name
 
 # upload pinger cfg
 def upload_pinger_cfg(vpc_name, s3_config):
@@ -493,9 +497,6 @@ def delete_iam_users_and_policies(region_name, name_prefix, iam_config):
         user_name = name_prefix + "_" + user_config
         try:
             user =  conn.get_user(user_name=user_name)
-        except BotoServerError:
-            user = None
-        if user:
             policy_configs = iam_config["users"][user_config]["inline_policies"]
             for policy_config in policy_configs:
                 policy_name = user_name + "_policy"
@@ -512,6 +513,8 @@ def delete_iam_users_and_policies(region_name, name_prefix, iam_config):
                 conn.delete_access_key(access_key["access_key_id"], user_name=user_name)
             print "Deleting user (%s)" % user_name
             conn.delete_user(user_name)
+        except BotoServerError:
+            print "  User %s not found to delete" % user_name
 
 # create iam users and policies
 def create_iam_users_and_policies(region_name, name_prefix, iam_config):
@@ -596,7 +599,8 @@ def deprovision_pinger(args):
     s3_config = config["s3_config"]
     vpc_config = config["vpc_config"]
     if not args.name:
-        args.name = vpc_config["name"]
+        print "ERROR: No vpc base-name provided."
+        return
 
     print "De-Provisioning Pinger %s" % args.name
     delete_autoscaler(aws_config["region_name"], args.name + "-AS")
@@ -662,9 +666,9 @@ def main():
     create_parser.set_defaults(func=provision_pinger)
 
     delete_parser = subparser.add_parser("delete")
+    delete_parser.add_argument('name', help="override cluster name", nargs='?', type=str, default=None)
     delete_parser.add_argument('--config', required=True, type=json_config, metavar="config_file",
                    help='the config(json) file for the deployment', )
-    delete_parser.add_argument('-n', '--name', help="override cluster name", nargs='?', type=str, default=None)
     delete_parser.set_defaults(func=deprovision_pinger)
 
     args = parser.parse_args()
