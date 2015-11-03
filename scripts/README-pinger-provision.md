@@ -28,13 +28,12 @@ optional arguments:
   
 ## Provision a dev deployment env
 1. run the following command to get the temporary security token set in your env:
-   - use your own user access keys 
-   - update the stscreds.sh to refer to your user id,  .aws/credentials profile_name, account_id
-        USER=<user_name>
-        PROFILE=<aws_credentials_profile_name>
-        ACCOUNT_ID=<account_id>
-   - use the MFA token as the command line argument
-$ `./stscreds.sh <token_id>`
+   $ `./stscreds.sh <aws-username/aws-profile[/aws-accountId]> <MFA token>`
+
+   - aws-username is the username you have in AWS IAM, e.g. janv
+   - aws-profile is the profile to use. See ~/.aws/credentials for details
+   - aws-accountId is the AWS account ID. For devops, this is 263277746520, which is also the default.
+   - "MFA token" is a token from your registered MFA device
 
 2. then run 
 $ python pinger-provision.py --config devprov.json
