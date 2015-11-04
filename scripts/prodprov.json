@@ -17,15 +17,92 @@
     "iam_config": {
         "users": {
             "pinger": {
-                "inline_policies" : [
+                "inline_policies": [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17", 
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "s3:PutObject"
+                                    ], 
+                                    "Resource": [
+                                        "arn:aws:s3:::9c7574a2-544f-447e-962b-3661a595f971-prod-pinger/*"
+                                    ], 
+                                    "Effect": "Allow", 
+                                    "Sid": "Stmt1426990618000"
+                                }, 
+                                {
+                                    "Action": [
+                                        "cognito-identity:DescribeIdentity", 
+                                        "cognito-identity:ListIdentities"
+                                    ], 
+                                    "Resource": [
+                                        "arn:aws:cognito-identity:us-east-1:610813048224:identitypool/"
+                                    ], 
+                                    "Effect": "Allow", 
+                                    "Sid": "Stmt1426990755000"
+                                }
+                            ]
+                        }
+                    }
                 ]
-            },
-            "pinger_boot": {
-                "inline_policies" : [
-                ]
-            },
+            }, 
             "pinger_cloudwatch": {
-                "inline_policies" : [
+                "inline_policies": [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17", 
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "logs:*"
+                                    ], 
+                                    "Resource": [
+                                        "arn:aws:logs:*:*:*"
+                                    ], 
+                                    "Effect": "Allow"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }, 
+            "pinger_boot": {
+                "inline_policies": [
+                    {
+                        "policy": {
+                            "Version": "2012-10-17", 
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "s3:Get*", 
+                                        "s3:List*"
+                                    ], 
+                                    "Resource": [
+                                        "arn:aws:s3:::nachoprodconf/prodpinger/*"
+                                    ], 
+                                    "Effect": "Allow"
+                                }, 
+                                {
+                                    "Action": [
+                                        "s3:ListBucket"
+                                    ], 
+                                    "Resource": [
+                                        "arn:aws:s3:::nachoprodconf"
+                                    ], 
+                                    "Effect": "Allow", 
+                                    "Condition": {
+                                        "StringLike": {
+                                            "s3:prefix": [
+                                                "prodpinger/*"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
                 ]
             }
         }
@@ -90,7 +167,6 @@
                     "to_port": 22,
                     "cidr_ip": "xx.xx.xx.xx/32"
                 }
-
             ],
             "egress-rules": [
               {
