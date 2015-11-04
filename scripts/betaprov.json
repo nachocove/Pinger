@@ -29,7 +29,6 @@
                                         "s3:PutObject"
                                     ],
                                     "Resource": [
-                                        "arn:aws:s3:::nachotele3/beta/*",
                                         "arn:aws:s3:::e01c178d-d558-4b54-b11f-897af5700283-beta-pinger/*"
                                     ]
                                 },
