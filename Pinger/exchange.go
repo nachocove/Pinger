@@ -185,7 +185,7 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 			errCh <- NoSuchHostError
 			return
 		} else {
-			ex.Info("Post failed: %s. Will retry", err.Error())
+			ex.Info("Post failed: %s. Will retry", redactEmailFromError(err.Error()))
 		}
 		responseCh <- retryResponse
 		return
