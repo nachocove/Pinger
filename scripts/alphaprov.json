@@ -7,7 +7,7 @@
         "jumphost": "52.25.152.172"
     },
     "vpc_config": {
-        "name": "TestAlphaPingerVPC",
+        "name": "AlphaPingerVPC-2016-02-16-01",
         "log_group_name": "AlphaPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
@@ -142,7 +142,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-a25344c3",
+        "ami_id": "ami-ba9675da",
         "key_pair": "AlphaPinger",
         "instance_type": "m3.medium",
         "instance_monitoring": false,

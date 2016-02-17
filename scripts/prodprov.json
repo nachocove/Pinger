@@ -7,7 +7,7 @@
         "jumphost": "52.11.11.66"
     },
     "vpc_config": {
-        "name": "TestProdPingerVPC",
+        "name": "ProdPingerVPC-2016-02-16-01",
         "log_group_name": "ProdPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
@@ -145,7 +145,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-a25344c3",
+        "ami_id": "ami-ba9675da",
         "key_pair": "ProdPinger",
         "instance_type": "m3.medium",
         "instance_monitoring": false,
