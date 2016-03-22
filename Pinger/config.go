@@ -2,10 +2,12 @@ package Pinger
 
 import (
 	"code.google.com/p/gcfg"
+	"crypto/x509"
 	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils/Telemetry"
+	"io/ioutil"
 	"os"
 	"path"
 )
@@ -33,6 +35,9 @@ type BackendConfiguration struct {
 	APNSSound             string
 	APNSContentAvailable  int
 	APNSExpirationSeconds int64
+	OSTrustStore          string
+	SupplementalRootCADir string
+	configDir             string `gcfg:"-"`
 }
 
 var days_28 int64 = 28 * 24 * 60 * 60
@@ -48,6 +53,8 @@ func NewBackendConfiguration() *BackendConfiguration {
 		APNSSound:             "silent.wav",
 		APNSContentAvailable:  1,
 		APNSExpirationSeconds: days_28,
+		OSTrustStore:          defaultTrustStore,
+		SupplementalRootCADir: defaultSupplementalCertsDir,
 	}
 }
 
@@ -64,6 +71,39 @@ func (cfg *BackendConfiguration) validate() error {
 	return nil
 }
 
+func (cfg *BackendConfiguration) RootCerts() (*x509.CertPool, error) {
+	roots := x509.NewCertPool()
+	data, err := ioutil.ReadFile(cfg.OSTrustStore)
+	if err != nil {
+		return nil, err
+	}
+	if !roots.AppendCertsFromPEM(data) {
+		return nil, fmt.Errorf("Could not read PEM file %s", cfg.OSTrustStore)
+	}
+
+	var suppDir string
+	if cfg.SupplementalRootCADir[0] != '/' {
+		suppDir = path.Join(cfg.configDir, cfg.SupplementalRootCADir)
+	} else {
+		suppDir = cfg.SupplementalRootCADir
+	}
+	files, err := ioutil.ReadDir(suppDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, fi := range files {
+		filename := path.Join(suppDir, fi.Name())
+		data, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return nil, err
+		}
+		if !roots.AppendCertsFromPEM(data) {
+			return nil, fmt.Errorf("Could not read PEM file %s", filename)
+		}
+	}
+	return roots, nil
+}
+
 type LoggingConfiguration struct {
 	LogDir       string
 	LogFileName  string
@@ -74,14 +114,16 @@ type LoggingConfiguration struct {
 }
 
 const (
-	defaultDumpRequests       = false
-	defaultDebug              = false
-	defaultLogDir             = "./log"
-	defaultLogFileName        = ""
-	defaultLogFileLevel       = "INFO"
-	defaultPingerUpdater      = 0
-	defaultAPNSFeedbackPeriod = 10
-	defaultReArmTimeout       = 10
+	defaultDumpRequests         = false
+	defaultDebug                = false
+	defaultLogDir               = "./log"
+	defaultLogFileName          = ""
+	defaultLogFileLevel         = "INFO"
+	defaultPingerUpdater        = 0
+	defaultAPNSFeedbackPeriod   = 10
+	defaultReArmTimeout         = 10
+	defaultTrustStore           = "/etc/pki/tls/certs/ca-bundle.crt"
+	defaultSupplementalCertsDir = "certs"
 )
 
 func NewLoggingConfiguration() *LoggingConfiguration {
@@ -110,6 +152,7 @@ func (config *Configuration) Read(filename string) error {
 	if err != nil {
 		return err
 	}
+	config.Backend.configDir = path.Clean(path.Dir(filename))
 	return nil
 }
 
@@ -151,7 +194,7 @@ func (cfg *LoggingConfiguration) InitLogging(screen bool, screenLevel Logging.Le
 
 func ReadConfig(filename string) (*Configuration, error) {
 	config := NewConfiguration()
-	err := gcfg.ReadFileInto(config, filename)
+	err := config.Read(filename)
 	if err != nil {
 		return nil, err
 	}
