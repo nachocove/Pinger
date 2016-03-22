@@ -399,14 +399,14 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 				switch {
 				case response.StatusCode == 401:
 					// ask the client to re-register, since nothing we could do would fix this
-					ex.Warning("401 response. Telling client to re-register|msgCode=EAS_AUTH_ERR_REREGISTER")
+					ex.Info("401 response. Telling client to re-register|msgCode=EAS_AUTH_ERR_REREGISTER")
 					errCh <- LongPollReRegister
 					return
 
 				default:
 					// just retry
 					sleepTime = ex.exponentialBackoff(sleepTime)
-					ex.Warning("Response Status %s. Back to polling", response.Status)
+					ex.Info("Response Status %s. Back to polling", response.Status)
 				}
 				//EAS Ping
 			case ex.pi.ASIsSyncRequest == false && (ex.pi.NoChangeReply != nil && bytes.Compare(responseBody, ex.pi.NoChangeReply) == 0):

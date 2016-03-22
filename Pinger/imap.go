@@ -609,12 +609,12 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			}
 			authSuccess, err := imap.doImapAuth()
 			if err != nil {
-				imap.Warning("Authentication failed. Telling client to re-register|msgCode=IMAP_AUTH_FAIL_REREGISTER")
+				imap.Warning("Authentication error (%s). Telling client to re-register|msgCode=IMAP_AUTH_FAIL_REREGISTER", err)
 				errCh <- LongPollReRegister
 				return
 			}
 			if !authSuccess {
-				imap.Warning("Authentication failed. Telling client to re-register|msgCode=IMAP_AUTH_FAIL_REREGISTER")
+				imap.Info("Authentication failed. Telling client to re-register|msgCode=IMAP_AUTH_FAIL_REREGISTER")
 				errCh <- LongPollReRegister
 				return
 			}
@@ -649,7 +649,7 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			imap.cancelIDLE()
 
 		case err := <-responseErrCh:
-			imap.Warning("Got error %s. Sending back LongPollReRegister|msgCode=IMAP_ERR_REREGISTER", err)
+			imap.Info("Got error %s. Sending back LongPollReRegister|msgCode=IMAP_ERR_REREGISTER", err)
 			errCh <- LongPollReRegister // erroring out... ask for reregister
 			return
 
