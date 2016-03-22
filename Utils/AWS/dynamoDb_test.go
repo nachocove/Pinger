@@ -52,6 +52,8 @@ func (s *awsDynamoDbTester) TearDownTest() {
 	s.cleanUp()
 }
 
+const dynamodb_local_dir string = "dynamodb_local_2016-03-01"
+
 func (s *awsDynamoDbTester) doJavaDynamoLocal(readyCh chan int) {
 	java, err := exec.LookPath("java")
 	if err != nil {
@@ -62,7 +64,7 @@ func (s *awsDynamoDbTester) doJavaDynamoLocal(readyCh chan int) {
 	if nachoHome == "" {
 		nachoHome = fmt.Sprintf("%s/src/nacho", os.Getenv("HOME"))
 	}
-	cmd.Dir = fmt.Sprintf("%s/dynamodb_local_2015-04-27_1.0", nachoHome)
+	cmd.Dir = fmt.Sprintf("%s/%s", nachoHome, dynamodb_local_dir)
 	err = cmd.Start()
 	if err != nil {
 		panic(err)
