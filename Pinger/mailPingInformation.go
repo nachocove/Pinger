@@ -116,6 +116,10 @@ func (pi *MailPingInformation) Validate() bool {
 }
 
 func (pi *MailPingInformation) getLogPrefix() string {
+	if pi == nil {
+		panic("pi is nill")
+	}
+
 	if pi.logPrefix == "" {
 		pi.logPrefix = fmt.Sprintf("|device=%s|client=%s|context=%s|session=%s", pi.DeviceId, pi.UserId, pi.ClientContext, pi.SessionId)
 	}
