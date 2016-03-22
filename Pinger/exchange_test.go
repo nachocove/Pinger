@@ -49,3 +49,16 @@ func (s *exchangeTester) TestNewExchangeClient() {
 	s.Equal(debug, ex.debug)
 	s.NotEqual(s.logger, ex.logger) // NewExchangeClient makes a copy
 }
+
+func (s *exchangeTester) TestUserRedaction() {
+	urls := make(map[string]string)
+	urls["https://mail.enel.com/Microsoft-Server-ActiveSync?Cmd=Ping&User=someUser@company.fr&DeviceId=Ncho4B1AE6BFX5E1BX46A1XB3C7B&DeviceType=iPhone"] = "https://mail.enel.com/Microsoft-Server-ActiveSync?Cmd=Ping&User=<redacted>&DeviceId=Ncho4B1AE6BFX5E1BX46A1XB3C7B&DeviceType=iPhone"
+	urls["https://mail.enel.com/Microsoft-Server-ActiveSync?Cmd=Ping&User=otherDomain\\user001&DeviceId=NchoA2CE1911X846CX49C3X83C7B&DeviceType=iPad"] = "https://mail.enel.com/Microsoft-Server-ActiveSync?Cmd=Ping&User=<redacted>&DeviceId=NchoA2CE1911X846CX49C3X83C7B&DeviceType=iPad"
+	urls["https://mail.aspirezone.net/Microsoft-Server-ActiveSync?Cmd=Ping&User=myDomain\\userid&DeviceId=NchoFFCB24ABX741CX46BBXA3C7B&DeviceType=iPhone"] = "https://mail.aspirezone.net/Microsoft-Server-ActiveSync?Cmd=Ping&User=<redacted>&DeviceId=NchoFFCB24ABX741CX46BBXA3C7B&DeviceType=iPhone"
+	urls["https://mobilesync.level3.com/Microsoft-Server-ActiveSync?Cmd=Ping&User=some.company.com.foo\\first.last&DeviceId=Ncho2615D601X244EX4B0EX93C7B&DeviceType=iPad"] = "https://mobilesync.level3.com/Microsoft-Server-ActiveSync?Cmd=Ping&User=<redacted>&DeviceId=Ncho2615D601X244EX4B0EX93C7B&DeviceType=iPad"
+
+	for key,value := range urls {
+		redacted := RedactEmailFromError(key)
+		s.Equal(value, redacted)
+	}
+}

@@ -98,9 +98,9 @@ func init() {
 	NoSuchHostError = fmt.Errorf("No such host exists")
 }
 
-func redactEmailFromError(message string) string {
-	r := regexp.MustCompile("User=.*@")
-	return r.ReplaceAllString(message, "User=<redacted>@")
+func RedactEmailFromError(message string) string {
+	r := regexp.MustCompile("User=[^&]+")
+	return r.ReplaceAllString(message, "User=<redacted>")
 }
 
 // doRequestResponse is used as a go-routine to do the actual send/receive (blocking) of the exchange messages.
@@ -181,11 +181,11 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		// TODO Can 'err.Error()' be data from the remote endpoint? Do we need to protect against it?
 		// TODO Perhaps limit the length we log here.
 		if strings.Contains(err.Error(), "no such host") == true {
-			ex.Warning("No such host: %s", redactEmailFromError(err.Error()))
+			ex.Warning("No such host: %s", RedactEmailFromError(err.Error()))
 			errCh <- NoSuchHostError
 			return
 		} else {
-			ex.Info("Post failed: %s. Will retry", redactEmailFromError(err.Error()))
+			ex.Info("Post failed: %s. Will retry", RedactEmailFromError(err.Error()))
 		}
 		responseCh <- retryResponse
 		return
