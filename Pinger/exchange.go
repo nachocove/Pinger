@@ -92,10 +92,12 @@ func (ex *ExchangeClient) maxResponseSize() (size int) {
 // This dummy response is used to indicate to the receiver of the http reply that we need to retry.
 var retryResponse *http.Response
 var NoSuchHostError error
+var UnknownCertificateAuthority error
 
 func init() {
 	retryResponse = &http.Response{}
 	NoSuchHostError = fmt.Errorf("No such host exists")
+	UnknownCertificateAuthority = fmt.Errorf("x509: certificate signed by unknown authority")
 }
 
 func RedactEmailFromError(message string) string {
@@ -180,12 +182,17 @@ func (ex *ExchangeClient) doRequestResponse(responseCh chan *http.Response, errC
 		// memory leakage in this case
 		// TODO Can 'err.Error()' be data from the remote endpoint? Do we need to protect against it?
 		// TODO Perhaps limit the length we log here.
-		if strings.Contains(err.Error(), "no such host") == true {
-			ex.Warning("No such host: %s", RedactEmailFromError(err.Error()))
+		redactedError := RedactEmailFromError(err.Error())
+		if strings.Contains(redactedError, "no such host") == true {
+			ex.Warning(redactedError)
 			errCh <- NoSuchHostError
 			return
+		} else if strings.Contains(redactedError, "certificate signed by unknown authority") {
+			ex.Error(redactedError)
+			errCh <- UnknownCertificateAuthority
+			return
 		} else {
-			ex.Info("Post failed: %s. Will retry", RedactEmailFromError(err.Error()))
+			ex.Info("Post failed: %s. Will retry", redactedError)
 		}
 		responseCh <- retryResponse
 		return
@@ -362,7 +369,7 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 		go ex.doRequestResponse(responseCh, responseErrCh)
 		select {
 		case err = <-responseErrCh:
-			if err == NoSuchHostError {
+			if err == NoSuchHostError || err == UnknownCertificateAuthority {
 				errCh <- LongPollReRegister
 			} else {
 				ex.sendError(errCh, err)
