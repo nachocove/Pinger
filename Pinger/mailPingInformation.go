@@ -117,7 +117,7 @@ func (pi *MailPingInformation) Validate() bool {
 
 func (pi *MailPingInformation) getLogPrefix() string {
 	if pi == nil {
-		panic("pi is nill")
+		panic("pi has been cleaned up or not initialized")
 	}
 
 	if pi.logPrefix == "" {
