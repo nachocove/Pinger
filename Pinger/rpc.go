@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"net/rpc"
 	"os"
+	"sync"
+	"os/signal"
+	"syscall"
 )
 
 const (
@@ -81,20 +84,28 @@ type BackendPoller interface {
 
 type pollMapType map[string]MailClientContextType
 
+var pollingServer *BackendPolling
+
 func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Logger) error {
-	pollingAPI, err := NewBackendPolling(config, debug, logger)
+	if (pollingServer != nil) {
+		logger.Error("StartPollingRPCServer called multiple times")
+	}
+	var err error
+	pollingServer, err = NewBackendPolling(config, debug, logger)
 	if err != nil {
 		return err
 	}
 	setGlobal(&config.Backend)
 
 	rpcServer := rpc.NewServer()
-	rpcServer.Register(pollingAPI)
+	rpcServer.Register(pollingServer)
 	go FeedbackListener(logger)
-	go alertAllDevices(pollingAPI.dbm, pollingAPI.aws, pollingAPI.logger)
+	go alertAllDevices(pollingServer.dbm, pollingServer.aws, pollingServer.logger)
+
+	initReRegisterSignal(logger)
 
 	if config.Backend.PingerUpdater > 0 {
-		pinger, err := newPingerInfo(newPingerInfoSqlHandler(pollingAPI.dbm), logger)
+		pinger, err := newPingerInfo(newPingerInfoSqlHandler(pollingServer.dbm), logger)
 		if err != nil {
 			return err
 		}
@@ -132,6 +143,41 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 		rpcServer.Accept(listener)
 	}
 	return nil
+}
+
+var signalChannel chan os.Signal
+var signalMutex *sync.Mutex
+var initialized bool
+func init() {
+	signalMutex = &sync.Mutex{}
+}
+
+func initReRegisterSignal(logger *Logging.Logger) {
+	signalMutex.Lock()
+	defer signalMutex.Unlock()
+	if !initialized {
+		signalChannel = make(chan os.Signal, 1)
+		signal.Notify(signalChannel, syscall.SIGHUP, syscall.SIGABRT, syscall.SIGINT)
+		go signalCatcher(logger)
+		initialized = true
+	}
+}
+
+func signalCatcher(logger *Logging.Logger) {
+	for {
+		signal := <-signalChannel
+		switch {
+		case signal == syscall.SIGHUP:
+		case signal == syscall.SIGABRT:
+		case signal == syscall.SIGINT:
+			logger.Info("signalCatcher: Received signal %s\n", signal.String())
+			alertAllDevices(pollingServer.dbm, pollingServer.aws, pollingServer.logger)
+			os.Exit(1)
+
+		default:
+			logger.Error("signalCatcher: Received unexpected signal %s\n", signal.String())
+		}
+	}
 }
 
 // StartPollingResponse is used by the start polling rpc
