@@ -1,12 +1,12 @@
 package Pinger
 
 import (
-	"gopkg.in/gcfg.v1"
 	"crypto/x509"
 	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils/Telemetry"
+	"gopkg.in/gcfg.v1"
 	"io/ioutil"
 	"os"
 	"path"

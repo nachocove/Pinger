@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"net/rpc"
 	"os"
-	"sync"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
@@ -87,7 +87,7 @@ type pollMapType map[string]MailClientContextType
 var pollingServer *BackendPolling
 
 func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Logger) error {
-	if (pollingServer != nil) {
+	if pollingServer != nil {
 		logger.Error("StartPollingRPCServer called multiple times")
 	}
 	var err error
@@ -148,6 +148,7 @@ func StartPollingRPCServer(config *Configuration, debug bool, logger *Logging.Lo
 var signalChannel chan os.Signal
 var signalMutex *sync.Mutex
 var initialized bool
+
 func init() {
 	signalMutex = &sync.Mutex{}
 }

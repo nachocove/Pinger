@@ -57,7 +57,7 @@ func (s *exchangeTester) TestUserRedaction() {
 	urls["https://mail.aspirezone.net/Microsoft-Server-ActiveSync?Cmd=Ping&User=myDomain\\userid&DeviceId=NchoFFCB24ABX741CX46BBXA3C7B&DeviceType=iPhone"] = "https://mail.aspirezone.net/Microsoft-Server-ActiveSync?Cmd=Ping&User=<redacted>&DeviceId=NchoFFCB24ABX741CX46BBXA3C7B&DeviceType=iPhone"
 	urls["https://mobilesync.level3.com/Microsoft-Server-ActiveSync?Cmd=Ping&User=some.company.com.foo\\first.last&DeviceId=Ncho2615D601X244EX4B0EX93C7B&DeviceType=iPad"] = "https://mobilesync.level3.com/Microsoft-Server-ActiveSync?Cmd=Ping&User=<redacted>&DeviceId=Ncho2615D601X244EX4B0EX93C7B&DeviceType=iPad"
 
-	for key,value := range urls {
+	for key, value := range urls {
 		redacted := RedactEmailFromError(key)
 		s.Equal(value, redacted)
 	}
