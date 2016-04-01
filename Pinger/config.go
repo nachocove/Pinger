@@ -35,10 +35,11 @@ type BackendConfiguration struct {
 	APNSSound             string
 	APNSContentAvailable  int
 	APNSExpirationSeconds int64
-	OSTrustStore          string
 }
 
 var days_28 int64 = 28 * 24 * 60 * 60
+
+var OsTrustStore = "/etc/pki/tls/certs/ca-bundle.crt"
 
 func NewBackendConfiguration() *BackendConfiguration {
 	return &BackendConfiguration{
@@ -51,7 +52,6 @@ func NewBackendConfiguration() *BackendConfiguration {
 		APNSSound:             "silent.wav",
 		APNSContentAvailable:  1,
 		APNSExpirationSeconds: days_28,
-		OSTrustStore:          defaultTrustStore,
 	}
 }
 
@@ -73,12 +73,12 @@ var rootCAs *x509.CertPool
 func (cfg *BackendConfiguration) RootCerts() *x509.CertPool {
 	if rootCAs == nil {
 		roots := x509.NewCertPool()
-		data, err := ioutil.ReadFile(cfg.OSTrustStore)
+		data, err := ioutil.ReadFile(OsTrustStore)
 		if err != nil {
 			panic(err.Error())
 		}
 		if !roots.AppendCertsFromPEM(data) {
-			panic(fmt.Sprintf("Could not read PEM file %s", cfg.OSTrustStore))
+			panic(fmt.Sprintf("Could not read PEM file %s", OsTrustStore))
 		}
 
 		for i, cert := range extra_certs {
@@ -112,7 +112,6 @@ const (
 	defaultPingerUpdater      = 0
 	defaultAPNSFeedbackPeriod = 10
 	defaultReArmTimeout       = 10
-	defaultTrustStore         = "/etc/pki/tls/certs/ca-bundle.crt"
 )
 
 func NewLoggingConfiguration() *LoggingConfiguration {
