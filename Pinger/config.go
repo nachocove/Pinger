@@ -36,7 +36,6 @@ type BackendConfiguration struct {
 	APNSContentAvailable  int
 	APNSExpirationSeconds int64
 	OSTrustStore          string
-	configDir             string `gcfg:"-"`
 }
 
 var days_28 int64 = 28 * 24 * 60 * 60
@@ -142,7 +141,6 @@ func (config *Configuration) Read(filename string) error {
 	if err != nil {
 		return err
 	}
-	config.Backend.configDir = path.Clean(path.Dir(filename))
 	return nil
 }
 
