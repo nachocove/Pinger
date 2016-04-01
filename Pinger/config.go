@@ -76,6 +76,8 @@ func (cfg *BackendConfiguration) validate() error {
 
 var rootCAs *x509.CertPool
 
+// Read the certs in OsTrustStore, then add in the additional
+// certs, then return that CertPool structure for use in TlsConfig's
 func (cfg *BackendConfiguration) RootCerts() *x509.CertPool {
 	if rootCAs == nil {
 		roots := x509.NewCertPool()
