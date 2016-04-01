@@ -16,7 +16,6 @@ NACHO_USER=nachocove
 NACHO_HOME=/home/$NACHO_USER
 NACHO_CONFIG=$NACHO_HOME/config
 
-
 if [ -z "$HOME" ] ; then
 	HOME=``echo ~`
 	if [ -z "$HOME"] ; then
