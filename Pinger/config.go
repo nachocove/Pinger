@@ -39,6 +39,12 @@ type BackendConfiguration struct {
 
 var days_28 int64 = 28 * 24 * 60 * 60
 
+// We have this hardcoded, instead of a config item,
+// to make it harder for an attacker to replace the
+// os trust store with a compromised copy.
+// The downside is that we would have to change this
+// for different OS's and distro's. This is currently not
+// an issue.
 var OsTrustStore = "/etc/pki/tls/certs/ca-bundle.crt"
 
 func NewBackendConfiguration() *BackendConfiguration {
