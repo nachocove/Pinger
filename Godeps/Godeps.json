@@ -6,10 +6,6 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "code.google.com/p/gcfg",
-			"Rev": "c2d3050044d05357eaf6c3547249ba57c5e235cb"
-		},
-		{
 			"ImportPath": "github.com/Go-SQL-Driver/MySQL",
 			"Comment": "v1.2-88-ga197e5d",
 			"Rev": "a197e5d40516f2e9f74dcee085a5f2d4604e94df"
@@ -17,6 +13,11 @@
 		{
 			"ImportPath": "github.com/anachronistic/apns",
 			"Rev": "f90152b7e0ae845938ce1258d90072fd116131ac"
+		},
+		{
+			"ImportPath": "github.com/asaskevich/govalidator",
+			"Comment": "v3",
+			"Rev": "5208815a79dd0135690e0d716d4663c2fbd41ac4"
 		},
 		{
 			"ImportPath": "github.com/awslabs/aws-sdk-go/aws",
@@ -82,10 +83,6 @@
 			"Rev": "e6c862d3128ea3285965d454652154176a2a5987"
 		},
 		{
-			"ImportPath": "github.com/satori/go.uuid",
-			"Rev": "242673bbc820e051ef00033e274d32e08ece9e15"
-		},
-		{
 			"ImportPath": "github.com/stretchr/objx",
 			"Rev": "cbeaeb16a013161a98496fad62933b1d21786672"
 		},
@@ -116,6 +113,10 @@
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",
 			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
+		},
+		{
+			"ImportPath": "gopkg.in/gcfg.v1",
+			"Rev": "083575c3955c85df16fe9590cceab64d03f5eb6e"
 		}
 	]
 }

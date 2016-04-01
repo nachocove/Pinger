@@ -1,7 +1,7 @@
 package Pinger
 
 import (
-	"code.google.com/p/gcfg"
+	"gopkg.in/gcfg.v1"
 	"crypto/x509"
 	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
