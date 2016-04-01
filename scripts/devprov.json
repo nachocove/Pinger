@@ -7,7 +7,7 @@
         "jumphost": "52.25.152.172"
     },
     "vpc_config": {
-        "name": "DevPingerVPC-2016-02-16-01",
+        "name": "DevPingerVPC-2016-04-01-01",
         "log_group_name": "DevPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
@@ -114,7 +114,7 @@
     },
     "elb_config": {
         "ports": [
-            [443, 8443, "https", "https", "arn:aws:iam::263277746520:server-certificate/DevPinger"]
+            [443, 8443, "https", "https", "arn:aws:iam::263277746520:server-certificate/pinger.officetaco.com-2016"]
         ],
         "health_check": {
             "interval" :20,
@@ -141,7 +141,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-ba9675da",
+        "ami_id": "ami-f9b04599",
         "key_pair": "goTestServer",
         "instance_type": "m3.medium",
         "instance_monitoring": false,
