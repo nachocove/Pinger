@@ -2,10 +2,12 @@ package Pinger
 
 import (
 	"code.google.com/p/gcfg"
+	"crypto/x509"
 	"fmt"
 	"github.com/nachocove/Pinger/Utils/AWS"
 	"github.com/nachocove/Pinger/Utils/Logging"
 	"github.com/nachocove/Pinger/Utils/Telemetry"
+	"io/ioutil"
 	"os"
 	"path"
 )
@@ -37,6 +39,14 @@ type BackendConfiguration struct {
 
 var days_28 int64 = 28 * 24 * 60 * 60
 
+// We have this hardcoded, instead of a config item,
+// to make it harder for an attacker to replace the
+// os trust store with a compromised copy.
+// The downside is that we would have to change this
+// for different OS's and distro's. This is currently not
+// an issue.
+var OsTrustStore = "/etc/pki/tls/certs/ca-bundle.crt"
+
 func NewBackendConfiguration() *BackendConfiguration {
 	return &BackendConfiguration{
 		Debug:                 defaultDebug,
@@ -62,6 +72,34 @@ func (cfg *BackendConfiguration) validate() error {
 		return fmt.Errorf("APNSFeedbackPeriod can not be <= 0 if APNS cert and keys are configured")
 	}
 	return nil
+}
+
+var rootCAs *x509.CertPool
+
+// Read the certs in OsTrustStore, then add in the additional
+// certs, then return that CertPool structure for use in TlsConfig's
+func (cfg *BackendConfiguration) RootCerts() *x509.CertPool {
+	if rootCAs == nil {
+		roots := x509.NewCertPool()
+		data, err := ioutil.ReadFile(OsTrustStore)
+		if err != nil {
+			panic(err.Error())
+		}
+		if !roots.AppendCertsFromPEM(data) {
+			panic(fmt.Sprintf("Could not read PEM file %s", OsTrustStore))
+		}
+
+		for i, cert := range extra_certs {
+			if !roots.AppendCertsFromPEM([]byte(cert)) {
+				panic(fmt.Sprintf("Could not parse PEM cert %s", i))
+			}
+		}
+		for _, c := range roots.Subjects() {
+			fmt.Println("Cert: %v", c)
+		}
+		rootCAs = roots
+	}
+	return rootCAs
 }
 
 type LoggingConfiguration struct {
@@ -151,7 +189,7 @@ func (cfg *LoggingConfiguration) InitLogging(screen bool, screenLevel Logging.Le
 
 func ReadConfig(filename string) (*Configuration, error) {
 	config := NewConfiguration()
-	err := gcfg.ReadFileInto(config, filename)
+	err := config.Read(filename)
 	if err != nil {
 		return nil, err
 	}

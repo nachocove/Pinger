@@ -299,6 +299,9 @@ func (ex *ExchangeClient) cancel() {
 //    the dummy errors, we'd need a resultsChannel or some kind.
 //
 func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan error) {
+	if ex.pi == nil {
+		panic("No pi in ex")
+	}
 	ex.Info("Starting LongPoll|msgCode=POLLING")
 	defer Utils.RecoverCrash(ex.logger) // catch all panic. RecoverCrash logs information needed for debugging.
 	ex.wg.Add(1)
@@ -312,8 +315,14 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 	var err error
 	reqTimeout := ex.pi.ResponseTimeout
 	reqTimeout += uint64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
+
+	if err != nil {
+	}
 	ex.transport = &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: false},
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: false,
+			RootCAs:            globals.config.RootCerts(),
+		},
 		ResponseHeaderTimeout: time.Duration(reqTimeout) * time.Millisecond,
 	}
 

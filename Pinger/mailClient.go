@@ -495,12 +495,6 @@ func (client *MailClientContext) start() {
 	}
 }
 
-func sendError(errCh chan error, err error, logger *Logging.Logger) {
-	_, fn, line, _ := runtime.Caller(1)
-	logger.Error("%s/%s:%d %s", path.Base(path.Dir(fn)), path.Base(fn), line, err)
-	errCh <- err
-}
-
 func (client *MailClientContext) Action(action PingerCommand) error {
 	client.command <- action
 	return nil

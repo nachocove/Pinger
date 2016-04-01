@@ -526,14 +526,6 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 	return
 }
 
-func defaultPort(addr, port string) string {
-	_, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		addr = net.JoinHostPort(addr, port)
-	}
-	return addr
-}
-
 func (imap *IMAPClient) setupConn() error {
 	imap.Debug("Setting up TLS connection")
 	if imap.tlsConn != nil {
@@ -547,9 +539,13 @@ func (imap *IMAPClient) setupConn() error {
 		}
 		imap.url = imapUrl
 	}
+
 	host, _, _ := net.SplitHostPort(imap.url.Host)
 	if imap.tlsConfig == nil {
-		imap.tlsConfig = &tls.Config{ServerName: host}
+		imap.tlsConfig = &tls.Config{
+			ServerName: host,
+			RootCAs:    globals.config.RootCerts(),
+		}
 	}
 	conn, err := net.DialTimeout("tcp", imap.url.Host, netTimeout)
 	if err == nil {
