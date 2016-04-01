@@ -15,7 +15,6 @@ secretKeyCloudWatch=SECRET_KEY_CW
 NACHO_USER=nachocove
 NACHO_HOME=/home/$NACHO_USER
 NACHO_CONFIG=$NACHO_HOME/config
-NACHO_SUPP_CERTS=$NACHO_CONFIG/certs
 
 
 if [ -z "$HOME" ] ; then
@@ -53,7 +52,6 @@ EOF
 
 /usr/bin/chcon -v --type=shadow_t /etc/shadow
 aws --profile nacho s3 cp s3://$bucket/$name/pinger $NACHO_CONFIG --recursive --include ''*' || (echo "Could not download s3 items for pinger"; exit 1) || exit 1
-mkdir $NACHO_SUPP_CERTS || (echo "Could not mkdir supplemental certs directory") || exit 1
 chown -R $NACHO_USER:$NACHO_USER $NACHO_CONFIG || (echo "Could not chown $NACHO_CONFIG directory"; exit 1) || exit 1
 mv $NACHO_CONFIG/$pingerCfg $NACHO_CONFIG/pinger.cfg || (echo "Could not move $pingerCfg to pinger.cfg in $NACHO_CONFIG"; exit 1) || exit 1
 sed "s/DEPLOY_ENV/$logGroupName/g" /etc/awslogs/awslogs.conf > /tmp/awslogs.conf

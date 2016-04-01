@@ -36,7 +36,6 @@ type BackendConfiguration struct {
 	APNSContentAvailable  int
 	APNSExpirationSeconds int64
 	OSTrustStore          string
-	SupplementalRootCADir string
 	configDir             string `gcfg:"-"`
 }
 
@@ -54,7 +53,6 @@ func NewBackendConfiguration() *BackendConfiguration {
 		APNSContentAvailable:  1,
 		APNSExpirationSeconds: days_28,
 		OSTrustStore:          defaultTrustStore,
-		SupplementalRootCADir: defaultSupplementalCertsDir,
 	}
 }
 
@@ -71,37 +69,30 @@ func (cfg *BackendConfiguration) validate() error {
 	return nil
 }
 
-func (cfg *BackendConfiguration) RootCerts() (*x509.CertPool, error) {
-	roots := x509.NewCertPool()
-	data, err := ioutil.ReadFile(cfg.OSTrustStore)
-	if err != nil {
-		return nil, err
-	}
-	if !roots.AppendCertsFromPEM(data) {
-		return nil, fmt.Errorf("Could not read PEM file %s", cfg.OSTrustStore)
-	}
+var rootCAs *x509.CertPool
 
-	var suppDir string
-	if cfg.SupplementalRootCADir[0] != '/' {
-		suppDir = path.Join(cfg.configDir, cfg.SupplementalRootCADir)
-	} else {
-		suppDir = cfg.SupplementalRootCADir
-	}
-	files, err := ioutil.ReadDir(suppDir)
-	if err != nil {
-		return nil, err
-	}
-	for _, fi := range files {
-		filename := path.Join(suppDir, fi.Name())
-		data, err := ioutil.ReadFile(filename)
+func (cfg *BackendConfiguration) RootCerts() *x509.CertPool {
+	if rootCAs == nil {
+		roots := x509.NewCertPool()
+		data, err := ioutil.ReadFile(cfg.OSTrustStore)
 		if err != nil {
-			return nil, err
+			panic(err.Error())
 		}
 		if !roots.AppendCertsFromPEM(data) {
-			return nil, fmt.Errorf("Could not read PEM file %s", filename)
+			panic(fmt.Sprintf("Could not read PEM file %s", cfg.OSTrustStore))
 		}
+
+		for i, cert := range extra_certs {
+			if !roots.AppendCertsFromPEM([]byte(cert)) {
+				panic(fmt.Sprintf("Could not parse PEM cert %s", i))
+			}
+		}
+		for _, c := range roots.Subjects() {
+			fmt.Println("Cert: %v", c)
+		}
+		rootCAs = roots
 	}
-	return roots, nil
+	return rootCAs
 }
 
 type LoggingConfiguration struct {
@@ -114,16 +105,15 @@ type LoggingConfiguration struct {
 }
 
 const (
-	defaultDumpRequests         = false
-	defaultDebug                = false
-	defaultLogDir               = "./log"
-	defaultLogFileName          = ""
-	defaultLogFileLevel         = "INFO"
-	defaultPingerUpdater        = 0
-	defaultAPNSFeedbackPeriod   = 10
-	defaultReArmTimeout         = 10
-	defaultTrustStore           = "/etc/pki/tls/certs/ca-bundle.crt"
-	defaultSupplementalCertsDir = "certs"
+	defaultDumpRequests       = false
+	defaultDebug              = false
+	defaultLogDir             = "./log"
+	defaultLogFileName        = ""
+	defaultLogFileLevel       = "INFO"
+	defaultPingerUpdater      = 0
+	defaultAPNSFeedbackPeriod = 10
+	defaultReArmTimeout       = 10
+	defaultTrustStore         = "/etc/pki/tls/certs/ca-bundle.crt"
 )
 
 func NewLoggingConfiguration() *LoggingConfiguration {

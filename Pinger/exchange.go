@@ -3,7 +3,6 @@ package Pinger
 import (
 	"bytes"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"github.com/nachocove/Pinger/Utils"
@@ -286,9 +285,6 @@ func (ex *ExchangeClient) cancel() {
 	ex.transport.CloseIdleConnections()
 }
 
-var RootCAs *x509.CertPool
-var once sync.Once
-
 // LongPoll is called by the FSM loop to do the actual work.
 //
 // stopPollCh - used by the parent loop to tell us to stop. This is used when a defer comes in, and
@@ -320,19 +316,12 @@ func (ex *ExchangeClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan er
 	reqTimeout := ex.pi.ResponseTimeout
 	reqTimeout += uint64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
 
-	once.Do(func() {
-		RootCAs, err = globals.config.RootCerts()
-		if err != nil {
-			panic("Could not load root certs")
-		}
-	})
-
 	if err != nil {
 	}
 	ex.transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: false,
-			RootCAs:            RootCAs,
+			RootCAs:            globals.config.RootCerts(),
 		},
 		ResponseHeaderTimeout: time.Duration(reqTimeout) * time.Millisecond,
 	}
