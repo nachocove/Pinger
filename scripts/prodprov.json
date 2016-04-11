@@ -7,7 +7,7 @@
         "jumphost": "52.11.11.66"
     },
     "vpc_config": {
-        "name": "ProdPingerVPC-2016-02-16-01",
+        "name": "ProdPingerVPC-2016-04-01-01",
         "log_group_name": "ProdPingerVPC",
         "vpc_cidr_block": "10.0.0.0/20",
         "subnet_cidr_block": "10.0.0.0/24",
@@ -118,7 +118,7 @@
     },
     "elb_config": {
         "ports": [
-            [443, 8443, "https", "https", "arn:aws:iam::610813048224:server-certificate/ProdPinger_DigiCert_2015_With_Chain"]
+            [443, 8443, "https", "https", "arn:aws:iam::610813048224:server-certificate/ProdPinger_DigiCert_2016"]
         ],
         "health_check": {
             "interval" :20,
@@ -145,7 +145,7 @@
         }
     },
     "autoscale_config": {
-        "ami_id": "ami-ba9675da",
+        "ami_id": "ami-f9b04599",
         "key_pair": "ProdPinger",
         "instance_type": "m3.medium",
         "instance_monitoring": false,
