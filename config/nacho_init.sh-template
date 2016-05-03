@@ -49,6 +49,8 @@ aws_access_key_id = $accessKeyCloudWatch
 aws_secret_access_key = $secretKeyCloudWatch
 EOF
 
+hostname $name
+
 /usr/bin/chcon -v --type=shadow_t /etc/shadow
 aws --profile nacho s3 cp s3://$bucket/$name/pinger $NACHO_CONFIG --recursive --include ''*' || (echo "Could not download s3 items for pinger"; exit 1) || exit 1
 chown -R $NACHO_USER:$NACHO_USER $NACHO_CONFIG || (echo "Could not chown $NACHO_CONFIG directory"; exit 1) || exit 1
