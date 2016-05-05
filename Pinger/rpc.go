@@ -169,7 +169,9 @@ func signalCatcher(logger *Logging.Logger) {
 		signal := <-signalChannel
 		switch {
 		case signal == syscall.SIGHUP:
+			fallthrough
 		case signal == syscall.SIGABRT:
+			fallthrough
 		case signal == syscall.SIGINT:
 			logger.Info("signalCatcher: Received signal %s\n", signal.String())
 			alertAllDevices(pollingServer.dbm, pollingServer.aws, pollingServer.logger)
