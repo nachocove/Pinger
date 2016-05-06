@@ -62,10 +62,12 @@ type IMAPClient struct {
 
 var prng *rand.Rand
 var commandTerminator []byte
+var IOTimeoutError error
 
 func init() {
 	prng = rand.New(&prngSource{src: rand.NewSource(time.Now().UnixNano())})
 	commandTerminator = []byte("\r\n")
+	IOTimeoutError = fmt.Errorf("I/O Timeout Error")
 }
 
 func (imap *IMAPClient) getLogPrefix() string {
@@ -519,7 +521,12 @@ func (imap *IMAPClient) doRequestResponse(request string, responseCh chan []stri
 			imap.isIdling = false
 		}
 		imap.Info("Request/Response Error: %s", err)
-		responseErrCh <- fmt.Errorf("Request/Response Error: %s", err)
+		nerr, ok := err.(net.Error)
+		if ok && nerr.Timeout() {
+			responseErrCh <- IOTimeoutError;
+		} else {
+			responseErrCh <- fmt.Errorf("Request/Response Error: %s", err)
+		}
 		return
 	}
 	responseCh <- responses
@@ -624,9 +631,8 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 				return
 			}
 		}
-		reqTimeout := imap.pi.ResponseTimeout
-		reqTimeout += uint64(float64(reqTimeout) * 0.1) // add 10% so we don't step on the HeartbeatInterval inside the ping
-		requestTimer := time.NewTimer(time.Duration(reqTimeout) * time.Millisecond)
+		imap.Info("Request timeout %d|msgCode=IMAP_POLL_REQ_TIMEDOUT_VALUE", imap.pi.ResponseTimeout)
+		requestTimer := time.NewTimer(time.Duration(imap.pi.ResponseTimeout) * time.Millisecond)
 		responseCh := make(chan []string)
 		responseErrCh := make(chan error)
 		command := IMAP_NOOP
@@ -643,10 +649,17 @@ func (imap *IMAPClient) LongPoll(stopPollCh, stopAllCh chan int, errCh chan erro
 			imap.Info("Request timed out. Starting over|msgCode=IMAP_POLL_REQ_TIMEDOUT")
 			requestTimer.Stop()
 			imap.cancelIDLE()
+			sleepTime = 1
 
 		case err := <-responseErrCh:
-			imap.Info("Got error %s. Sending back LongPollReRegister|msgCode=IMAP_ERR_REREGISTER", err)
-			errCh <- LongPollReRegister // erroring out... ask for reregister
+			if err == IOTimeoutError {
+				// just retry on an I/O Timeout. No need for the device to re-register
+				sleepTime = 1
+			} else {
+				imap.Info("Got error %s. Sending back LongPollReRegister|msgCode=IMAP_ERR_REREGISTER", err)
+				errCh <- LongPollReRegister // erroring out... ask for reregister
+				return
+			}
 			return
 
 		case <-responseCh:
