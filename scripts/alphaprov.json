@@ -4,7 +4,7 @@
         "zones": ["us-west-2a"]
     },
     "misc" : {
-        "jumphost": "52.25.152.172"
+        "jumphost": ""
     },
     "vpc_config": {
         "name": "AlphaPingerVPC-2016-05-06-01",
@@ -41,7 +41,7 @@
                                         "cognito-identity:ListIdentities"
                                     ],
                                     "Resource": [
-                                        "arn:aws:cognito-identity:us-east-1:263277746520:identitypool/"
+                                        "arn:aws:cognito-identity:us-east-1::identitypool/"
                                     ]
                                 }
                             ]
@@ -115,7 +115,7 @@
     },
     "elb_config": {
         "ports": [
-            [443, 8443, "https", "https", "arn:aws:iam::263277746520:server-certificate/AlphaPinger_DigiCert_2016"]
+            [443, 8443, "https", "https", "arn:aws:iam:::server-certificate/AlphaPinger"]
         ],
         "health_check": {
             "interval" :20,

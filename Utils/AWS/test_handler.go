@@ -24,7 +24,7 @@ type TestAwsHandler struct {
 
 func NewTestAwsHandler() *TestAwsHandler {
 	return &TestAwsHandler{
-		registeredEndpoint:    "arn:aws:sns:us-west-2:263277746520:endpoint/APNS/com.nachocove.nachomail.alpha/1bd0418c-48da-36f4-8653-8d54c36d54bd",
+		registeredEndpoint:    "",
 		registeredEndpointErr: nil,
 		returnGetAttributes: map[string]string{
 			"Enabled":        "true",

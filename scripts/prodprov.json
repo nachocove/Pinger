@@ -4,7 +4,7 @@
         "zones": ["us-west-2a"]
     },
     "misc" : {
-        "jumphost": "52.11.11.66"
+        "jumphost": ""
     },
     "vpc_config": {
         "name": "ProdPingerVPC-2016-05-06-01",
@@ -38,7 +38,7 @@
                                         "cognito-identity:ListIdentities"
                                     ], 
                                     "Resource": [
-                                        "arn:aws:cognito-identity:us-east-1:610813048224:identitypool/"
+                                        "arn:aws:cognito-identity:us-east-1::identitypool/"
                                     ], 
                                     "Effect": "Allow", 
                                     "Sid": "Stmt1426990755000"
@@ -118,7 +118,7 @@
     },
     "elb_config": {
         "ports": [
-            [443, 8443, "https", "https", "arn:aws:iam::610813048224:server-certificate/ProdPinger_DigiCert_2016"]
+            [443, 8443, "https", "https", "arn:aws:iam:::server-certificate/ProdPinger"]
         ],
         "health_check": {
             "interval" :20,

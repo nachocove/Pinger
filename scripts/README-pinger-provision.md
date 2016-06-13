@@ -32,7 +32,7 @@ optional arguments:
 
    - aws-username is the username you have in AWS IAM, e.g. janv
    - aws-profile is the profile to use. See ~/.aws/credentials for details
-   - aws-accountId is the AWS account ID. For devops, this is 263277746520, which is also the default.
+   - aws-accountId is the AWS account ID. 
    - "MFA token" is a token from your registered MFA device
 
 2. then run 

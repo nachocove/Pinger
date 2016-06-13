@@ -17,10 +17,6 @@ TOKEN=$2
 USER=`echo $USERPROFILE | cut -d'/' -f1`
 PROFILE=`echo $USERPROFILE | cut -d'/' -f2`
 ACCOUNT_ID=`echo $USERPROFILE | cut -d'/' -f3`
-if [ -z "$ACCOUNT_ID" ] ; then
-    ACCOUNT_ID=263277746520
-fi
-
 
 jsonResponse=`aws --profile $PROFILE sts get-session-token --serial-number arn:aws:iam::$ACCOUNT_ID:mfa/$USER --token $TOKEN`
 if [ $? != 0 ] ; then
