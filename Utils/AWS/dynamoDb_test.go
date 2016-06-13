@@ -24,7 +24,7 @@ func (s *awsDynamoDbTester) SetupSuite() {
 	readyCh := make(chan int)
 	go s.doJavaDynamoLocal(readyCh)
 	<-readyCh
-	s.dynDb = newDynamoDbSession("AKIAIEKBHZUDER5TYR7Q", "9bSGWoFxSGRLS+J4EhLbR3NMkjWUbdVu+itcYT6g", "local")
+	s.dynDb = newDynamoDbSession("", "", "local")
 	s.clientRecord = map[string]interface{}{
 		"id":           int64(1),
 		"client":       "foo12334",
